@@ -1,0 +1,56 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth-helpers";
+import { UserForm } from "@/components/users/user-form";
+
+export default async function EditUserPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  await requireAdmin();
+  const { id } = await params;
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) notFound();
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <Link
+          href="/dashboard/users"
+          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to users
+        </Link>
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Edit {user.firstName} {user.lastName}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">{user.email}</p>
+      </div>
+
+      <UserForm
+        mode="edit"
+        userId={user.id}
+        defaultValues={{
+          firstName: user.firstName,
+          middleName: user.middleName ?? "",
+          lastName: user.lastName,
+          email: user.email,
+          phoneNumber: user.phoneNumber ?? "",
+          role: user.role,
+          idNumber: user.idNumber ?? "",
+          department: user.department ?? "",
+          course: user.course ?? "",
+          yearLevel: user.yearLevel ?? "",
+          section: user.section ?? "",
+          position: user.position ?? "",
+          status: user.status,
+        }}
+      />
+    </div>
+  );
+}

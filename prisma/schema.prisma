@@ -1,0 +1,399 @@
+// H-Auto: Online Smart Gardening Monitoring System
+// Database schema for capstone project
+//
+// Stack: PostgreSQL + Prisma ORM
+// Run after editing: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  FACULTY
+  STUDENT_FARMER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PlotStatus {
+  PREPARING
+  PLANTED
+  GROWING
+  READY_FOR_HARVEST
+  HARVESTED
+  FALLOW
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+  RETIRED
+}
+
+enum AlertType {
+  LOW_SOIL_MOISTURE
+  HIGH_SOIL_MOISTURE
+  LOW_TEMPERATURE
+  HIGH_TEMPERATURE
+  LOW_HUMIDITY
+  HIGH_HUMIDITY
+  LOW_LIGHT
+  HIGH_LIGHT
+  LOW_NITROGEN
+  HIGH_NITROGEN
+  LOW_PHOSPHORUS
+  HIGH_PHOSPHORUS
+  LOW_POTASSIUM
+  HIGH_POTASSIUM
+  DEVICE_OFFLINE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum NotificationChannel {
+  SMS
+  IN_APP
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  DELIVERED
+}
+
+enum ImportType {
+  FACULTY
+  STUDENT_FARMER
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum ReportType {
+  PLOT_ENVIRONMENTAL
+  PLOT_GROWTH
+  PLOT_FULL
+  CROP_PERFORMANCE
+  ALERTS_SUMMARY
+  ASSIGNMENT_SUMMARY
+}
+
+// ============================================================
+// USERS
+// ============================================================
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  firstName    String
+  middleName   String?
+  lastName     String
+  phoneNumber  String?
+  role         UserRole
+  idNumber     String?    @unique // student number OR employee number
+  department   String?    // for faculty
+  course       String?    // for students
+  yearLevel    String?    // for students
+  section      String?    // for students
+  position     String?    // for faculty
+  profileImage String?
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  facultyAssignments  PlotAssignment[]    @relation("FacultyAssignments")
+  studentAssignments  PlotAssignment[]    @relation("StudentAssignments")
+  growthLogs          GrowthLog[]
+  reports             Report[]
+  importBatches       ImportBatch[]
+  notifications       AlertNotification[]
+
+  @@index([role])
+  @@index([status])
+}
+
+// ============================================================
+// CROPS & GROWTH STAGES
+// ============================================================
+
+model Crop {
+  id             String      @id @default(cuid())
+  name           String      @unique
+  variety        String?
+  description    String?
+  imageUrl       String?
+  daysToHarvest  Int
+  cultivationGuide String?   @db.Text
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  stages CropStage[]
+  plots  Plot[]
+}
+
+model CropStage {
+  id           String @id @default(cuid())
+  cropId       String
+  name         String // e.g. "Germination", "Vegetative", "Flowering", "Harvest"
+  orderIndex   Int
+  durationDays Int
+  description  String?
+
+  // Ideal thresholds for this stage
+  minSoilMoisture  Float
+  maxSoilMoisture  Float
+  minTemperature   Float
+  maxTemperature   Float
+  minHumidity      Float
+  maxHumidity      Float
+  minLightIntensity Float
+  maxLightIntensity Float
+  minNitrogen      Float
+  maxNitrogen      Float
+  minPhosphorus    Float
+  maxPhosphorus    Float
+  minPotassium     Float
+  maxPotassium     Float
+
+  crop          Crop        @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  currentPlots  Plot[]      @relation("CurrentStage")
+  growthLogs    GrowthLog[]
+
+  @@unique([cropId, orderIndex])
+  @@index([cropId])
+}
+
+// ============================================================
+// PLOTS & ASSIGNMENTS
+// ============================================================
+
+model Plot {
+  id              String     @id @default(cuid())
+  name            String
+  location        String?
+  sizeSqm         Float?
+  cropId          String?
+  currentStageId  String?
+  plantingDate    DateTime?
+  expectedHarvest DateTime?
+  status          PlotStatus @default(PREPARING)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  crop          Crop?            @relation(fields: [cropId], references: [id])
+  currentStage  CropStage?       @relation("CurrentStage", fields: [currentStageId], references: [id])
+  device        Device?
+  assignments   PlotAssignment[]
+  sensorReadings SensorReading[]
+  alerts        Alert[]
+  growthLogs    GrowthLog[]
+
+  @@index([cropId])
+  @@index([status])
+}
+
+model PlotAssignment {
+  id         String           @id @default(cuid())
+  plotId     String
+  facultyId  String
+  studentId  String
+  assignedAt DateTime         @default(now())
+  endedAt    DateTime?
+  status     AssignmentStatus @default(ACTIVE)
+  notes      String?
+
+  plot    Plot @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  faculty User @relation("FacultyAssignments", fields: [facultyId], references: [id])
+  student User @relation("StudentAssignments", fields: [studentId], references: [id])
+
+  @@index([plotId])
+  @@index([facultyId])
+  @@index([studentId])
+  @@index([status])
+}
+
+// ============================================================
+// IOT: DEVICES & SENSOR READINGS
+// ============================================================
+
+model Device {
+  id          String       @id @default(cuid())
+  deviceCode  String       @unique // physical device identifier
+  plotId      String       @unique
+  apiKey      String       @unique // for authenticating ESP32 POSTs
+  firmwareVersion String?
+  lastSeenAt  DateTime?
+  status      DeviceStatus @default(OFFLINE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  plot     Plot            @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  readings SensorReading[]
+}
+
+model SensorReading {
+  id             String   @id @default(cuid())
+  deviceId       String
+  plotId         String   // denormalized for fast plot-scoped queries
+  recordedAt     DateTime @default(now())
+  soilMoisture   Float?   // percentage
+  temperature    Float?   // celsius
+  humidity       Float?   // percentage
+  lightIntensity Float?   // lux
+  nitrogen       Float?   // mg/kg
+  phosphorus     Float?   // mg/kg
+  potassium      Float?   // mg/kg
+
+  device Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  plot   Plot    @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  alerts Alert[]
+
+  @@index([plotId, recordedAt])
+  @@index([deviceId, recordedAt])
+}
+
+// ============================================================
+// ALERTS & NOTIFICATIONS
+// ============================================================
+
+model Alert {
+  id        String        @id @default(cuid())
+  plotId    String
+  readingId String?
+  type      AlertType
+  severity  AlertSeverity @default(WARNING)
+  message   String
+  resolved  Boolean       @default(false)
+  resolvedAt DateTime?
+  createdAt DateTime      @default(now())
+
+  plot         Plot                @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  reading      SensorReading?      @relation(fields: [readingId], references: [id])
+  notifications AlertNotification[]
+
+  @@index([plotId, createdAt])
+  @@index([resolved])
+}
+
+model AlertNotification {
+  id                String              @id @default(cuid())
+  alertId           String
+  userId            String
+  channel           NotificationChannel
+  status            NotificationStatus  @default(PENDING)
+  providerMessageId String?
+  errorMessage      String?
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([alertId])
+}
+
+// ============================================================
+// MONITORING: GROWTH LOGS & IMAGES
+// ============================================================
+
+model GrowthLog {
+  id            String   @id @default(cuid())
+  plotId        String
+  userId        String
+  stageId       String?
+  plantHeightCm Float?
+  leafCount     Int?
+  observations  String?  @db.Text
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  plot   Plot          @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id])
+  stage  CropStage?    @relation(fields: [stageId], references: [id])
+  images GrowthImage[]
+
+  @@index([plotId, createdAt])
+}
+
+model GrowthImage {
+  id          String   @id @default(cuid())
+  growthLogId String
+  imageUrl    String
+  caption     String?
+  createdAt   DateTime @default(now())
+
+  growthLog GrowthLog @relation(fields: [growthLogId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// REPORTS & IMPORTS
+// ============================================================
+
+model Report {
+  id         String     @id @default(cuid())
+  userId     String
+  type       ReportType
+  title      String
+  params     Json       // date range, plot IDs, crop IDs, etc.
+  fileUrl    String?
+  fileFormat String?    // "pdf" | "xlsx" | "csv"
+  createdAt  DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model ImportBatch {
+  id            String       @id @default(cuid())
+  userId        String
+  type          ImportType
+  fileName      String?
+  totalRows     Int
+  successCount  Int          @default(0)
+  failureCount  Int          @default(0)
+  errorLog      Json?
+  status        ImportStatus @default(PENDING)
+  createdAt     DateTime     @default(now())
+  completedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}

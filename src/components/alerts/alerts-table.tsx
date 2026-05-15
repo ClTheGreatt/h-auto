@@ -1,0 +1,320 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  BellRing,
+  Mail,
+  MailX,
+} from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { resolveAlert } from "@/actions/alerts";
+import type { AlertSeverity, AlertType, NotificationStatus } from "@prisma/client";
+
+type AlertRow = {
+  id: string;
+  type: AlertType;
+  severity: AlertSeverity;
+  message: string;
+  resolved: boolean;
+  resolvedAt: Date | null;
+  createdAt: Date;
+  plot: { id: string; name: string };
+  notifications: {
+    id: string;
+    status: NotificationStatus;
+    errorMessage: string | null;
+    user: { firstName: string; lastName: string; phoneNumber: string | null };
+  }[];
+};
+
+const severityIcons: Record<AlertSeverity, React.ComponentType<{ className?: string }>> = {
+  INFO: Info,
+  WARNING: AlertTriangle,
+  CRITICAL: AlertCircle,
+};
+
+const severityColors: Record<AlertSeverity, string> = {
+  INFO: "bg-blue-100 text-blue-700",
+  WARNING: "bg-amber-100 text-amber-700",
+  CRITICAL: "bg-red-100 text-red-700",
+};
+
+const severityIconColors: Record<AlertSeverity, string> = {
+  INFO: "text-blue-500",
+  WARNING: "text-amber-500",
+  CRITICAL: "text-red-500",
+};
+
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+export function AlertsTable({
+  alerts,
+  canResolve,
+}: {
+  alerts: AlertRow[];
+  canResolve: boolean;
+}) {
+  const router = useRouter();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  async function handleResolve(id: string) {
+    setResolvingId(id);
+    const result = await resolveAlert(id);
+    setResolvingId(null);
+
+    if (result?.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Alert resolved");
+    router.refresh();
+  }
+
+  if (alerts.length === 0) {
+    return (
+      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
+        <BellRing className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+        No alerts. All plots within ideal thresholds.
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-md bg-white">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-12"></TableHead>
+            <TableHead>Severity</TableHead>
+            <TableHead>Plot</TableHead>
+            <TableHead>Message</TableHead>
+            <TableHead>Notifications</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>When</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {alerts.map((alert) => {
+            const SeverityIcon = severityIcons[alert.severity];
+            const sent = alert.notifications.filter((n) => n.status === "SENT").length;
+            const failed = alert.notifications.filter((n) => n.status === "FAILED").length;
+            const total = alert.notifications.length;
+            const isExpanded = expanded === alert.id;
+
+            return (
+              <>
+                <TableRow
+                  key={alert.id}
+                  className={alert.resolved ? "opacity-60" : ""}
+                >
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setExpanded(isExpanded ? null : alert.id)}
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <SeverityIcon
+                        className={`w-4 h-4 ${severityIconColors[alert.severity]}`}
+                      />
+                      <Badge
+                        variant="secondary"
+                        className={severityColors[alert.severity]}
+                      >
+                        {alert.severity}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/dashboard/plots/${alert.plot.id}`}
+                      className="text-sm font-medium hover:underline"
+                    >
+                      {alert.plot.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-700 max-w-md">
+                    {alert.message}
+                  </TableCell>
+                  <TableCell>
+                    {total === 0 ? (
+                      <span className="text-xs text-gray-500">No recipients</span>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="flex items-center gap-1 text-green-600">
+                          <Mail className="w-3 h-3" />
+                          {sent}
+                        </span>
+                        {failed > 0 && (
+                          <span className="flex items-center gap-1 text-red-600">
+                            <MailX className="w-3 h-3" />
+                            {failed}
+                          </span>
+                        )}
+                        <span className="text-gray-400">of {total}</span>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {alert.resolved ? (
+                      <Badge
+                        variant="secondary"
+                        className="bg-gray-100 text-gray-700"
+                      >
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Resolved
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="bg-red-100 text-red-700"
+                      >
+                        Open
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-gray-500">
+                    {timeAgo(alert.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {!alert.resolved && canResolve && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResolve(alert.id)}
+                        disabled={resolvingId === alert.id}
+                      >
+                        {resolvingId === alert.id ? "Resolving..." : "Resolve"}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+
+                {isExpanded && (
+                  <TableRow key={alert.id + "-expanded"} className="bg-gray-50">
+                    <TableCell colSpan={8} className="py-3">
+                      <div className="space-y-3 px-2">
+                        <div>
+                          <div className="text-xs font-medium text-gray-500 mb-1">
+                            ALERT TYPE
+                          </div>
+                          <code className="text-xs bg-white px-2 py-0.5 rounded border">
+                            {alert.type}
+                          </code>
+                        </div>
+
+                        <div>
+                          <div className="text-xs font-medium text-gray-500 mb-1">
+                            NOTIFICATION DELIVERY
+                          </div>
+                          {alert.notifications.length === 0 ? (
+                            <p className="text-xs text-gray-500">
+                              No recipients (no active assignments for this plot)
+                            </p>
+                          ) : (
+                            <div className="space-y-1">
+                              {alert.notifications.map((n) => (
+                                <div
+                                  key={n.id}
+                                  className="flex items-center justify-between bg-white border rounded px-3 py-1.5 text-xs"
+                                >
+                                  <div>
+                                    <span className="font-medium">
+                                      {n.user.firstName} {n.user.lastName}
+                                    </span>
+                                    <span className="text-gray-500 ml-2">
+                                      {n.user.phoneNumber ?? "No phone"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {n.status === "SENT" && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-green-100 text-green-700 text-xs"
+                                      >
+                                        Sent
+                                      </Badge>
+                                    )}
+                                    {n.status === "FAILED" && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-red-100 text-red-700 text-xs"
+                                      >
+                                        Failed
+                                      </Badge>
+                                    )}
+                                    {n.status === "PENDING" && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-gray-100 text-gray-700 text-xs"
+                                      >
+                                        Pending
+                                      </Badge>
+                                    )}
+                                    {n.errorMessage && (
+                                      <span
+                                        className="text-red-600 text-xs"
+                                        title={n.errorMessage}
+                                      >
+                                        ({n.errorMessage.slice(0, 30)})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {alert.resolved && alert.resolvedAt && (
+                          <div className="text-xs text-gray-500">
+                            Resolved {new Date(alert.resolvedAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
