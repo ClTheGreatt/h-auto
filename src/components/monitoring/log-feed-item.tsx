@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Ruler, Leaf, ChevronRight, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { timeAgo } from "@/lib/format-date";
 
 type LogProps = {
   id: string;
@@ -23,18 +24,7 @@ type LogProps = {
   images: { id: string; imageUrl: string }[];
 };
 
-function timeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 86400 * 7) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+
 
 export function LogFeedItem({ log }: { log: LogProps }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);

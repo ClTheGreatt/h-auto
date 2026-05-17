@@ -128,13 +128,39 @@ export async function deleteUser(id: string) {
     return { error: "You cannot delete your own account" };
   }
 
+  // Try permanent delete first (works if user has no related records)
   try {
     await prisma.user.delete({ where: { id } });
+    revalidatePath("/dashboard/users");
+    return { success: true, mode: "deleted" };
   } catch (error) {
-    console.error("deleteUser error:", error);
-    return { error: "Failed to delete user. They may have associated records." };
-  }
+    // Foreign key constraint = user has associated records (logs, assignments, etc.)
+    // Fall back to soft delete: deactivate to preserve history.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2003" || error.code === "P2014")
+    ) {
+      try {
+        await prisma.user.update({
+          where: { id },
+          data: { status: "INACTIVE" },
+        });
+        revalidatePath("/dashboard/users");
+        return {
+          success: true,
+          mode: "deactivated",
+          message:
+            "User has historical records, so they were deactivated instead of deleted. Their data remains intact.",
+        };
+      } catch (innerError) {
+        console.error("Soft delete fallback failed:", innerError);
+      }
+    }
 
-  revalidatePath("/dashboard/users");
-  return { success: true };
+    console.error("deleteUser error:", error);
+    return {
+      error:
+        "Failed to delete user. Please contact your administrator if this persists.",
+    };
+  }
 }

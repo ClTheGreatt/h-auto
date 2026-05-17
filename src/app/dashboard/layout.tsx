@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+
 
 export default async function DashboardLayout({
   children,
@@ -45,7 +47,10 @@ export default async function DashboardLayout({
           email={user.email}
           role={user.role}
         />
-        <main className="flex-1 p-4 lg:p-6 page-fade-in">{children}</main>
+      <main className="flex-1 p-4 lg:p-6 page-fade-in">
+          <Breadcrumbs />
+          {children}
+        </main>
       </div>
     </div>
   );

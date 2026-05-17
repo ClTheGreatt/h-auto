@@ -57,7 +57,11 @@ export function SearchableSelect({
           <ChevronsUpDown className="w-4 h-4 opacity-50 flex-shrink-0 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn(width, "p-0")} align="start">
+      <PopoverContent
+        className="p-0"
+        align="start"
+        style={{ width: "var(--radix-popover-trigger-width)" }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} className="h-9" />
           <CommandList>

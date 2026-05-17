@@ -39,7 +39,15 @@ export function DeleteUserDialog({
       return;
     }
 
-    toast.success("User deleted");
+    // Show different toast depending on outcome
+    if (result?.mode === "deactivated") {
+      toast.success("User deactivated", {
+        description: result.message,
+      });
+    } else {
+      toast.success("User deleted");
+    }
+
     setOpen(false);
     router.refresh();
   }
@@ -51,8 +59,9 @@ export function DeleteUserDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this user?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete <strong>{userName}</strong>. This action
-            cannot be undone.
+            <strong>{userName}</strong> will be removed. If they have associated
+            records (assignments, growth logs, alerts), they will be deactivated
+            instead — preserving audit history.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -65,7 +74,7 @@ export function DeleteUserDialog({
             disabled={deleting}
             className="bg-red-600 hover:bg-red-700"
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {deleting ? "Processing..." : "Delete"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

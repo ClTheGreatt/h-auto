@@ -10,11 +10,17 @@ import { AlertTriangle } from "lucide-react";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  FormErrorSummary,
+  RequiredMark,
+  mapServerErrorsToForm,
+} from "@/components/ui/form-helpers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,8 +72,9 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [similarUsers, setSimilarUsers] = useState<SimilarUser[]>([]);
 
-  const form = useForm<FormValues>({
+const form = useForm<FormValues>({
     resolver: zodResolver(updateUserSchema),
+    mode: "onBlur", // Validate when user leaves a field (modern UX)
     defaultValues: {
       firstName: defaultValues?.firstName ?? "",
       middleName: defaultValues?.middleName ?? "",
@@ -136,8 +143,14 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
 
     setSubmitting(false);
 
+// Try server fieldErrors first (Zod validation that escaped client)
+    if (mapServerErrorsToForm(form, result ?? {})) {
+      toast.error(result?.error ?? "Please fix the errors below");
+      return;
+    }
+
+    // Fall back to keyword mapping for friendly Prisma errors
     if (result?.error) {
-      // Surface error in the most relevant field
       const errorMsg = result.error.toLowerCase();
       if (errorMsg.includes("email")) {
         form.setError("email", { message: result.error });
@@ -157,7 +170,9 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormErrorSummary form={form} />
+
         <Card>
           <CardHeader>
             <CardTitle>Personal information</CardTitle>
@@ -169,7 +184,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First name *</FormLabel>
+                  <FormLabel>First name <RequiredMark /></FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -195,7 +210,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last name *</FormLabel>
+                   <FormLabel>Last name <RequiredMark /></FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -238,7 +253,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email *</FormLabel>
+                  <FormLabel>Email <RequiredMark /></FormLabel>
                     <FormControl>
                       <Input type="email" {...field} />
                     </FormControl>
@@ -246,15 +261,18 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                   </FormItem>
                 )}
               />
-              <FormField
+          <FormField
                 control={form.control}
                 name="phoneNumber"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Phone number</FormLabel>
                     <FormControl>
-                      <Input placeholder="+639..." {...field} />
+                      <Input placeholder="+639171234567" {...field} />
                     </FormControl>
+                    <FormDescription className="text-xs">
+                      Format: +63 followed by 10 digits
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -286,7 +304,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role *</FormLabel>
+                <FormLabel>Role <RequiredMark /></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -309,7 +327,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               name="status"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status *</FormLabel>
+                  <FormLabel>Status <RequiredMark /></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -331,12 +349,22 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               name="password"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                  <FormLabel>
-                    Password {mode === "create" ? "*" : "(leave blank to keep current)"}
+                 <FormLabel>
+                    Password
+                    {mode === "create" ? (
+                      <RequiredMark />
+                    ) : (
+                      <span className="text-gray-400 text-xs ml-1 font-normal">
+                        (leave blank to keep current)
+                      </span>
+                    )}
                   </FormLabel>
-                  <FormControl>
+             <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
+                  <FormDescription className="text-xs">
+                    Minimum 6 characters
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -433,10 +461,18 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
           <Button type="submit" disabled={submitting}>
             {submitting ? "Saving..." : mode === "create" ? "Create user" : "Save changes"}
           </Button>
-          <Button
+    <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/dashboard/users")}
+            onClick={() => {
+              if (
+                form.formState.isDirty &&
+                !confirm("Discard unsaved changes?")
+              ) {
+                return;
+              }
+              router.push("/dashboard/users");
+            }}
           >
             Cancel
           </Button>

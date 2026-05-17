@@ -22,10 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { TIME_RANGES, type TimeRange } from "@/lib/analytics/time-range";
 import type { LucideIcon } from "lucide-react";
-
-const ALL_PLOTS = "__all_plots__";
 
 // Map string identifiers to actual Lucide icon components
 const ICONS: Record<string, LucideIcon> = {
@@ -54,7 +53,8 @@ export function ReportCard({
   plots?: Plot[];
 }) {
   const [range, setRange] = useState<TimeRange>("7d");
-  const [plotId, setPlotId] = useState<string>(ALL_PLOTS);
+  // undefined = All plots (cleaner than the old ALL_PLOTS sentinel)
+  const [plotId, setPlotId] = useState<string | undefined>(undefined);
   const [downloading, setDownloading] = useState<"pdf" | "excel" | null>(null);
 
   const Icon = ICONS[icon] ?? Activity;
@@ -65,7 +65,7 @@ export function ReportCard({
       const params = new URLSearchParams();
       params.set("format", format);
       params.set("range", range);
-      if (plots && plotId !== ALL_PLOTS) {
+      if (plots && plotId) {
         params.set("plotId", plotId);
       }
 
@@ -116,6 +116,7 @@ export function ReportCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Time range — basic Select (few options, no search needed) */}
           <div>
             <Label htmlFor={`${type}-range`} className="text-xs">
               Time range
@@ -137,24 +138,19 @@ export function ReportCard({
             </Select>
           </div>
 
+          {/* Plot — SearchableSelect (can scale to many plots) */}
           {plots && (
             <div>
-              <Label htmlFor={`${type}-plot`} className="text-xs">
-                Plot
-              </Label>
-              <Select value={plotId} onValueChange={setPlotId}>
-                <SelectTrigger id={`${type}-plot`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_PLOTS}>All plots</SelectItem>
-                  {plots.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs">Plot</Label>
+              <SearchableSelect
+                options={plots.map((p) => ({ value: p.id, label: p.name }))}
+                value={plotId}
+                onChange={setPlotId}
+                allLabel="All plots"
+                searchPlaceholder="Search plot..."
+                emptyText="No plots found"
+                width="w-full"
+              />
             </div>
           )}
         </div>

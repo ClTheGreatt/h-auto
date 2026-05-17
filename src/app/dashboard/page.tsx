@@ -6,9 +6,7 @@ import {
   Camera,
   BellRing,
   Activity,
-  Plus,
   ArrowRight,
-  Cpu,
   TrendingUp,
   AlertTriangle,
   Users,
@@ -19,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
-
+import { QuickActions } from "@/components/dashboard/quick-actions";
 export default async function DashboardPage() {
   // Mark this as dynamic - required for impure functions like Date.now()
   await connection();
@@ -416,80 +414,14 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Quick actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {isStudent && myPlots[0] && (
-              <Button variant="outline" asChild className="justify-start h-auto py-3">
-                <Link href={`/dashboard/plots/${myPlots[0].id}/log/new`}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  <div className="text-left">
-                    <div className="text-sm font-medium">Add log entry</div>
-                    <div className="text-xs text-gray-500">For {myPlots[0].name}</div>
-                  </div>
-                </Link>
-              </Button>
-            )}
-
-            <Button variant="outline" asChild className="justify-start h-auto py-3">
-              <Link href="/dashboard/monitoring">
-                <Camera className="w-4 h-4 mr-2" />
-                <div className="text-left">
-                  <div className="text-sm font-medium">Monitor plots</div>
-                  <div className="text-xs text-gray-500">View timelines</div>
-                </div>
-              </Link>
-            </Button>
-
-            <Button variant="outline" asChild className="justify-start h-auto py-3">
-              <Link href="/dashboard/analytics">
-                <Activity className="w-4 h-4 mr-2" />
-                <div className="text-left">
-                  <div className="text-sm font-medium">Analytics</div>
-                  <div className="text-xs text-gray-500">View charts</div>
-                </div>
-              </Link>
-            </Button>
-
-            <Button variant="outline" asChild className="justify-start h-auto py-3">
-              <Link href="/dashboard/reports">
-                <Activity className="w-4 h-4 mr-2" />
-                <div className="text-left">
-                  <div className="text-sm font-medium">Reports</div>
-                  <div className="text-xs text-gray-500">Export data</div>
-                </div>
-              </Link>
-            </Button>
-
-            {isAdmin && (
-              <Button variant="outline" asChild className="justify-start h-auto py-3">
-                <Link href="/dashboard/users/new">
-                  <Plus className="w-4 h-4 mr-2" />
-                  <div className="text-left">
-                    <div className="text-sm font-medium">Add user</div>
-                    <div className="text-xs text-gray-500">Faculty or student</div>
-                  </div>
-                </Link>
-              </Button>
-            )}
-
-            {isAdmin && (
-              <Button variant="outline" asChild className="justify-start h-auto py-3">
-                <Link href="/dashboard/devices/new">
-                  <Cpu className="w-4 h-4 mr-2" />
-                  <div className="text-left">
-                    <div className="text-sm font-medium">Register device</div>
-                    <div className="text-xs text-gray-500">Add ESP32</div>
-                  </div>
-                </Link>
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <QuickActions
+        role={role}
+        openAlertCount={openAlertCount}
+        criticalAlertCount={criticalAlertCount}
+        studentFirstPlot={
+          myPlots[0] ? { id: myPlots[0].id, name: myPlots[0].name } : null
+        }
+      />
     </div>
   );
 }
