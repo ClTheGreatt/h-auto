@@ -4,7 +4,6 @@ import {
   BellRing,
   TrendingUp,
   Sprout,
-  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +12,9 @@ import { requireAuth } from "@/lib/auth-helpers";
 import { TimeRangePicker } from "@/components/analytics/time-range-picker";
 import { StatCard } from "@/components/analytics/stat-card";
 import { AlertsByTypeChart } from "@/components/analytics/alerts-by-type-chart";
+import { SensorTrendsChart } from "@/components/analytics/sensor-trends-chart";
+import { AlertsOverTimeChart } from "@/components/analytics/alerts-over-time-chart";
+import { PlotFilter } from "@/components/analytics/plot-filter";
 import {
   getDateFromRange,
   parseRange,
@@ -22,17 +24,149 @@ import {
   ALERT_TYPE_LABELS,
 } from "@/lib/analytics/aggregator";
 
+type RawReading = {
+  recordedAt: Date;
+  soilMoisture: number | null;
+  temperature: number | null;
+  humidity: number | null;
+};
+
+type RawAlert = {
+  createdAt: Date;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  resolved: boolean;
+  type: string;
+};
+
+function aggregateSensorReadings(
+  readings: RawReading[],
+  since: Date | null,
+  now: Date
+) {
+  if (readings.length === 0) return [];
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const rangeMs = now.getTime() - (since?.getTime() ?? readings[0].recordedAt.getTime());
+  const totalDays = rangeMs / dayMs;
+
+  // Choose bucket size based on time range
+  const bucketSize = totalDays <= 1 ? 60 * 60 * 1000 : dayMs;
+
+  const buckets = new Map<
+    number,
+    {
+      time: number;
+      moistureSum: number;
+      moistureCount: number;
+      tempSum: number;
+      tempCount: number;
+      humSum: number;
+      humCount: number;
+    }
+  >();
+
+  for (const r of readings) {
+    const time = new Date(r.recordedAt).getTime();
+    const bucket = Math.floor(time / bucketSize) * bucketSize;
+
+    if (!buckets.has(bucket)) {
+      buckets.set(bucket, {
+        time: bucket,
+        moistureSum: 0,
+        moistureCount: 0,
+        tempSum: 0,
+        tempCount: 0,
+        humSum: 0,
+        humCount: 0,
+      });
+    }
+
+    const b = buckets.get(bucket)!;
+    if (r.soilMoisture !== null) {
+      b.moistureSum += r.soilMoisture;
+      b.moistureCount++;
+    }
+    if (r.temperature !== null) {
+      b.tempSum += r.temperature;
+      b.tempCount++;
+    }
+    if (r.humidity !== null) {
+      b.humSum += r.humidity;
+      b.humCount++;
+    }
+  }
+
+  return Array.from(buckets.values())
+    .sort((a, b) => a.time - b.time)
+    .map((b) => ({
+      label: new Date(b.time).toLocaleString(
+        "en-US",
+        bucketSize < dayMs
+          ? { hour: "numeric", hour12: true }
+          : { month: "short", day: "numeric" }
+      ),
+      moisture:
+        b.moistureCount > 0
+          ? Math.round((b.moistureSum / b.moistureCount) * 10) / 10
+          : null,
+      temperature:
+        b.tempCount > 0
+          ? Math.round((b.tempSum / b.tempCount) * 10) / 10
+          : null,
+      humidity:
+        b.humCount > 0 ? Math.round((b.humSum / b.humCount) * 10) / 10 : null,
+    }));
+}
+
+function aggregateAlertsByDate(alerts: RawAlert[]) {
+  if (alerts.length === 0) return [];
+
+  const buckets = new Map<
+    number,
+    { date: number; critical: number; warning: number; info: number }
+  >();
+
+  for (const a of alerts) {
+    const date = new Date(a.createdAt);
+    date.setHours(0, 0, 0, 0);
+    const key = date.getTime();
+
+    if (!buckets.has(key)) {
+      buckets.set(key, { date: key, critical: 0, warning: 0, info: 0 });
+    }
+
+    const b = buckets.get(key)!;
+    if (a.severity === "CRITICAL") b.critical++;
+    else if (a.severity === "WARNING") b.warning++;
+    else b.info++;
+  }
+
+  return Array.from(buckets.values())
+    .sort((a, b) => a.date - b.date)
+    .map((b) => ({
+      label: new Date(b.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      critical: b.critical,
+      warning: b.warning,
+      info: b.info,
+    }));
+}
+
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; plotId?: string }>;
 }) {
   const session = await requireAuth();
   const sp = await searchParams;
   const range = parseRange(sp.range);
   const since = getDateFromRange(range);
   const role = session.user.role;
+  const selectedPlotId = sp.plotId;
 
+  // Role-aware base filter
   const plotFilter =
     role === "STUDENT_FARMER"
       ? {
@@ -42,35 +176,66 @@ export default async function AnalyticsPage({
         }
       : {};
 
-  const [plots, totalReadings, alerts, totalLogs] = await Promise.all([
-    prisma.plot.findMany({
-      where: plotFilter,
-      orderBy: { name: "asc" },
-      include: {
-        crop: { select: { name: true } },
-        currentStage: true,
-        _count: {
-          select: {
-            alerts: { where: { resolved: false } },
-            growthLogs: true,
-          },
+  // Combined filter (role + selected plot)
+  const combinedPlotFilter = selectedPlotId
+    ? { ...plotFilter, id: selectedPlotId }
+    : plotFilter;
+
+  // Fetch plots for dropdown (always all role-visible plots)
+  const plots = await prisma.plot.findMany({
+    where: plotFilter,
+    orderBy: { name: "asc" },
+    include: {
+      crop: { select: { name: true } },
+      currentStage: true,
+      _count: {
+        select: {
+          alerts: { where: { resolved: false } },
+          growthLogs: true,
         },
       },
-    }),
+    },
+  });
+
+  // Fetch summary data scoped to filter
+  const [totalReadings, alerts, totalLogs, allReadings] = await Promise.all([
     prisma.sensorReading.count({
-      where: since
-        ? { recordedAt: { gte: since }, plot: plotFilter }
-        : { plot: plotFilter },
+      where: {
+        ...(since && { recordedAt: { gte: since } }),
+        plot: combinedPlotFilter,
+      },
     }),
     prisma.alert.findMany({
-      where: since
-        ? { createdAt: { gte: since }, plot: plotFilter }
-        : { plot: plotFilter },
+      where: {
+        ...(since && { createdAt: { gte: since } }),
+        plot: combinedPlotFilter,
+      },
+      select: {
+        createdAt: true,
+        severity: true,
+        resolved: true,
+        type: true,
+      },
     }),
     prisma.growthLog.count({
-      where: since
-        ? { createdAt: { gte: since }, plot: plotFilter }
-        : { plot: plotFilter },
+      where: {
+        ...(since && { createdAt: { gte: since } }),
+        plot: combinedPlotFilter,
+      },
+    }),
+    prisma.sensorReading.findMany({
+      where: {
+        ...(since && { recordedAt: { gte: since } }),
+        plot: combinedPlotFilter,
+      },
+      orderBy: { recordedAt: "asc" },
+      take: 2000,
+      select: {
+        recordedAt: true,
+        soilMoisture: true,
+        temperature: true,
+        humidity: true,
+      },
     }),
   ]);
 
@@ -79,10 +244,18 @@ export default async function AnalyticsPage({
     (a) => !a.resolved && a.severity === "CRITICAL"
   ).length;
 
+  const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
+  const alertsByDate = aggregateAlertsByDate(alerts);
+
   // Group alerts by type
   const alertTypeCounts = new Map<
     string,
-    { type: string; label: string; count: number; severity: "WARNING" | "CRITICAL" | "INFO" }
+    {
+      type: string;
+      label: string;
+      count: number;
+      severity: "WARNING" | "CRITICAL" | "INFO";
+    }
   >();
   for (const a of alerts) {
     const existing = alertTypeCounts.get(a.type);
@@ -99,7 +272,7 @@ export default async function AnalyticsPage({
     }
   }
 
-  // Calculate health per plot
+  // Plot health per plot
   const plotHealth: Record<string, number> = {};
   for (const plot of plots) {
     if (!plot.currentStage) {
@@ -116,23 +289,35 @@ export default async function AnalyticsPage({
     plotHealth[plot.id] = calculateOptimalPercent(readings, plot.currentStage);
   }
 
+  const selectedPlot = plots.find((p) => p.id === selectedPlotId);
+  const plotCount = selectedPlotId ? 1 : plots.length;
+
   return (
     <div className="space-y-6">
+      {/* Header with filters */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
           <p className="text-sm text-gray-500 mt-1">
-            System-wide insights, trends, and plot health overview.
+            {selectedPlot
+              ? `Detailed insights for ${selectedPlot.name}.`
+              : "System-wide insights and trends across all plots."}
           </p>
         </div>
-        <TimeRangePicker current={range} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <PlotFilter
+            plots={plots.map((p) => ({ id: p.id, name: p.name }))}
+            current={selectedPlotId}
+          />
+          <TimeRangePicker current={range} />
+        </div>
       </div>
 
-      {/* Summary stats */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
-          label="Plots"
-          value={plots.length}
+          label={selectedPlot ? "Selected plot" : "Plots"}
+          value={plotCount}
           icon={Sprout}
           accent="green"
         />
@@ -147,7 +332,11 @@ export default async function AnalyticsPage({
           value={openAlerts}
           icon={BellRing}
           sublabel={
-            criticalAlerts > 0 ? `${criticalAlerts} critical` : "all warning"
+            criticalAlerts > 0
+              ? `${criticalAlerts} critical`
+              : openAlerts > 0
+              ? "all warning"
+              : "all clear"
           }
           accent={openAlerts > 0 ? "red" : "gray"}
         />
@@ -159,20 +348,78 @@ export default async function AnalyticsPage({
         />
       </div>
 
-      {/* Alerts breakdown */}
+      {/* Sensor trends */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Alerts by type</CardTitle>
+          <CardTitle className="text-base">Sensor trends</CardTitle>
+          <p className="text-xs text-gray-500 mt-1">
+            Average soil moisture, temperature, and humidity over time
+            {selectedPlot && ` for ${selectedPlot.name}`}.
+          </p>
         </CardHeader>
         <CardContent>
-          <AlertsByTypeChart data={Array.from(alertTypeCounts.values())} />
+          {sensorTrends.length === 0 ? (
+            <div className="text-center py-12 text-sm text-gray-500">
+              No sensor data in this range.
+            </div>
+          ) : (
+            <SensorTrendsChart data={sensorTrends} />
+          )}
         </CardContent>
       </Card>
 
-      {/* Plot health table */}
+      {/* Two charts side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Alerts over time</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">
+              Daily alert count by severity.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {alertsByDate.length === 0 ? (
+              <div className="text-center py-12 text-sm text-gray-500">
+                No alerts in this range.
+              </div>
+            ) : (
+              <AlertsOverTimeChart data={alertsByDate} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Alerts by type</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">
+              Breakdown by sensor type and severity.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <AlertsByTypeChart data={Array.from(alertTypeCounts.values())} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Plot health summary - inline filtering, no redirects */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Plot health summary</CardTitle>
+          <p className="text-xs text-gray-500 mt-1">
+            {selectedPlot ? (
+              <>
+                Showing one plot.{" "}
+                <Link
+                  href={`/dashboard/analytics?range=${range}`}
+                  className="text-green-600 hover:underline"
+                >
+                  Clear filter to see all
+                </Link>
+              </>
+            ) : (
+              "Click a plot to filter this entire page to its data."
+            )}
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           {plots.length === 0 ? (
@@ -189,12 +436,18 @@ export default async function AnalyticsPage({
                     : health >= 50
                     ? "text-amber-700 bg-amber-100"
                     : "text-red-700 bg-red-100";
+                const isSelected = plot.id === selectedPlotId;
 
                 return (
                   <Link
                     key={plot.id}
-                    href={`/dashboard/plots/${plot.id}/analytics`}
-                    className="flex items-center gap-4 p-4 hover:bg-gray-50 transition"
+                    href={`/dashboard/analytics?plotId=${plot.id}&range=${range}`}
+                    className={
+                      "flex items-center gap-4 p-4 transition " +
+                      (isSelected
+                        ? "bg-green-50 hover:bg-green-100"
+                        : "hover:bg-gray-50")
+                    }
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -212,14 +465,21 @@ export default async function AnalyticsPage({
                             {plot.currentStage.name}
                           </Badge>
                         )}
+                        {isSelected && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs bg-blue-100 text-blue-700"
+                          >
+                            Filtered
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {plot.location ?? "No location"} -{" "}
+                        {plot.location ?? "No location"} •{" "}
                         {plot._count.alerts > 0
                           ? `${plot._count.alerts} open alert${plot._count.alerts === 1 ? "" : "s"}`
-                          : "No open alerts"}
-                        {" - "}
-                        {plot._count.growthLogs} log
+                          : "No open alerts"}{" "}
+                        • {plot._count.growthLogs} log
                         {plot._count.growthLogs === 1 ? "" : "s"}
                       </div>
                     </div>
@@ -230,7 +490,6 @@ export default async function AnalyticsPage({
                       >
                         {Math.round(health)}% optimal
                       </Badge>
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
                     </div>
                   </Link>
                 );

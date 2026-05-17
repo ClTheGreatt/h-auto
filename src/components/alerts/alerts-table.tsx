@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { resolveAlert } from "@/actions/alerts";
 import type { AlertSeverity, AlertType, NotificationStatus } from "@prisma/client";
 
@@ -74,9 +75,11 @@ function timeAgo(date: Date): string {
 export function AlertsTable({
   alerts,
   canResolve,
+  emptyMessage,
 }: {
   alerts: AlertRow[];
   canResolve: boolean;
+  emptyMessage?: string;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -87,8 +90,8 @@ export function AlertsTable({
     const result = await resolveAlert(id);
     setResolvingId(null);
 
-    if (result?.error) {
-      toast.error(result.error);
+    if (!result?.success) {
+      toast.error("Failed to resolve alert");
       return;
     }
     toast.success("Alert resolved");
@@ -97,15 +100,16 @@ export function AlertsTable({
 
   if (alerts.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
-        <BellRing className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-        No alerts. All plots within ideal thresholds.
-      </div>
+      <EmptyState
+        icon={BellRing}
+        title={emptyMessage ?? "No alerts"}
+        description="All plots are within their ideal thresholds. Alerts will appear here when sensor readings exceed limits."
+      />
     );
   }
 
   return (
-    <div className="border rounded-md bg-white">
+    <div className="border rounded-md bg-white overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -128,9 +132,8 @@ export function AlertsTable({
             const isExpanded = expanded === alert.id;
 
             return (
-              <>
+              <Fragment key={alert.id}>
                 <TableRow
-                  key={alert.id}
                   className={alert.resolved ? "opacity-60" : ""}
                 >
                   <TableCell>
@@ -163,7 +166,7 @@ export function AlertsTable({
                   <TableCell>
                     <Link
                       href={`/dashboard/plots/${alert.plot.id}`}
-                      className="text-sm font-medium hover:underline"
+                      className="text-sm font-medium hover:underline whitespace-nowrap"
                     >
                       {alert.plot.name}
                     </Link>
@@ -208,7 +211,7 @@ export function AlertsTable({
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-500">
+                  <TableCell className="text-xs text-gray-500 whitespace-nowrap">
                     {timeAgo(alert.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -226,7 +229,7 @@ export function AlertsTable({
                 </TableRow>
 
                 {isExpanded && (
-                  <TableRow key={alert.id + "-expanded"} className="bg-gray-50">
+                  <TableRow className="bg-gray-50">
                     <TableCell colSpan={8} className="py-3">
                       <div className="space-y-3 px-2">
                         <div>
@@ -310,7 +313,7 @@ export function AlertsTable({
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </TableBody>

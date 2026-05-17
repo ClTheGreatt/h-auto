@@ -1,16 +1,51 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import type { Prisma, PlotStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { PlotsTable } from "@/components/plots/plots-table";
+import { SearchBar } from "@/components/ui/search-bar";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { CropFilter } from "@/components/plots/crop-filter";
+import { PlotStatusFilter } from "@/components/plots/plot-status-filter";
 
-export default async function PlotsPage() {
+const PAGE_SIZE = 20;
+
+const VALID_STATUSES: PlotStatus[] = [
+  "PREPARING",
+  "PLANTED",
+  "GROWING",
+  "READY_FOR_HARVEST",
+  "HARVESTED",
+  "FALLOW",
+];
+
+export default async function PlotsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    search?: string;
+    cropId?: string;
+    status?: string;
+    page?: string;
+  }>;
+}) {
   const session = await requireAuth();
   const role = session.user.role;
   const canManage = role === "SUPER_ADMIN" || role === "ADMIN";
 
-  const where =
+  const sp = await searchParams;
+  const search = sp.search?.trim() ?? "";
+  const cropId = sp.cropId;
+  const status =
+    sp.status && VALID_STATUSES.includes(sp.status as PlotStatus)
+      ? (sp.status as PlotStatus)
+      : undefined;
+  const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+
+  // Role-based base filter
+  const roleFilter: Prisma.PlotWhereInput =
     role === "STUDENT_FARMER"
       ? {
           assignments: {
@@ -19,19 +54,51 @@ export default async function PlotsPage() {
         }
       : {};
 
-  const plots = await prisma.plot.findMany({
-    where,
-    orderBy: { name: "asc" },
-    include: {
-      crop: { select: { name: true } },
-      currentStage: { select: { name: true } },
-      _count: { select: { assignments: { where: { status: "ACTIVE" } } } },
-    },
-  });
+  // Combined where clause
+  const where: Prisma.PlotWhereInput = {
+    ...roleFilter,
+    ...(cropId && { cropId }),
+    ...(status && { status }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { location: { contains: search, mode: "insensitive" } },
+        {
+          crop: {
+            name: { contains: search, mode: "insensitive" },
+          },
+        },
+      ],
+    }),
+  };
+
+  // Fetch in parallel: crops (for filter), count, and page data
+  const [crops, totalPlots, plots] = await Promise.all([
+    prisma.crop.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.plot.count({ where }),
+    prisma.plot.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        crop: { select: { name: true } },
+        currentStage: { select: { name: true } },
+        _count: { select: { assignments: { where: { status: "ACTIVE" } } } },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalPlots / PAGE_SIZE));
+  const hasFilters = Boolean(search || cropId || status);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Plots</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -50,7 +117,44 @@ export default async function PlotsPage() {
         )}
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex-1 max-w-sm">
+          <SearchBar placeholder="Search name, location, crop..." />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <CropFilter crops={crops} current={cropId} />
+          <PlotStatusFilter current={status} />
+          {hasFilters && (
+            <Link
+              href="/dashboard/plots"
+              className="text-sm text-green-600 hover:underline self-center"
+            >
+              Clear filters
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* Results count */}
+      <div className="text-xs text-gray-500">
+        {totalPlots === 0
+          ? "No plots match your filters"
+          : `${totalPlots} plot${totalPlots === 1 ? "" : "s"}${hasFilters ? " (filtered)" : ""}`}
+      </div>
+
+      {/* Table */}
       <PlotsTable plots={plots} canManage={canManage} />
+
+      {/* Pagination */}
+      {totalPlots > 0 && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalPlots}
+          itemLabel="plots"
+        />
+      )}
     </div>
   );
 }

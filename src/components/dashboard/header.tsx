@@ -1,4 +1,11 @@
-import { auth, signOut } from "@/auth";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { LogOut, User as UserIcon, ChevronDown } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,58 +15,85 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User } from "lucide-react";
+import { MobileSidebar } from "./mobile-sidebar";
 
-export async function Header() {
-  const session = await auth();
-  const user = session?.user;
+type UserRole = "SUPER_ADMIN" | "ADMIN" | "FACULTY" | "STUDENT_FARMER";
 
-  const initials =
-    user?.name
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() ?? "??";
+export function Header({
+  firstName,
+  lastName,
+  email,
+  role,
+}: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+}) {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
+  const fullName = `${firstName} ${lastName}`;
+  const roleLabel = role.toLowerCase().replace("_", " ");
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    await signOut({ redirect: false });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-end">
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+      {/* Left: Mobile menu trigger */}
+      <div className="flex items-center gap-3">
+        <MobileSidebar role={role} />
+      </div>
+
+      {/* Right: User dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex items-center gap-2 h-auto py-1.5">
-            <Avatar className="w-8 h-8">
-              <AvatarFallback className="bg-green-100 text-green-700 text-xs">
+          <Button
+            variant="ghost"
+            className="flex items-center gap-3 h-auto py-1.5 px-2 hover:bg-gray-100"
+          >
+            <Avatar className="w-9 h-9">
+              <AvatarFallback className="bg-green-100 text-green-700 font-medium text-sm">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="text-left">
-              <div className="text-sm font-medium">{user?.name}</div>
-              <div className="text-xs text-gray-500">{user?.role}</div>
+            <div className="hidden md:block text-left">
+              <div className="text-sm font-medium text-gray-900">{fullName}</div>
+              <div className="text-xs text-gray-500 capitalize">{roleLabel}</div>
             </div>
+            <ChevronDown className="w-4 h-4 text-gray-400 hidden md:block" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel>
+            <div className="flex flex-col gap-1">
+              <span className="font-medium">{fullName}</span>
+              <span className="text-xs text-gray-500 font-normal truncate">
+                {email}
+              </span>
+              <Badge
+                variant="secondary"
+                className="bg-green-100 text-green-700 capitalize w-fit mt-1 text-xs"
+              >
+                {roleLabel}
+              </Badge>
+            </div>
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
-            <User className="w-4 h-4 mr-2" />
-            Profile
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
+          <DropdownMenuItem
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
           >
-            <button type="submit" className="w-full">
-              <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600">
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign out
-              </DropdownMenuItem>
-            </button>
-          </form>
+            <LogOut className="w-4 h-4 mr-2" />
+            {signingOut ? "Signing out..." : "Sign out"}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

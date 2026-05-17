@@ -7,3 +7,15 @@ export const deviceSchema = z.object({
 });
 
 export type DeviceFormValues = z.infer<typeof deviceSchema>;
+
+export const sensorReadingSchema = z.object({
+  soilMoisture: z.number().min(0).max(100).nullable().optional(),
+  temperature: z.number().nullable().optional(),
+  humidity: z.number().min(0).max(100).nullable().optional(),
+  lightIntensity: z.number().min(0).nullable().optional(),
+  nitrogen: z.number().min(0).nullable().optional(),
+  phosphorus: z.number().min(0).nullable().optional(),
+  potassium: z.number().min(0).nullable().optional(),
+});
+
+export type SensorReadingInput = z.infer<typeof sensorReadingSchema>;

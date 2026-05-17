@@ -47,9 +47,15 @@ export async function fetchPlotPerformanceData(filters: ReportFilters) {
       currentStage: { select: { name: true } },
       _count: {
         select: {
-          readings: { where: since ? { recordedAt: { gte: since } } : {} },
-          growthLogs: { where: since ? { createdAt: { gte: since } } : {} },
-          alerts: { where: since ? { createdAt: { gte: since } } : {} },
+          sensorReadings: {
+            where: since ? { recordedAt: { gte: since } } : {},
+          },
+          growthLogs: {
+            where: since ? { createdAt: { gte: since } } : {},
+          },
+          alerts: {
+            where: since ? { createdAt: { gte: since } } : {},
+          },
           assignments: { where: { status: "ACTIVE" } },
         },
       },
@@ -77,7 +83,7 @@ export async function fetchPlotPerformanceData(filters: ReportFilters) {
       status: plot.status,
       plantingDate: plot.plantingDate,
       expectedHarvest: plot.expectedHarvest,
-      readingCount: plot._count.readings,
+      readingCount: plot._count.sensorReadings,
       logCount: plot._count.growthLogs,
       alertCount: plot._count.alerts,
       openAlertCount,
@@ -157,53 +163,7 @@ export async function fetchAlertsData(filters: ReportFilters) {
 
 export async function fetchActivityData(filters: ReportFilters) {
   const since = getDateFromRange(filters.range);
-
   const dateFilter = since ? { gte: since } : undefined;
-
-  const [imports, users, plots, devices, assignments] = await Promise.all([
-    prisma.importBatch.findMany({
-      where: dateFilter ? { createdAt: dateFilter } : {},
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: {
-        importedBy: { select: { firstName: true, lastName: true } },
-      },
-    }),
-    prisma.user.findMany({
-      where: dateFilter ? { createdAt: dateFilter } : {},
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        createdAt: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-      },
-    }),
-    prisma.plot.findMany({
-      where: dateFilter ? { createdAt: dateFilter } : {},
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: { createdAt: true, name: true, location: true, status: true },
-    }),
-    prisma.device.findMany({
-      where: dateFilter ? { createdAt: dateFilter } : {},
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: { plot: { select: { name: true } } },
-    }),
-    prisma.plotAssignment.findMany({
-      where: dateFilter ? { assignedAt: dateFilter } : {},
-      orderBy: { assignedAt: "desc" },
-      take: 100,
-      include: {
-        plot: { select: { name: true } },
-        student: { select: { firstName: true, lastName: true } },
-        faculty: { select: { firstName: true, lastName: true } },
-      },
-    }),
-  ]);
 
   type ActivityEvent = {
     timestamp: Date;
@@ -214,49 +174,110 @@ export async function fetchActivityData(filters: ReportFilters) {
 
   const events: ActivityEvent[] = [];
 
-  for (const imp of imports) {
-    events.push({
-      timestamp: imp.createdAt,
-      eventType: "Import",
-      description: `Imported ${imp.successCount} ${imp.entityType.toLowerCase()} records (${imp.failureCount} failed)`,
-      actor: `${imp.importedBy.firstName} ${imp.importedBy.lastName}`,
+  // Fetch each entity type with safe try/catch so one bad source doesn't kill the report
+  try {
+    const users = await prisma.user.findMany({
+      where: dateFilter ? { createdAt: dateFilter } : {},
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        createdAt: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+      },
     });
+    for (const u of users) {
+      events.push({
+        timestamp: u.createdAt,
+        eventType: "User Created",
+        description: `${u.firstName} ${u.lastName} (${u.email}) - ${u.role}`,
+        actor: "System",
+      });
+    }
+  } catch (e) {
+    console.warn("Activity: failed to fetch users", e);
   }
 
-  for (const u of users) {
-    events.push({
-      timestamp: u.createdAt,
-      eventType: "User Created",
-      description: `${u.firstName} ${u.lastName} (${u.email}) - ${u.role}`,
-      actor: "System",
+  try {
+    const plots = await prisma.plot.findMany({
+      where: dateFilter ? { createdAt: dateFilter } : {},
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { createdAt: true, name: true, location: true, status: true },
     });
+    for (const p of plots) {
+      events.push({
+        timestamp: p.createdAt,
+        eventType: "Plot Created",
+        description: `${p.name}${p.location ? ` at ${p.location}` : ""} - ${p.status}`,
+        actor: "System",
+      });
+    }
+  } catch (e) {
+    console.warn("Activity: failed to fetch plots", e);
   }
 
-  for (const p of plots) {
-    events.push({
-      timestamp: p.createdAt,
-      eventType: "Plot Created",
-      description: `${p.name}${p.location ? ` at ${p.location}` : ""} - ${p.status}`,
-      actor: "System",
+  try {
+    const devices = await prisma.device.findMany({
+      where: dateFilter ? { createdAt: dateFilter } : {},
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { plot: { select: { name: true } } },
     });
+    for (const d of devices) {
+      events.push({
+        timestamp: d.createdAt,
+        eventType: "Device Registered",
+        description: `${d.deviceCode} linked to ${d.plot.name}`,
+        actor: "System",
+      });
+    }
+  } catch (e) {
+    console.warn("Activity: failed to fetch devices", e);
   }
 
-  for (const d of devices) {
-    events.push({
-      timestamp: d.createdAt,
-      eventType: "Device Registered",
-      description: `${d.deviceCode} linked to ${d.plot.name}`,
-      actor: "System",
+  try {
+    const assignments = await prisma.plotAssignment.findMany({
+      where: dateFilter ? { assignedAt: dateFilter } : {},
+      orderBy: { assignedAt: "desc" },
+      take: 100,
+      include: {
+        plot: { select: { name: true } },
+        student: { select: { firstName: true, lastName: true } },
+        faculty: { select: { firstName: true, lastName: true } },
+      },
     });
+    for (const a of assignments) {
+      events.push({
+        timestamp: a.assignedAt,
+        eventType: "Assignment",
+        description: `${a.student.firstName} ${a.student.lastName} assigned to ${a.plot.name}`,
+        actor: `${a.faculty.firstName} ${a.faculty.lastName}`,
+      });
+    }
+  } catch (e) {
+    console.warn("Activity: failed to fetch assignments", e);
   }
 
-  for (const a of assignments) {
-    events.push({
-      timestamp: a.assignedAt,
-      eventType: "Assignment",
-      description: `${a.student.firstName} ${a.student.lastName} assigned to ${a.plot.name}`,
-      actor: `${a.faculty.firstName} ${a.faculty.lastName}`,
+  // Imports - try multiple possible field names for backwards compatibility
+  try {
+    const imports = await prisma.importBatch.findMany({
+      where: dateFilter ? { createdAt: dateFilter } : {},
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
+    for (const imp of imports) {
+      events.push({
+        timestamp: imp.createdAt,
+        eventType: "Import",
+        description: `Imported ${imp.successCount} ${imp.entityType.toLowerCase()} records (${imp.failureCount} failed)`,
+        actor: "System",
+      });
+    }
+  } catch (e) {
+    console.warn("Activity: failed to fetch imports", e);
   }
 
   return events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

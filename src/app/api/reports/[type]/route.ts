@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { renderToBuffer } from "@react-pdf/renderer";
 import { auth } from "@/auth";
 import { parseRange, TIME_RANGES } from "@/lib/analytics/time-range";
 import { prisma } from "@/lib/prisma";
@@ -11,12 +10,12 @@ import {
   fetchActivityData,
 } from "@/lib/reports/data-fetchers";
 import {
-  SensorReadingsPDF,
-  PlotPerformancePDF,
-  GrowthLogPDF,
-  AlertsPDF,
-  ActivityPDF,
-} from "@/lib/reports/pdf-generators";
+  renderSensorReadingsPDF,
+  renderPlotPerformancePDF,
+  renderGrowthLogPDF,
+  renderAlertsPDF,
+  renderActivityPDF,
+} from "@/lib/reports/pdf-renderers";
 import {
   generateSensorReadingsExcel,
   generatePlotPerformanceExcel,
@@ -26,6 +25,7 @@ import {
 } from "@/lib/reports/excel-generators";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const VALID_TYPES = [
   "sensor-readings",
@@ -34,6 +34,9 @@ const VALID_TYPES = [
   "alerts",
   "activity",
 ];
+
+const EXCEL_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export async function GET(
   request: NextRequest,
@@ -49,7 +52,6 @@ export async function GET(
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 });
   }
 
-  // Admin-only check for activity report
   if (
     type === "activity" &&
     session.user.role !== "SUPER_ADMIN" &&
@@ -66,7 +68,6 @@ export async function GET(
   const rangeLabel =
     TIME_RANGES.find((r) => r.value === range)?.label ?? "7 days";
 
-  // Look up plot name if filtered
   let plotName: string | undefined;
   if (plotId) {
     const plot = await prisma.plot.findUnique({
@@ -87,13 +88,10 @@ export async function GET(
         const data = await fetchSensorReadingsData({ range, plotId });
         if (format === "excel") {
           buffer = await generateSensorReadingsExcel(data, rangeLabel, plotName);
-          mimeType =
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          mimeType = EXCEL_MIME;
           filename = `sensor-readings-${timestamp}.xlsx`;
         } else {
-          buffer = await renderToBuffer(
-            SensorReadingsPDF({ data, rangeLabel, plotName })
-          );
+          buffer = await renderSensorReadingsPDF(data, rangeLabel, plotName);
           mimeType = "application/pdf";
           filename = `sensor-readings-${timestamp}.pdf`;
         }
@@ -103,13 +101,10 @@ export async function GET(
         const data = await fetchPlotPerformanceData({ range });
         if (format === "excel") {
           buffer = await generatePlotPerformanceExcel(data, rangeLabel);
-          mimeType =
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          mimeType = EXCEL_MIME;
           filename = `plot-performance-${timestamp}.xlsx`;
         } else {
-          buffer = await renderToBuffer(
-            PlotPerformancePDF({ data, rangeLabel })
-          );
+          buffer = await renderPlotPerformancePDF(data, rangeLabel);
           mimeType = "application/pdf";
           filename = `plot-performance-${timestamp}.pdf`;
         }
@@ -119,13 +114,10 @@ export async function GET(
         const data = await fetchGrowthLogData({ range, plotId });
         if (format === "excel") {
           buffer = await generateGrowthLogExcel(data, rangeLabel, plotName);
-          mimeType =
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          mimeType = EXCEL_MIME;
           filename = `growth-log-${timestamp}.xlsx`;
         } else {
-          buffer = await renderToBuffer(
-            GrowthLogPDF({ data, rangeLabel, plotName })
-          );
+          buffer = await renderGrowthLogPDF(data, rangeLabel, plotName);
           mimeType = "application/pdf";
           filename = `growth-log-${timestamp}.pdf`;
         }
@@ -135,13 +127,10 @@ export async function GET(
         const data = await fetchAlertsData({ range, plotId });
         if (format === "excel") {
           buffer = await generateAlertsExcel(data, rangeLabel, plotName);
-          mimeType =
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          mimeType = EXCEL_MIME;
           filename = `alerts-${timestamp}.xlsx`;
         } else {
-          buffer = await renderToBuffer(
-            AlertsPDF({ data, rangeLabel, plotName })
-          );
+          buffer = await renderAlertsPDF(data, rangeLabel, plotName);
           mimeType = "application/pdf";
           filename = `alerts-${timestamp}.pdf`;
         }
@@ -151,11 +140,10 @@ export async function GET(
         const data = await fetchActivityData({ range });
         if (format === "excel") {
           buffer = await generateActivityExcel(data, rangeLabel);
-          mimeType =
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          mimeType = EXCEL_MIME;
           filename = `system-activity-${timestamp}.xlsx`;
         } else {
-          buffer = await renderToBuffer(ActivityPDF({ data, rangeLabel }));
+          buffer = await renderActivityPDF(data, rangeLabel);
           mimeType = "application/pdf";
           filename = `system-activity-${timestamp}.pdf`;
         }
@@ -175,11 +163,22 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Report generation failed:", error);
+    console.error("=".repeat(60));
+    console.error("REPORT GENERATION FAILED");
+    console.error("Type:", type);
+    console.error("Format:", format);
+    console.error("Error:", error);
+    if (error instanceof Error) {
+      console.error("Stack:", error.stack);
+    }
+    console.error("=".repeat(60));
+
     return NextResponse.json(
       {
         error: "Report generation failed",
         details: error instanceof Error ? error.message : "Unknown error",
+        type,
+        format,
       },
       { status: 500 }
     );

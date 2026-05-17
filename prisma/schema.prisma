@@ -122,7 +122,7 @@ model User {
   firstName    String
   middleName   String?
   lastName     String
-  phoneNumber  String?
+  phoneNumber  String?  @unique
   role         UserRole
   idNumber     String?    @unique // student number OR employee number
   department   String?    // for faculty

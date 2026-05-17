@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "H-Auto",
-  description: "Smart Gardening Monitoring System",
+  title: "H-Auto - Smart Gardening",
+  description:
+    "Online Smart Gardening Monitoring System for Vegetables using Microcontrollers",
 };
 
 export default function RootLayout({
@@ -29,7 +30,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={4000}
+        />
       </body>
     </html>
   );

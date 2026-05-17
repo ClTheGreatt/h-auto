@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Users as UsersIcon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DeleteUserDialog } from "./delete-user-dialog";
 import type { UserRole, UserStatus } from "@prisma/client";
 
@@ -54,14 +55,20 @@ const statusColors: Record<UserStatus, string> = {
 export function UsersTable({ users }: { users: UserRow[] }) {
   if (users.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
-        No users yet. Click &quot;Add user&quot; to create one.
-      </div>
+      <EmptyState
+        icon={UsersIcon}
+        title="No users found"
+        description="Try adjusting your search or filters, or add a new user to get started."
+        action={{
+          label: "Add user",
+          href: "/dashboard/users/new",
+        }}
+      />
     );
   }
 
   return (
-    <div className="border rounded-md bg-white">
+    <div className="border rounded-md bg-white overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -76,7 +83,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
         <TableBody>
           {users.map((user) => (
             <TableRow key={user.id}>
-              <TableCell className="font-medium">
+              <TableCell className="font-medium whitespace-nowrap">
                 {user.firstName} {user.lastName}
               </TableCell>
               <TableCell className="text-gray-600">{user.email}</TableCell>

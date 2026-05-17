@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DeletePlotDialog } from "./delete-plot-dialog";
 import type { PlotStatus } from "@prisma/client";
 
@@ -58,15 +59,24 @@ export function PlotsTable({
 }) {
   if (plots.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
-        <MapPinned className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-        No plots yet.
-      </div>
+      <EmptyState
+        icon={MapPinned}
+        title="No plots found"
+        description="Try adjusting your search or filters, or add a new plot to get started."
+        action={
+          canManage
+            ? {
+                label: "Add plot",
+                href: "/dashboard/plots/new",
+              }
+            : undefined
+        }
+      />
     );
   }
 
   return (
-    <div className="border rounded-md bg-white">
+    <div className="border rounded-md bg-white overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -82,7 +92,7 @@ export function PlotsTable({
         <TableBody>
           {plots.map((plot) => (
             <TableRow key={plot.id}>
-              <TableCell className="font-medium">
+              <TableCell className="font-medium whitespace-nowrap">
                 <Link
                   href={`/dashboard/plots/${plot.id}`}
                   className="hover:underline"

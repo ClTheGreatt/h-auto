@@ -3,87 +3,221 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { toast } from "sonner";
+import {
+  Sprout,
+  Eye,
+  EyeOff,
+  Loader2,
+  Mail,
+  Lock,
+  Leaf,
+  Droplets,
+  Sun,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    setLoading(true);
+    setSubmitting(true);
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Invalid email or password.");
-      setLoading(false);
-    } else {
+      if (result?.error) {
+        toast.error("Invalid email or password");
+        setSubmitting(false);
+        return;
+      }
+
+      toast.success("Welcome back!");
       router.push("/dashboard");
       router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+      setSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-gray-900">H-Auto</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Smart Gardening Monitoring System
-          </p>
+    <div className="min-h-screen flex">
+      {/* Left side - Brand panel (hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-green-600 via-green-700 to-emerald-800 overflow-hidden">
+        {/* Decorative pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-32 right-16 w-80 h-80 bg-green-300 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-emerald-400 rounded-full blur-3xl" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="admin@h-auto.local"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Your password"
-            />
-          </div>
-
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-              {error}
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
+          {/* Top: Logo + system name */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
+              <Sprout className="w-7 h-7 text-white" />
             </div>
-          )}
+            <div>
+              <div className="text-xl font-bold">H-Auto</div>
+              <div className="text-xs text-green-100">Smart Gardening</div>
+            </div>
+          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-green-600 text-white py-2 rounded-md font-medium hover:bg-green-700 disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+          {/* Middle: Headline */}
+          <div className="space-y-6 max-w-md">
+            <h1 className="text-4xl font-bold leading-tight">
+              Cultivating the future of school gardens
+            </h1>
+            <p className="text-green-100 text-lg leading-relaxed">
+              Real-time monitoring of soil moisture, temperature, humidity, light,
+              and nutrients — all from one intelligent platform.
+            </p>
+
+            {/* Feature highlights */}
+            <div className="grid grid-cols-3 gap-4 pt-4">
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                  <Droplets className="w-5 h-5" />
+                </div>
+                <div className="text-xs text-green-100">Moisture tracking</div>
+              </div>
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                  <Sun className="w-5 h-5" />
+                </div>
+                <div className="text-xs text-green-100">Light analytics</div>
+              </div>
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                  <Leaf className="w-5 h-5" />
+                </div>
+                <div className="text-xs text-green-100">Growth monitoring</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom: Attribution */}
+          <div className="text-sm text-green-100/80">
+            <div>Bataan Peninsula State University</div>
+            <div className="text-xs mt-1 text-green-100/60">
+              Capstone Project | College of CCST
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right side - Form */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-stone-50">
+        <div className="w-full max-w-md space-y-8 page-fade-in">
+          {/* Mobile logo (only shown on small screens) */}
+          <div className="lg:hidden flex items-center gap-3 justify-center">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm">
+              <Sprout className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <div className="text-lg font-bold text-gray-900">H-Auto</div>
+              <div className="text-xs text-gray-500">Smart Gardening</div>
+            </div>
+          </div>
+
+          {/* Header */}
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-gray-900">Welcome back</h2>
+            <p className="text-gray-500">
+              Sign in to access your monitoring dashboard
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email address
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="pl-10 h-11"
+                  disabled={submitting}
+                  autoComplete="email"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pl-10 pr-10 h-11"
+                  disabled={submitting}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full h-11 bg-green-600 hover:bg-green-700 transition"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
+
+          {/* Footer */}
+          <div className="text-center pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              Need an account? Contact your system administrator.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

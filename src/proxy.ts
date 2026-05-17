@@ -1,7 +1,10 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth"];
+// Paths accessible without session authentication.
+// /api/sensors uses API key authentication (x-api-key header)
+// /api/auth is NextAuth's own endpoints
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/sensors"];
 
 export default auth((req) => {
   const { nextUrl } = req;
