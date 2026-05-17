@@ -1,5 +1,10 @@
 # H-Auto: Online Smart Gardening Monitoring System
 
+![Status](https://img.shields.io/badge/status-capstone-green)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![License](https://img.shields.io/badge/license-Academic-orange)
+
 > Online Smart Gardening Monitoring System for Vegetables using Microcontrollers — a capstone project by IT students at Bataan Peninsula State University.
 
 H-Auto combines IoT sensor technology with a modern web platform to enable real-time monitoring, data analytics, and automated alerting for vegetable cultivation in educational gardens.
@@ -114,6 +119,20 @@ Plus: 4 crops (Tomato, Lettuce, Pechay, Eggplant) with growth stages, 6 plots, a
 
 ⚠️ Change these passwords before deploying to production!
 
+### Build & Run in Production Mode
+
+After confirming the dev server works, validate the production build:
+
+​```bash
+# Build the optimized production bundle (includes type-checking)
+npm run build
+
+# Start the production server
+npm run start
+​```
+
+Open [http://localhost:3000](http://localhost:3000) — should now serve the production-optimized version.
+
 ## 📂 Project Structure
 
 ```
@@ -218,12 +237,19 @@ This project is developed as an academic capstone and is provided as-is for educ
 
 ## 👥 Team
 
-Developed by IT students at:
+Developed by Information Technology students at:
 
 **Bataan Peninsula State University**
-College of Information and Communications Technology
+College of Computer Studies
 Bachelor of Science in Information Technology
-Academic Year 2025-2026
+Academic Year 2025–2026
+
+| Name | Role |
+|------|------|
+| Said Hussin | Project Lead / Full-stack Developer |
+| Chrislord Dizon | Backend / IoT Integration |
+| Geoffrey Perello | Frontend / UI Design |
+| Jhan Criss Alba | Documentation / Research |
 
 ## 🙏 Acknowledgments
 

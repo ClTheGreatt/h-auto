@@ -3,8 +3,6 @@ import {
   GraduationCap,
   Code2,
   Heart,
-  Github,
-  ExternalLink,
   Cpu,
   Database,
   Globe,
@@ -134,7 +132,7 @@ export default function AboutPage() {
                 Bataan Peninsula State University
               </h3>
               <p className="text-sm text-gray-600">
-                College of Computer Studies 
+                College of Computer Studies
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 Bachelor of Science in Information Technology
@@ -236,12 +234,8 @@ export default function AboutPage() {
 
       {/* Footer */}
       <div className="text-center text-sm text-gray-500 pt-4 pb-8">
-        <p>
-          © 2026 H-Auto Development Team
-        </p>
-        <p className="mt-1">
-          Bataan Peninsula State University
-        </p>
+        <p>© 2026 H-Auto Development Team</p>
+        <p className="mt-1">Bataan Peninsula State University</p>
       </div>
     </div>
   );

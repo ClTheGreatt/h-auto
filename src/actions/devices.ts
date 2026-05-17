@@ -71,20 +71,30 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
 
 export async function regenerateApiKey(id: string) {
   await requireAdmin();
-  const newKey = generateApiKey();
-  await prisma.device.update({
-    where: { id },
-    data: { apiKey: newKey },
-  });
-  revalidatePath("/dashboard/devices");
-  return { success: true, apiKey: newKey };
+  try {
+    const newKey = generateApiKey();
+    await prisma.device.update({
+      where: { id },
+      data: { apiKey: newKey },
+    });
+    revalidatePath("/dashboard/devices");
+    return { success: true, apiKey: newKey };
+  } catch (error) {
+    console.error("regenerateApiKey error:", error);
+    return { error: "Failed to regenerate API key. Please try again." };
+  }
 }
 
 export async function deleteDevice(id: string) {
   await requireAdmin();
-  await prisma.device.delete({ where: { id } });
-  revalidatePath("/dashboard/devices");
-  return { success: true };
+  try {
+    await prisma.device.delete({ where: { id } });
+    revalidatePath("/dashboard/devices");
+    return { success: true };
+  } catch (error) {
+    console.error("deleteDevice error:", error);
+    return { error: "Failed to delete device. It may have associated sensor readings." };
+  }
 }
 
 export async function simulateReading(deviceId: string) {

@@ -53,12 +53,12 @@ export function SensorLineChart({
     }
   }
 
-  const chartData = Array.from(timeMap.values())
+const chartData = Array.from(timeMap.values())
+    .sort((a, b) => (a.time as number) - (b.time as number))
     .map((d) => ({
       ...d,
       timeLabel: formatChartDate(new Date(d.time as number), range),
-    }))
-    .sort((a, b) => (a.time as number) - (b.time as number));
+    }));
 
   if (chartData.length === 0) {
     return (
@@ -96,7 +96,7 @@ export function SensorLineChart({
               border: "1px solid #e5e7eb",
               backgroundColor: "white",
             }}
-            formatter={(value: number) => [`${value}${unit}`, ""]}
+            formatter={(value) => [`${value}${unit}`, ""]}
           />
           {series.length > 1 && (
             <Legend wrapperStyle={{ fontSize: 12 }} iconType="line" />

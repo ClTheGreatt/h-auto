@@ -272,7 +272,7 @@ export async function fetchActivityData(filters: ReportFilters) {
       events.push({
         timestamp: imp.createdAt,
         eventType: "Import",
-        description: `Imported ${imp.successCount} ${imp.entityType.toLowerCase()} records (${imp.failureCount} failed)`,
+        description: `Imported ${imp.successCount} ${imp.type.toLowerCase()} records (${imp.failureCount} failed)`,
         actor: "System",
       });
     }

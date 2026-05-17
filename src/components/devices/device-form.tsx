@@ -72,7 +72,7 @@ export function DeviceForm({
       return;
     }
 
-    if (mode === "create" && result && "apiKey" in result && result.apiKey) {
+   if (mode === "create" && result && "apiKey" in result && typeof result.apiKey === "string") {
       setGeneratedKey(result.apiKey);
       toast.success("Device registered. Copy the API key below.");
       return;
