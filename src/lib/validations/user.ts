@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { bpsuEmail } from "./email";
 
 const baseUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   middleName: z.string().optional().or(z.literal("")),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email"),
+  email: bpsuEmail,
   phoneNumber: z.string().optional().or(z.literal("")),
   role: z.enum(["SUPER_ADMIN", "ADMIN", "FACULTY", "STUDENT_FARMER"]),
   idNumber: z.string().optional().or(z.literal("")),

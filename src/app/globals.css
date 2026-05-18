@@ -39,10 +39,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE
+   ═══════════════════════════════════════════════════════════ */
 :root {
   --radius: 0.625rem;
   --background: oklch(0.99 0.003 95);
@@ -79,18 +82,83 @@
   --sidebar-ring: oklch(0.58 0.14 145);
 }
 
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE
+   ═══════════════════════════════════════════════════════════ */
+.dark {
+  --background: oklch(0.14 0.005 250);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.18 0.005 250);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.18 0.005 250);
+  --popover-foreground: oklch(0.96 0 0);
+  --primary: oklch(0.7 0.17 145);
+  --primary-foreground: oklch(0.14 0 0);
+  --secondary: oklch(0.24 0.005 250);
+  --secondary-foreground: oklch(0.96 0 0);
+  --muted: oklch(0.24 0.005 250);
+  --muted-foreground: oklch(0.66 0 0);
+  --accent: oklch(0.28 0.05 145);
+  --accent-foreground: oklch(0.96 0 0);
+  --destructive: oklch(0.65 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.28 0.005 250);
+  --input: oklch(0.28 0.005 250);
+  --ring: oklch(0.7 0.17 145);
+  --chart-1: oklch(0.7 0.17 145);
+  --chart-2: oklch(0.7 0.14 200);
+  --chart-3: oklch(0.75 0.17 80);
+  --chart-4: oklch(0.65 0.2 30);
+  --chart-5: oklch(0.7 0.2 320);
+  --sidebar: oklch(0.16 0.005 250);
+  --sidebar-foreground: oklch(0.96 0 0);
+  --sidebar-primary: oklch(0.7 0.17 145);
+  --sidebar-primary-foreground: oklch(0.14 0 0);
+  --sidebar-accent: oklch(0.24 0.005 250);
+  --sidebar-accent-foreground: oklch(0.96 0 0);
+  --sidebar-border: oklch(0.24 0.005 250);
+  --sidebar-ring: oklch(0.7 0.17 145);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BASE LAYER
+   ═══════════════════════════════════════════════════════════ */
 @layer base {
   * {
     border-color: var(--border);
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Smooth color transition when switching themes */
+    transition: background-color 200ms ease, color 200ms ease;
   }
 
+  /* Text selection — branded green */
+  ::selection {
+    background-color: oklch(0.85 0.15 145);
+    color: oklch(0.15 0 0);
+  }
+  .dark ::selection {
+    background-color: oklch(0.4 0.15 145);
+    color: oklch(0.95 0 0);
+  }
+
+  /* Focus visible — accessibility + branded */
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar — light mode */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -105,9 +173,19 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #a1a1aa;
   }
+
+  /* Scrollbar — dark mode */
+  .dark ::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
+  }
 }
 
-/* Animations */
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -129,6 +207,11 @@
   animation: shimmer 1.8s infinite linear;
 }
 
+.dark .skeleton {
+  background: linear-gradient(90deg, #27272a 25%, #3f3f46 50%, #27272a 75%);
+  background-size: 1000px 100%;
+}
+
 .page-fade-in {
   animation: fade-in 0.4s ease-out;
 }
@@ -144,9 +227,68 @@
 .stagger-item:nth-child(5) { animation-delay: 240ms; }
 .stagger-item:nth-child(6) { animation-delay: 300ms; }
 
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+
 /* Hide native browser X on search inputs (we have our own) */
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE COVERAGE - Global overrides
+   
+   Many pages use hardcoded Tailwind grays (text-gray-900, bg-white, etc.).
+   These overrides make them adapt automatically in dark mode without
+   editing every individual component.
+   ═══════════════════════════════════════════════════════════ */
+@layer utilities {
+  /* Headings & primary text */
+  .dark .text-gray-900 { color: rgb(243 244 246); }   /* gray-100 */
+  .dark .text-gray-800 { color: rgb(229 231 235); }   /* gray-200 */
+  .dark .text-gray-700 { color: rgb(209 213 219); }   /* gray-300 */
+
+  /* Backgrounds — map to semantic CSS vars so they follow theme */
+  .dark .bg-white { background-color: var(--card); }
+  .dark .bg-gray-50 { background-color: var(--muted); }
+  .dark .bg-gray-100 { background-color: var(--accent); }
+
+  /* Borders */
+  .dark .border-gray-200 { border-color: var(--border); }
+  .dark .border-gray-100 { border-color: var(--border); }
+  .dark .border-gray-300 { border-color: var(--border); }
+
+  /* Hover states */
+  .dark .hover\:bg-gray-50:hover { background-color: var(--muted); }
+  .dark .hover\:bg-gray-100:hover { background-color: var(--accent); }
+  .dark .hover\:bg-gray-200:hover { background-color: var(--accent); }
+
+  /* Pastel badges — tone down for dark mode contrast */
+  .dark .bg-green-100 { background-color: rgb(20 83 45 / 0.4); }
+  .dark .bg-green-50 { background-color: rgb(20 83 45 / 0.25); }
+  .dark .bg-red-100 { background-color: rgb(127 29 29 / 0.4); }
+  .dark .bg-red-50 { background-color: rgb(127 29 29 / 0.25); }
+  .dark .bg-amber-100 { background-color: rgb(120 53 15 / 0.4); }
+  .dark .bg-amber-50 { background-color: rgb(120 53 15 / 0.25); }
+  .dark .bg-blue-100 { background-color: rgb(30 58 138 / 0.4); }
+  .dark .bg-blue-50 { background-color: rgb(30 58 138 / 0.25); }
+  .dark .bg-purple-100 { background-color: rgb(76 29 149 / 0.4); }
+  .dark .bg-orange-100 { background-color: rgb(124 45 18 / 0.4); }
+  .dark .bg-stone-50 { background-color: var(--background); }
+
+  /* Brighten dark text on dark badges */
+  .dark .text-green-700 { color: rgb(74 222 128); }   /* green-400 */
+  .dark .text-red-700 { color: rgb(248 113 113); }    /* red-400 */
+  .dark .text-amber-700 { color: rgb(251 191 36); }   /* amber-400 */
+  .dark .text-blue-700 { color: rgb(96 165 250); }    /* blue-400 */
+  .dark .text-purple-700 { color: rgb(192 132 252); } /* purple-400 */
+
+  /* Common pastel borders */
+  .dark .border-green-200 { border-color: rgb(20 83 45 / 0.5); }
+  .dark .border-red-200 { border-color: rgb(127 29 29 / 0.5); }
+  .dark .border-amber-200 { border-color: rgb(120 53 15 / 0.5); }
+  .dark .border-blue-200 { border-color: rgb(30 58 138 / 0.5); }
 }

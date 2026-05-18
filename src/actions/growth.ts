@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { requireAuth } from "@/lib/auth-helpers";
 import { growthLogSchema, type GrowthLogFormValues } from "@/lib/validations/growth";
 

@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { requireFaculty } from "@/lib/auth-helpers";
 
 export async function assignStudent(

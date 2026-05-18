@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { bpsuEmail } from "./email";
 
 const baseRow = {
   firstName: z.string().trim().min(1, "First name is required"),
   middleName: z.string().trim().optional().default(""),
   lastName: z.string().trim().min(1, "Last name is required"),
-  email: z.string().trim().email("Invalid email"),
+  email: bpsuEmail,
   phoneNumber: z.string().trim().optional().default(""),
   idNumber: z.string().trim().optional().default(""),
   password: z.string().min(6, "Password must be at least 6 characters"),

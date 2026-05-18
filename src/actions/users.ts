@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { sendEmail } from "@/lib/email/send-email";
+import { welcomeEmailTemplate } from "@/lib/email/templates";
 import {
   createUserSchema,
   updateUserSchema,
@@ -49,13 +51,14 @@ export async function createUser(input: CreateUserInput) {
     };
   }
 
-  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 
-  const { password: _password, ...rest } = parsed.data;
-  void _password;
+  // Keep the plaintext password — we need it for the welcome email
+  const { password, ...rest } = parsed.data;
 
+  let createdUser;
   try {
-    await prisma.user.create({
+    createdUser = await prisma.user.create({
       data: {
         ...rest,
         middleName: rest.middleName || null,
@@ -74,6 +77,33 @@ export async function createUser(input: CreateUserInput) {
     if (friendly) return friendly;
     console.error("createUser error:", error);
     return { error: "Failed to create user. Please try again." };
+  }
+
+  // Send welcome email (best-effort — don't fail user creation if email fails)
+  try {
+    const { subject, html, text } = welcomeEmailTemplate({
+      firstName: createdUser.firstName,
+      email: createdUser.email,
+      tempPassword: password,
+      loginUrl: (process.env.AUTH_URL ?? "http://localhost:3000") + "/login",
+      role: createdUser.role,
+    });
+
+    const emailResult = await sendEmail({
+      to: createdUser.email,
+      subject,
+      html,
+      text,
+    });
+
+    if ("error" in emailResult) {
+      console.error(
+        `[createUser] Welcome email failed for ${createdUser.email}:`,
+        emailResult.error
+      );
+    }
+  } catch (emailError) {
+    console.error("[createUser] Welcome email exception:", emailError);
   }
 
   revalidatePath("/dashboard/users");

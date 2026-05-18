@@ -4,7 +4,6 @@ import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };

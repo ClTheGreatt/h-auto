@@ -6,11 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { UsersTable } from "@/components/users/users-table";
 import { SearchBar } from "@/components/ui/search-bar";
-import { PaginationControls } from "@/components/ui/pagination-controls";
 import { RoleFilter } from "@/components/users/role-filter";
 import { StatusFilter } from "@/components/users/status-filter";
-
-const PAGE_SIZE = 20;
 
 const VALID_ROLES: UserRole[] = [
   "SUPER_ADMIN",
@@ -28,20 +25,20 @@ export default async function UsersPage({
     search?: string;
     role?: string;
     status?: string;
-    page?: string;
   }>;
 }) {
   await requireAdmin();
 
   const sp = await searchParams;
   const search = sp.search?.trim() ?? "";
-  const role = sp.role && VALID_ROLES.includes(sp.role as UserRole)
-    ? (sp.role as UserRole)
-    : undefined;
-  const status = sp.status && VALID_STATUSES.includes(sp.status as UserStatus)
-    ? (sp.status as UserStatus)
-    : undefined;
-  const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+  const role =
+    sp.role && VALID_ROLES.includes(sp.role as UserRole)
+      ? (sp.role as UserRole)
+      : undefined;
+  const status =
+    sp.status && VALID_STATUSES.includes(sp.status as UserStatus)
+      ? (sp.status as UserStatus)
+      : undefined;
 
   // Build Prisma filter
   const where: Prisma.UserWhereInput = {
@@ -57,47 +54,42 @@ export default async function UsersPage({
     }),
   };
 
-  // Count + fetch in parallel
-  const [totalUsers, users] = await Promise.all([
-    prisma.user.count({ where }),
-    prisma.user.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (currentPage - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        status: true,
-        idNumber: true,
-      },
-    }),
-  ]);
+  // Fetch all matching users (grouped by role in the component, no pagination needed)
+  const users = await prisma.user.findMany({
+    where,
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      role: true,
+      status: true,
+      idNumber: true,
+    },
+  });
 
-  const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE));
+  const totalUsers = users.length;
   const hasFilters = Boolean(search || role || status);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-5">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage faculty members, student farmers, and administrators.
+            Grouped by role for easier browsing.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" className="flex-1 sm:flex-none" asChild>
             <Link href="/dashboard/users/import">
               <Upload className="w-4 h-4 mr-2" />
               Import CSV
             </Link>
           </Button>
-          <Button asChild>
+          <Button className="flex-1 sm:flex-none" asChild>
             <Link href="/dashboard/users/new">
               <Plus className="w-4 h-4 mr-2" />
               Add user
@@ -107,43 +99,40 @@ export default async function UsersPage({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="flex-1 max-w-sm">
-          <SearchBar placeholder="Search name, email, or ID..." />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <RoleFilter current={role} />
-          <StatusFilter current={status} />
-          {hasFilters && (
-            <Link
-              href="/dashboard/users"
-              className="text-sm text-green-600 hover:underline self-center"
-            >
-              Clear filters
-            </Link>
-          )}
+      <div className="rounded-md border bg-white p-3 shadow-sm dark:bg-gray-900">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="w-full sm:w-[380px] lg:w-[460px]">
+              <SearchBar placeholder="Search name, email, or ID..." />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <RoleFilter current={role} />
+              <StatusFilter current={status} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 text-sm text-gray-500 lg:justify-end">
+            <span className="whitespace-nowrap">
+              {totalUsers === 0
+                ? "No users match your filters"
+                : `${totalUsers} user${totalUsers === 1 ? "" : "s"}${
+                    hasFilters ? " found" : ""
+                  }`}
+            </span>
+            {hasFilters && (
+              <Link
+                href="/dashboard/users"
+                className="shrink-0 text-sm font-medium text-green-700 hover:underline"
+              >
+                Clear filters
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Results count */}
-      <div className="text-xs text-gray-500">
-        {totalUsers === 0
-          ? "No users match your filters"
-          : `${totalUsers} user${totalUsers === 1 ? "" : "s"}${hasFilters ? " (filtered)" : ""}`}
-      </div>
-
-      {/* Table */}
+      {/* Grouped table */}
       <UsersTable users={users} />
-
-      {/* Pagination */}
-      {totalUsers > 0 && (
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalUsers}
-          itemLabel="users"
-        />
-      )}
     </div>
   );
 }

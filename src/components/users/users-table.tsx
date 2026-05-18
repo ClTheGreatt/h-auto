@@ -1,7 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { MoreHorizontal, Pencil, Trash2, Users as UsersIcon } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Users as UsersIcon,
+  ShieldCheck,
+  Shield,
+  GraduationCap,
+  Sprout,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -20,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DeleteUserDialog } from "./delete-user-dialog";
+import { cn } from "@/lib/utils";
 import type { UserRole, UserStatus } from "@prisma/client";
 
 type UserRow = {
@@ -32,18 +43,51 @@ type UserRow = {
   idNumber: string | null;
 };
 
-const roleLabels: Record<UserRole, string> = {
-  SUPER_ADMIN: "Super Admin",
-  ADMIN: "Admin",
-  FACULTY: "Faculty",
-  STUDENT_FARMER: "Student",
-};
+const ROLE_ORDER: UserRole[] = [
+  "SUPER_ADMIN",
+  "ADMIN",
+  "FACULTY",
+  "STUDENT_FARMER",
+];
 
-const roleColors: Record<UserRole, string> = {
-  SUPER_ADMIN: "bg-purple-100 text-purple-700 hover:bg-purple-100",
-  ADMIN: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  FACULTY: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  STUDENT_FARMER: "bg-green-100 text-green-700 hover:bg-green-100",
+const ROLE_META: Record<
+  UserRole,
+  {
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    iconBg: string;
+    iconColor: string;
+  }
+> = {
+  SUPER_ADMIN: {
+    label: "Super Admins",
+    description: "Full system access",
+    icon: ShieldCheck,
+    iconBg: "bg-purple-100 dark:bg-purple-950/40",
+    iconColor: "text-purple-700 dark:text-purple-400",
+  },
+  ADMIN: {
+    label: "Admins",
+    description: "Manage users and devices",
+    icon: Shield,
+    iconBg: "bg-blue-100 dark:bg-blue-950/40",
+    iconColor: "text-blue-700 dark:text-blue-400",
+  },
+  FACULTY: {
+    label: "Faculty",
+    description: "Instructors and advisers",
+    icon: GraduationCap,
+    iconBg: "bg-amber-100 dark:bg-amber-950/40",
+    iconColor: "text-amber-700 dark:text-amber-400",
+  },
+  STUDENT_FARMER: {
+    label: "Student Farmers",
+    description: "Field operators",
+    icon: Sprout,
+    iconBg: "bg-green-100 dark:bg-green-950/40",
+    iconColor: "text-green-700 dark:text-green-400",
+  },
 };
 
 const statusColors: Record<UserStatus, string> = {
@@ -51,6 +95,19 @@ const statusColors: Record<UserStatus, string> = {
   INACTIVE: "bg-gray-100 text-gray-700 hover:bg-gray-100",
   SUSPENDED: "bg-red-100 text-red-700 hover:bg-red-100",
 };
+
+function groupByRole(users: UserRow[]): Record<UserRole, UserRow[]> {
+  const grouped: Record<UserRole, UserRow[]> = {
+    SUPER_ADMIN: [],
+    ADMIN: [],
+    FACULTY: [],
+    STUDENT_FARMER: [],
+  };
+  for (const user of users) {
+    grouped[user.role].push(user);
+  }
+  return grouped;
+}
 
 export function UsersTable({ users }: { users: UserRow[] }) {
   if (users.length === 0) {
@@ -67,73 +124,124 @@ export function UsersTable({ users }: { users: UserRow[] }) {
     );
   }
 
+  const grouped = groupByRole(users);
+  const visibleRoles = ROLE_ORDER.filter((role) => grouped[role].length > 0);
+
   return (
-    <div className="border rounded-md bg-white overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>ID number</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell className="font-medium whitespace-nowrap">
-                {user.firstName} {user.lastName}
-              </TableCell>
-              <TableCell className="text-gray-600">{user.email}</TableCell>
-              <TableCell>
-                <Badge variant="secondary" className={roleColors[user.role]}>
-                  {roleLabels[user.role]}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary" className={statusColors[user.status]}>
-                  {user.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-gray-600">
-                {user.idNumber ?? "—"}
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/users/${user.id}/edit`}>
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit
-                      </Link>
-                    </DropdownMenuItem>
-                    <DeleteUserDialog
-                      userId={user.id}
-                      userName={`${user.firstName} ${user.lastName}`}
-                      trigger={
-                        <DropdownMenuItem
-                          onSelect={(e) => e.preventDefault()}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      }
-                    />
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="space-y-4">
+      {visibleRoles.map((role) => (
+        <RoleSection key={role} role={role} users={grouped[role]} />
+      ))}
     </div>
+  );
+}
+
+function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
+  const meta = ROLE_META[role];
+  const Icon = meta.icon;
+
+  return (
+    <section className="overflow-hidden rounded-md border bg-white shadow-sm dark:bg-gray-900">
+      {/* Section header */}
+      <div className="flex items-center gap-3 border-b px-4 py-3">
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+            meta.iconBg
+          )}
+        >
+          <Icon className={cn("h-5 w-5", meta.iconColor)} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-gray-900">
+              {meta.label}
+            </h2>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              {users.length}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-gray-500">{meta.description}</p>
+        </div>
+      </div>
+
+      {/* Mini-table for this role */}
+      <div>
+        <Table className="min-w-[760px] table-fixed">
+          <colgroup>
+            <col className="w-[32%]" />
+            <col className="w-[36%]" />
+            <col className="w-[14%]" />
+            <col className="w-[14%]" />
+            <col className="w-12" />
+          </colgroup>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="px-4 text-xs">Name</TableHead>
+              <TableHead className="px-4 text-xs">Email</TableHead>
+              <TableHead className="px-4 text-xs">Status</TableHead>
+              <TableHead className="px-4 text-xs">ID number</TableHead>
+              <TableHead className="px-3"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="px-4 py-3 font-medium">
+                  {user.firstName} {user.lastName}
+                </TableCell>
+                <TableCell className="truncate px-4 py-3 text-gray-600">
+                  {user.email}
+                </TableCell>
+                <TableCell className="px-4 py-3">
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[11px] leading-4",
+                      statusColors[user.status]
+                    )}
+                  >
+                    {user.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="px-4 py-3 text-gray-600">
+                  {user.idNumber ?? "—"}
+                </TableCell>
+                <TableCell className="px-3 py-2 text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/users/${user.id}/edit`}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit
+                        </Link>
+                      </DropdownMenuItem>
+                      <DeleteUserDialog
+                        userId={user.id}
+                        userName={`${user.firstName} ${user.lastName}`}
+                        trigger={
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        }
+                      />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
   );
 }

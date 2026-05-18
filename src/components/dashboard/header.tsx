@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -45,7 +45,7 @@ export function Header({
   }
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+  <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
       {/* Left: Mobile menu trigger */}
       <div className="flex items-center gap-3">
         <MobileSidebar role={role} />
@@ -85,6 +85,13 @@ export function Header({
               </Badge>
             </div>
           </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/dashboard/profile" className="cursor-pointer">
+              <UserIcon className="w-4 h-4 mr-2" />
+              Profile & Settings
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={handleSignOut}

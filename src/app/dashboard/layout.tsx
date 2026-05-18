@@ -33,7 +33,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-stone-50">
+   <div className="flex min-h-screen bg-stone-50 dark:bg-gray-950">
       {/* Desktop sidebar - hidden on mobile */}
       <div className="hidden lg:block sticky top-0 h-screen">
         <Sidebar role={user.role} />
@@ -47,7 +47,7 @@ export default async function DashboardLayout({
           email={user.email}
           role={user.role}
         />
-      <main className="flex-1 p-4 lg:p-6 page-fade-in">
+    <main id="main-content" className="flex-1 p-4 lg:p-6 page-fade-in">
           <Breadcrumbs />
           {children}
         </main>

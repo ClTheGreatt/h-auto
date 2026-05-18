@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -70,9 +70,12 @@ const ROLE_LABELS: Record<string, string> = {
 export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [similarUsers, setSimilarUsers] = useState<SimilarUser[]>([]);
+  const [similarResult, setSimilarResult] = useState<{
+    key: string;
+    users: SimilarUser[];
+  }>({ key: "", users: [] });
 
-const form = useForm<FormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(updateUserSchema),
     mode: "onBlur", // Validate when user leaves a field (modern UX)
     defaultValues: {
@@ -93,29 +96,43 @@ const form = useForm<FormValues>({
     },
   });
 
-  const watchedRole = form.watch("role");
-  const watchedFirstName = form.watch("firstName");
-  const watchedLastName = form.watch("lastName");
+  const watchedRole = useWatch({ control: form.control, name: "role" });
+  const watchedFirstName = useWatch({
+    control: form.control,
+    name: "firstName",
+  });
+  const watchedLastName = useWatch({
+    control: form.control,
+    name: "lastName",
+  });
+  const similarFirstName = watchedFirstName?.trim() ?? "";
+  const similarLastName = watchedLastName?.trim() ?? "";
+  const similarKey =
+    similarFirstName.length >= 2 && similarLastName.length >= 2
+      ? `${similarFirstName}:${similarLastName}:${userId ?? ""}`
+      : "";
+  const similarUsers =
+    similarResult.key === similarKey ? similarResult.users : [];
 
   // Check for similar users (debounced)
   useEffect(() => {
-    const firstName = watchedFirstName?.trim();
-    const lastName = watchedLastName?.trim();
-
-    if (!firstName || !lastName || firstName.length < 2 || lastName.length < 2) {
-      setSimilarUsers([]);
-      return;
-    }
+    if (!similarKey) return;
 
     const timer = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ firstName, lastName });
+        const params = new URLSearchParams({
+          firstName: similarFirstName,
+          lastName: similarLastName,
+        });
         if (userId) params.set("excludeId", userId);
 
         const res = await fetch(`/api/users/check-similar?${params}`);
         if (res.ok) {
           const data = await res.json();
-          setSimilarUsers(data.similarUsers ?? []);
+          setSimilarResult({
+            key: similarKey,
+            users: data.similarUsers ?? [],
+          });
         }
       } catch {
         // Silently fail - warning is non-critical
@@ -123,7 +140,7 @@ const form = useForm<FormValues>({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [watchedFirstName, watchedLastName, userId]);
+  }, [similarFirstName, similarLastName, similarKey, userId]);
 
   async function onSubmit(values: FormValues) {
     if (mode === "create") {

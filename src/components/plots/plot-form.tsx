@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
@@ -60,8 +60,11 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
     },
   });
 
-  const watchedCropId = form.watch("cropId");
-  const watchedPlantingDate = form.watch("plantingDate");
+  const watchedCropId = useWatch({ control: form.control, name: "cropId" });
+  const watchedPlantingDate = useWatch({
+    control: form.control,
+    name: "plantingDate",
+  });
 
   const selectedCrop = crops.find((c) => c.id === watchedCropId);
   const stageOptions = selectedCrop?.stages ?? [];

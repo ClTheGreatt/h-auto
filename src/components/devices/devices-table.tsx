@@ -65,7 +65,11 @@ const statusColors: Record<DeviceStatus, string> = {
   RETIRED: "bg-red-100 text-red-700 hover:bg-red-100",
 };
 
-export function DevicesTable({ devices }: { devices: DeviceRow[] }) {
+export function DevicesTable({
+  devices,
+}: {
+  devices: DeviceRow[];
+}) {
   const router = useRouter();
   const [simulatingId, setSimulatingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -108,13 +112,15 @@ export function DevicesTable({ devices }: { devices: DeviceRow[] }) {
     setNewKey(result.apiKey!);
   }
 
-  function timeAgo(date: Date | null): string {
+  function formatLastSeen(date: Date | null): string {
     if (!date) return "Never";
-    const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
+    return new Date(date).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   if (devices.length === 0) {
@@ -164,7 +170,7 @@ export function DevicesTable({ devices }: { devices: DeviceRow[] }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm text-gray-600">
-                  {timeAgo(d.lastSeenAt)}
+                  {formatLastSeen(d.lastSeenAt)}
                 </TableCell>
                 <TableCell className="text-sm text-gray-600">
                   {d.firmwareVersion ?? "—"}

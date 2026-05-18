@@ -71,12 +71,9 @@ export function CropsTable({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const [searchInput, setSearchInput] = useState(query);
-
-  // Sync local input when URL changes externally (e.g., clear filters)
-  useEffect(() => {
-    setSearchInput(query);
-  }, [query]);
+  const [searchState, setSearchState] = useState({ query, value: query });
+  const searchInput =
+    searchState.query === query ? searchState.value : query;
 
   // Debounce search (300ms)
   useEffect(() => {
@@ -104,7 +101,7 @@ export function CropsTable({
   }
 
   function clearAll() {
-    setSearchInput("");
+    setSearchState({ query, value: "" });
     startTransition(() => {
       router.push(pathname);
     });
@@ -123,13 +120,15 @@ export function CropsTable({
           <Input
             placeholder="Search crop or variety..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(e) =>
+              setSearchState({ query, value: e.target.value })
+            }
             className="pl-9 pr-9"
           />
           {searchInput && (
             <button
               type="button"
-              onClick={() => setSearchInput("")}
+              onClick={() => setSearchState({ query, value: "" })}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label="Clear search"
             >

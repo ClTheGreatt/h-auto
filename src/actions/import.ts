@@ -6,6 +6,8 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { sendEmail } from "@/lib/email/send-email";
+import { welcomeEmailTemplate } from "@/lib/email/templates";
 import {
   facultyImportRowSchema,
   studentImportRowSchema,
@@ -77,9 +79,10 @@ export async function commitImport(
         passwordHash,
       };
 
+      let createdUser;
       if (type === "FACULTY") {
         const f = row as FacultyImportRow;
-        await prisma.user.create({
+        createdUser = await prisma.user.create({
           data: {
             ...baseData,
             role: "FACULTY",
@@ -89,7 +92,7 @@ export async function commitImport(
         });
       } else {
         const s = row as StudentImportRow;
-        await prisma.user.create({
+        createdUser = await prisma.user.create({
           data: {
             ...baseData,
             role: "STUDENT_FARMER",
@@ -101,6 +104,34 @@ export async function commitImport(
       }
 
       created.push(row.email);
+
+      // Send welcome email (best-effort — doesn't fail the import)
+      try {
+        const { subject, html, text } = welcomeEmailTemplate({
+          firstName: createdUser.firstName,
+          email: createdUser.email,
+          tempPassword: row.password,
+          loginUrl:
+            (process.env.AUTH_URL ?? "http://localhost:3000") + "/login",
+          role: createdUser.role,
+        });
+
+        const emailResult = await sendEmail({
+          to: createdUser.email,
+          subject,
+          html,
+          text,
+        });
+
+        if ("error" in emailResult) {
+          console.error(
+            `[commitImport] Welcome email failed for ${createdUser.email}:`,
+            emailResult.error
+          );
+        }
+      } catch (emailError) {
+        console.error("[commitImport] Welcome email exception:", emailError);
+      }
     } catch (err) {
       failed.push({
         email: row.email,

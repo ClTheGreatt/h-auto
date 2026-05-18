@@ -107,11 +107,11 @@ export function Sidebar({
         key={item.href}
         href={item.href}
         onClick={onNavigate}
-        className={cn(
+   className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all",
           isActive
-            ? "bg-green-50 text-green-700 font-medium shadow-sm"
-            : "text-gray-700 hover:bg-gray-50 hover:translate-x-0.5"
+            ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 font-medium shadow-sm"
+            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:translate-x-0.5"
         )}
       >
         <Icon className="w-4 h-4 flex-shrink-0" />
@@ -121,8 +121,8 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
-      <div className="p-6 border-b border-gray-200">
+    <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full">
+     <div className="p-6 border-b border-gray-200 dark:border-gray-800">
         <Link
           href="/dashboard"
           onClick={onNavigate}
@@ -146,7 +146,7 @@ export function Sidebar({
               {group.label && (
                 <div
                   className={cn(
-                    "px-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider",
+                 "px-3 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider",
                     idx > 0 ? "pt-4" : "pt-0"
                   )}
                 >
@@ -162,13 +162,13 @@ export function Sidebar({
         <div className="flex-1" />
 
         {/* Secondary navigation - Help + About */}
-        <div className="pt-3 border-t border-gray-200 space-y-1">
+    <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
           {visibleSecondary.map(renderItem)}
         </div>
       </nav>
 
-      <div className="p-3 border-t border-gray-200 text-xs text-gray-400 text-center">
-        H-Auto v1.0
+      <div className="p-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500 text-center">
+        H-Auto 
       </div>
     </aside>
   );
