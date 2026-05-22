@@ -2,7 +2,7 @@ import { Download, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const APK_URL = "/downloads/h-auto.apk";
+const APK_URL = "https://github.com/ClTheGreatt/h-auto/releases/download/v1.0.0/h-auto.apk";
 const APP_VERSION = "1.0.0";
 
 export default function DownloadPage() {
