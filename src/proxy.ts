@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 // Paths accessible without session authentication.
 // /api/sensors uses API key authentication (x-api-key header)
 // /api/auth is NextAuth's own endpoints
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/sensors"];
+// /api/mobile/* uses Bearer JWT auth (verified per-route via getMobileUser)
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/sensors", "/api/mobile"];
 
 export default auth((req) => {
   const { nextUrl } = req;
