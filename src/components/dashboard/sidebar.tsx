@@ -15,6 +15,7 @@ import {
   FileText,
   HelpCircle,
   Info,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +67,7 @@ const navGroups: NavGroup[] = [
 ];
 
 const secondaryNavItems: NavItem[] = [
+  { href: "/dashboard/download", label: "Download App", icon: Smartphone, roles: "all" },
   { href: "/dashboard/help", label: "Help", icon: HelpCircle, roles: "all" },
   { href: "/dashboard/about", label: "About", icon: Info, roles: "all" },
 ];
@@ -107,7 +109,7 @@ export function Sidebar({
         key={item.href}
         href={item.href}
         onClick={onNavigate}
-   className={cn(
+        className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all",
           isActive
             ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 font-medium shadow-sm"
@@ -122,7 +124,7 @@ export function Sidebar({
 
   return (
     <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full">
-     <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-800">
         <Link
           href="/dashboard"
           onClick={onNavigate}
@@ -146,7 +148,7 @@ export function Sidebar({
               {group.label && (
                 <div
                   className={cn(
-                 "px-3 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider",
+                    "px-3 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider",
                     idx > 0 ? "pt-4" : "pt-0"
                   )}
                 >
@@ -161,8 +163,8 @@ export function Sidebar({
         {/* Spacer pushes secondary nav to bottom */}
         <div className="flex-1" />
 
-        {/* Secondary navigation - Help + About */}
-    <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
+        {/* Secondary navigation */}
+        <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
           {visibleSecondary.map(renderItem)}
         </div>
       </nav>
