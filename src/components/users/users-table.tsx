@@ -115,7 +115,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
       <EmptyState
         icon={UsersIcon}
         title="No users found"
-        description="Try adjusting your search or filters, or add a new user to get started."
+       description="Try adjusting your search or filters, or add a new user."
         action={{
           label: "Add user",
           href: "/dashboard/users/new",

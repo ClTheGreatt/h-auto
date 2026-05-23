@@ -78,8 +78,8 @@ export default async function UsersPage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Grouped by role for easier browsing.
+          <p className="mt-1 text-sm text-gray-500">
+            Manage user accounts, roles, and permissions.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">

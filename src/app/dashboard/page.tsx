@@ -125,7 +125,7 @@ export default async function DashboardPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">
-            Welcome back, {userName} 👋
+            Welcome back, {userName} 
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {isAdmin && "System overview and recent activity."}
