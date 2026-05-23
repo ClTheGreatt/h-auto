@@ -64,18 +64,19 @@ export async function GET(req: NextRequest) {
     );
 
     if (plotIds.length === 0) {
-      const empty = buckets.map((b) => ({ label: b.label, value: 0 }));
+     const emptyAvg = buckets.map((b) => ({ label: b.label, value: null }));
+      const emptyCount = buckets.map((b) => ({ label: b.label, value: 0 }));
       return NextResponse.json({
         range,
         summary: emptySummary(),
-        observationsByDay: empty,
-        soilMoistureByDay: empty,
-        temperatureByDay: empty,
-        humidityByDay: empty,
-        lightByDay: empty,
-        nitrogenByDay: empty,
-        phosphorusByDay: empty,
-        potassiumByDay: empty,
+        observationsByDay: emptyCount,
+        soilMoistureByDay: emptyAvg,
+        temperatureByDay: emptyAvg,
+        humidityByDay: emptyAvg,
+        lightByDay: emptyAvg,
+        nitrogenByDay: emptyAvg,
+        phosphorusByDay: emptyAvg,
+        potassiumByDay: emptyAvg,
         statusDistribution,
       });
     }
@@ -127,7 +128,7 @@ export async function GET(req: NextRequest) {
       }
       return buckets.map((b) => ({
         label: b.label,
-        value: acc[b.key] ? acc[b.key].sum / acc[b.key].count : 0,
+       value: acc[b.key] ? acc[b.key].sum / acc[b.key].count : null,
       }));
     }
 
