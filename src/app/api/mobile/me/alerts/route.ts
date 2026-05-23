@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
+        type: true,
         severity: true,
         message: true,
         resolved: true,
