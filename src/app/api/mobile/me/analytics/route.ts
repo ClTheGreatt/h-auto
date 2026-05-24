@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
     const range: Range =
       rp === "24h" || rp === "30d" || rp === "all" ? rp : "7d";
     const plotIdParam = sp.get("plotId");
+    const monthParam = sp.get("month");
+    const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null;
 
     let plotFilter = {};
     if (user.role === "STUDENT_FARMER") {
@@ -42,15 +44,40 @@ export async function GET(req: NextRequest) {
       statusDistribution[p.status] = (statusDistribution[p.status] ?? 0) + 1;
     }
 
-    // Date window (same as web): 24h/7d/30d offsets, all = no bound
+    // Available months for the picker (earliest data -> now)
+    const availableMonths = await getAvailableMonths(plotIds);
+
+    // Time window + bucket size
     let since: Date | null = null;
-    if (range === "24h") since = new Date(Date.now() - DAY);
-    else if (range === "7d") since = new Date(Date.now() - 7 * DAY);
-    else if (range === "30d") since = new Date(Date.now() - 30 * DAY);
+    let until: Date | null = null;
+    let bucketMs = DAY;
+
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      since = new Date(Date.UTC(y, m - 1, 1));
+      until = new Date(Date.UTC(y, m, 1));
+      bucketMs = DAY; // daily within the month
+    } else if (range === "24h") {
+      since = new Date(Date.now() - DAY);
+      bucketMs = HOUR; // hourly — shows the time of day
+    } else if (range === "7d") {
+      since = new Date(Date.now() - 7 * DAY);
+    } else if (range === "30d") {
+      since = new Date(Date.now() - 30 * DAY);
+    } // all -> since null, daily
+
+    const win = (() => {
+      const w: { gte?: Date; lt?: Date } = {};
+      if (since) w.gte = since;
+      if (until) w.lt = until;
+      return Object.keys(w).length ? w : null;
+    })();
 
     if (plotIds.length === 0) {
       return NextResponse.json({
         range,
+        month,
+        availableMonths,
         summary: emptySummary(),
         observationsByDay: [],
         soilMoistureByDay: [],
@@ -65,24 +92,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const readingWhere: { plotId: { in: string[] }; recordedAt?: { gte: Date } } = {
-      plotId: { in: plotIds },
-    };
-    const obsWhere: { plotId: { in: string[] }; createdAt?: { gte: Date } } = {
-      plotId: { in: plotIds },
-    };
-    const alertWhere: { plotId: { in: string[] }; createdAt?: { gte: Date } } = {
-      plotId: { in: plotIds },
-    };
-    if (since) {
-      readingWhere.recordedAt = { gte: since };
-      obsWhere.createdAt = { gte: since };
-      alertWhere.createdAt = { gte: since };
-    }
-
     const [readings, observations, alerts] = await Promise.all([
       prisma.sensorReading.findMany({
-        where: readingWhere,
+        where: { plotId: { in: plotIds }, ...(win ? { recordedAt: win } : {}) },
         orderBy: { recordedAt: "asc" },
         select: {
           recordedAt: true,
@@ -95,19 +107,19 @@ export async function GET(req: NextRequest) {
           potassium: true,
         },
       }),
-      prisma.growthLog.findMany({ where: obsWhere, select: { createdAt: true } }),
+      prisma.growthLog.findMany({
+        where: { plotId: { in: plotIds }, ...(win ? { createdAt: win } : {}) },
+        select: { createdAt: true },
+      }),
       prisma.alert.findMany({
-        where: alertWhere,
+        where: { plotId: { in: plotIds }, ...(win ? { createdAt: win } : {}) },
         select: { createdAt: true, severity: true },
       }),
     ]);
 
-    // Readings: hourly for 24h, else daily (epoch-floor, data-only) — matches web
-    const bucketMs = range === "24h" ? HOUR : DAY;
     const trends = aggregateReadings(readings, bucketMs);
-
-    const observationsByDay = aggregateCounts(observations.map((o) => o.createdAt));
-    const alertsByDay = aggregateAlerts(alerts);
+    const observationsByDay = aggregateCounts(observations.map((o) => o.createdAt), bucketMs);
+    const alertsByDay = aggregateAlerts(alerts, bucketMs);
 
     const avg = (vals: (number | null)[]) => {
       const v = vals.filter((x): x is number => x !== null);
@@ -116,6 +128,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       range,
+      month,
+      availableMonths,
       summary: {
         totalReadings: readings.length,
         totalObservations: observations.length,
@@ -148,8 +162,46 @@ export async function GET(req: NextRequest) {
 function labelFor(time: number, bucketMs: number) {
   const d = new Date(time);
   return bucketMs < DAY
-    ? d.toLocaleTimeString("en-US", { hour: "numeric" }) // e.g. "2 PM"
-    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); // e.g. "May 16"
+    ? d.toLocaleTimeString("en-US", { hour: "numeric" }) // "9 AM"
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); // "May 16"
+}
+
+async function getAvailableMonths(plotIds: string[]): Promise<string[]> {
+  if (plotIds.length === 0) return [];
+  const [r, o, a] = await Promise.all([
+    prisma.sensorReading.findFirst({
+      where: { plotId: { in: plotIds } },
+      orderBy: { recordedAt: "asc" },
+      select: { recordedAt: true },
+    }),
+    prisma.growthLog.findFirst({
+      where: { plotId: { in: plotIds } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    }),
+    prisma.alert.findFirst({
+      where: { plotId: { in: plotIds } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    }),
+  ]);
+  const times = [r?.recordedAt, o?.createdAt, a?.createdAt]
+    .filter((d): d is Date => !!d)
+    .map((d) => d.getTime());
+  if (times.length === 0) return [];
+
+  const earliest = new Date(Math.min(...times));
+  const now = new Date();
+  const cur = new Date(Date.UTC(earliest.getUTCFullYear(), earliest.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const months: string[] = [];
+  while (cur <= end) {
+    months.push(
+      `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, "0")}`
+    );
+    cur.setUTCMonth(cur.getUTCMonth() + 1);
+  }
+  return months.reverse(); // newest first
 }
 
 function aggregateReadings(
@@ -167,22 +219,16 @@ function aggregateReadings(
 ) {
   type B = {
     time: number;
-    mS: number; mC: number;
-    tS: number; tC: number;
-    hS: number; hC: number;
-    lS: number; lC: number;
-    nS: number; nC: number;
-    pS: number; pC: number;
-    kS: number; kC: number;
+    mS: number; mC: number; tS: number; tC: number; hS: number; hC: number;
+    lS: number; lC: number; nS: number; nC: number; pS: number; pC: number; kS: number; kC: number;
   };
   const buckets = new Map<number, B>();
   for (const r of readings) {
     const key = Math.floor(new Date(r.recordedAt).getTime() / bucketMs) * bucketMs;
     if (!buckets.has(key)) {
       buckets.set(key, {
-        time: key,
-        mS: 0, mC: 0, tS: 0, tC: 0, hS: 0, hC: 0, lS: 0, lC: 0,
-        nS: 0, nC: 0, pS: 0, pC: 0, kS: 0, kC: 0,
+        time: key, mS: 0, mC: 0, tS: 0, tC: 0, hS: 0, hC: 0,
+        lS: 0, lC: 0, nS: 0, nC: 0, pS: 0, pC: 0, kS: 0, kC: 0,
       });
     }
     const b = buckets.get(key)!;
@@ -209,21 +255,21 @@ function aggregateReadings(
     }));
 }
 
-function aggregateCounts(dates: Date[]) {
+function aggregateCounts(dates: Date[], bucketMs: number) {
   const buckets = new Map<number, number>();
   for (const d of dates) {
-    const key = Math.floor(new Date(d).getTime() / DAY) * DAY;
+    const key = Math.floor(new Date(d).getTime() / bucketMs) * bucketMs;
     buckets.set(key, (buckets.get(key) ?? 0) + 1);
   }
   return Array.from(buckets.entries())
     .sort((a, b) => a[0] - b[0])
-    .map(([time, value]) => ({ label: labelFor(time, DAY), value }));
+    .map(([time, value]) => ({ label: labelFor(time, bucketMs), value }));
 }
 
-function aggregateAlerts(alerts: { createdAt: Date; severity: string }[]) {
+function aggregateAlerts(alerts: { createdAt: Date; severity: string }[], bucketMs: number) {
   const buckets = new Map<number, { critical: number; warning: number; info: number }>();
   for (const a of alerts) {
-    const key = Math.floor(new Date(a.createdAt).getTime() / DAY) * DAY;
+    const key = Math.floor(new Date(a.createdAt).getTime() / bucketMs) * bucketMs;
     if (!buckets.has(key)) buckets.set(key, { critical: 0, warning: 0, info: 0 });
     const b = buckets.get(key)!;
     if (a.severity === "CRITICAL") b.critical++;
@@ -233,7 +279,7 @@ function aggregateAlerts(alerts: { createdAt: Date; severity: string }[]) {
   return Array.from(buckets.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([time, b]) => ({
-      label: labelFor(time, DAY),
+      label: labelFor(time, bucketMs),
       critical: b.critical,
       warning: b.warning,
       info: b.info,
@@ -242,15 +288,8 @@ function aggregateAlerts(alerts: { createdAt: Date; severity: string }[]) {
 
 function emptySummary() {
   return {
-    totalReadings: 0,
-    totalObservations: 0,
-    totalAlerts: 0,
-    avgSoilMoisture: null,
-    avgTemperature: null,
-    avgHumidity: null,
-    avgLightIntensity: null,
-    avgNitrogen: null,
-    avgPhosphorus: null,
-    avgPotassium: null,
+    totalReadings: 0, totalObservations: 0, totalAlerts: 0,
+    avgSoilMoisture: null, avgTemperature: null, avgHumidity: null,
+    avgLightIntensity: null, avgNitrogen: null, avgPhosphorus: null, avgPotassium: null,
   };
 }
