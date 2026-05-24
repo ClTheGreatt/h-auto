@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { LatestReadings } from "@/components/devices/latest-readings";
+import { LiveRefresh } from "@/components/plots/live-refresh";
 import { GrowthTimeline } from "@/components/growth/growth-timeline";
 import type { PlotStatus } from "@prisma/client";
 
@@ -223,20 +224,23 @@ export default async function PlotDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+       <CardTitle className="flex items-center justify-between">
             Sensor readings
-            {plot.device && (
-              <Badge
-                variant="secondary"
-                className={
-                  plot.device.status === "ONLINE"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-700"
-                }
-              >
-                {plot.device.deviceCode} - {plot.device.status}
-              </Badge>
-            )}
+            <div className="flex items-center gap-3">
+              {plot.device && <LiveRefresh intervalMs={10000} />}
+              {plot.device && (
+                <Badge
+                  variant="secondary"
+                  className={
+                    plot.device.status === "ONLINE"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-700"
+                  }
+                >
+                  {plot.device.deviceCode} - {plot.device.status}
+                </Badge>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
