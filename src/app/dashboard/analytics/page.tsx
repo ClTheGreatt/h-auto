@@ -128,10 +128,9 @@ function aggregateAlertsByDate(alerts: RawAlert[]) {
     { date: number; critical: number; warning: number; info: number }
   >();
 
+const dayMs = 24 * 60 * 60 * 1000;
   for (const a of alerts) {
-    const date = new Date(a.createdAt);
-    date.setHours(0, 0, 0, 0);
-    const key = date.getTime();
+    const key = Math.floor(new Date(a.createdAt).getTime() / dayMs) * dayMs;
 
     if (!buckets.has(key)) {
       buckets.set(key, { date: key, critical: 0, warning: 0, info: 0 });
@@ -160,10 +159,9 @@ function aggregateObservationsByDate(logs: { createdAt: Date }[]) {
   if (logs.length === 0) return [];
 
   const buckets = new Map<number, { date: number; count: number }>();
+const dayMs = 24 * 60 * 60 * 1000;
   for (const l of logs) {
-    const d = new Date(l.createdAt);
-    d.setHours(0, 0, 0, 0);
-    const key = d.getTime();
+    const key = Math.floor(new Date(l.createdAt).getTime() / dayMs) * dayMs;
     if (!buckets.has(key)) buckets.set(key, { date: key, count: 0 });
     buckets.get(key)!.count++;
   }
