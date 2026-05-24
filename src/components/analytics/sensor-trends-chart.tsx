@@ -33,33 +33,9 @@ export function SensorTrendsChart({ data }: { data: DataPoint[] }) {
           }}
         />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-        <Line
-          type="monotone"
-          dataKey="moisture"
-          name="Moisture %"
-          stroke="#3b82f6"
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="temperature"
-          name="Temp °C"
-          stroke="#ef4444"
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey="humidity"
-          name="Humidity %"
-          stroke="#10b981"
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
+        <Line type="monotone" dataKey="moisture" name="Moisture %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+        <Line type="monotone" dataKey="temperature" name="Temp °C" stroke="#ef4444" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+        <Line type="monotone" dataKey="humidity" name="Humidity %" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} connectNulls />
       </LineChart>
     </ResponsiveContainer>
   );

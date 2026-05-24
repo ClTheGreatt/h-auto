@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
       }
       return buckets.map((b) => ({
         label: b.label,
-       value: acc[b.key] ? acc[b.key].sum / acc[b.key].count : null,
+       value: acc[b.key] ? acc[b.key].sum / acc[b.key].count : 0,
       }));
     }
 

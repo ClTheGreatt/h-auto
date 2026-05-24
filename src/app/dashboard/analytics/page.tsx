@@ -14,6 +14,7 @@ import { StatCard } from "@/components/analytics/stat-card";
 import { AlertsByTypeChart } from "@/components/analytics/alerts-by-type-chart";
 import { SensorTrendsChart } from "@/components/analytics/sensor-trends-chart";
 import { AlertsOverTimeChart } from "@/components/analytics/alerts-over-time-chart";
+import { SensorLineChart } from "@/components/analytics/sensor-line-chart";
 import { PlotFilter } from "@/components/analytics/plot-filter";
 import {
   getDateFromRange,
@@ -29,6 +30,10 @@ type RawReading = {
   soilMoisture: number | null;
   temperature: number | null;
   humidity: number | null;
+  lightIntensity: number | null;
+  nitrogen: number | null;
+  phosphorus: number | null;
+  potassium: number | null;
 };
 
 type RawAlert = {
@@ -46,24 +51,23 @@ function aggregateSensorReadings(
   if (readings.length === 0) return [];
 
   const dayMs = 24 * 60 * 60 * 1000;
-  const rangeMs = now.getTime() - (since?.getTime() ?? readings[0].recordedAt.getTime());
+  const rangeMs =
+    now.getTime() - (since?.getTime() ?? readings[0].recordedAt.getTime());
   const totalDays = rangeMs / dayMs;
-
-  // Choose bucket size based on time range
   const bucketSize = totalDays <= 1 ? 60 * 60 * 1000 : dayMs;
 
-  const buckets = new Map<
-    number,
-    {
-      time: number;
-      moistureSum: number;
-      moistureCount: number;
-      tempSum: number;
-      tempCount: number;
-      humSum: number;
-      humCount: number;
-    }
-  >();
+  type Bucket = {
+    time: number;
+    moistureSum: number; moistureCount: number;
+    tempSum: number; tempCount: number;
+    humSum: number; humCount: number;
+    lightSum: number; lightCount: number;
+    nSum: number; nCount: number;
+    pSum: number; pCount: number;
+    kSum: number; kCount: number;
+  };
+
+  const buckets = new Map<number, Bucket>();
 
   for (const r of readings) {
     const time = new Date(r.recordedAt).getTime();
@@ -72,49 +76,46 @@ function aggregateSensorReadings(
     if (!buckets.has(bucket)) {
       buckets.set(bucket, {
         time: bucket,
-        moistureSum: 0,
-        moistureCount: 0,
-        tempSum: 0,
-        tempCount: 0,
-        humSum: 0,
-        humCount: 0,
+        moistureSum: 0, moistureCount: 0,
+        tempSum: 0, tempCount: 0,
+        humSum: 0, humCount: 0,
+        lightSum: 0, lightCount: 0,
+        nSum: 0, nCount: 0,
+        pSum: 0, pCount: 0,
+        kSum: 0, kCount: 0,
       });
     }
 
     const b = buckets.get(bucket)!;
-    if (r.soilMoisture !== null) {
-      b.moistureSum += r.soilMoisture;
-      b.moistureCount++;
-    }
-    if (r.temperature !== null) {
-      b.tempSum += r.temperature;
-      b.tempCount++;
-    }
-    if (r.humidity !== null) {
-      b.humSum += r.humidity;
-      b.humCount++;
-    }
+    if (r.soilMoisture !== null) { b.moistureSum += r.soilMoisture; b.moistureCount++; }
+    if (r.temperature !== null) { b.tempSum += r.temperature; b.tempCount++; }
+    if (r.humidity !== null) { b.humSum += r.humidity; b.humCount++; }
+    if (r.lightIntensity !== null) { b.lightSum += r.lightIntensity; b.lightCount++; }
+    if (r.nitrogen !== null) { b.nSum += r.nitrogen; b.nCount++; }
+    if (r.phosphorus !== null) { b.pSum += r.phosphorus; b.pCount++; }
+    if (r.potassium !== null) { b.kSum += r.potassium; b.kCount++; }
   }
+
+  const avg = (sum: number, count: number) =>
+    count > 0 ? Math.round((sum / count) * 10) / 10 : null;
 
   return Array.from(buckets.values())
     .sort((a, b) => a.time - b.time)
     .map((b) => ({
+      time: b.time,
       label: new Date(b.time).toLocaleString(
         "en-US",
         bucketSize < dayMs
           ? { hour: "numeric", hour12: true }
           : { month: "short", day: "numeric" }
       ),
-      moisture:
-        b.moistureCount > 0
-          ? Math.round((b.moistureSum / b.moistureCount) * 10) / 10
-          : null,
-      temperature:
-        b.tempCount > 0
-          ? Math.round((b.tempSum / b.tempCount) * 10) / 10
-          : null,
-      humidity:
-        b.humCount > 0 ? Math.round((b.humSum / b.humCount) * 10) / 10 : null,
+      moisture: avg(b.moistureSum, b.moistureCount),
+      temperature: avg(b.tempSum, b.tempCount),
+      humidity: avg(b.humSum, b.humCount),
+      light: avg(b.lightSum, b.lightCount),
+      nitrogen: avg(b.nSum, b.nCount),
+      phosphorus: avg(b.pSum, b.pCount),
+      potassium: avg(b.kSum, b.kCount),
     }));
 }
 
@@ -228,13 +229,17 @@ export default async function AnalyticsPage({
         ...(since && { recordedAt: { gte: since } }),
         plot: combinedPlotFilter,
       },
-      orderBy: { recordedAt: "asc" },
+     orderBy: { recordedAt: "asc" },
       take: 2000,
       select: {
         recordedAt: true,
         soilMoisture: true,
         temperature: true,
         humidity: true,
+        lightIntensity: true,
+        nitrogen: true,
+        phosphorus: true,
+        potassium: true,
       },
     }),
   ]);
@@ -244,8 +249,22 @@ export default async function AnalyticsPage({
     (a) => !a.resolved && a.severity === "CRITICAL"
   ).length;
 
-  const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
+   const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
   const alertsByDate = aggregateAlertsByDate(alerts);
+
+  const lightSeries = [
+    {
+      key: "light",
+      label: "Light",
+      color: "#f59e0b",
+      data: sensorTrends.map((t) => ({ recordedAt: new Date(t.time), value: t.light })),
+    },
+  ];
+  const npkSeries = [
+    { key: "nitrogen", label: "Nitrogen", color: "#16a34a", data: sensorTrends.map((t) => ({ recordedAt: new Date(t.time), value: t.nitrogen })) },
+    { key: "phosphorus", label: "Phosphorus", color: "#a855f7", data: sensorTrends.map((t) => ({ recordedAt: new Date(t.time), value: t.phosphorus })) },
+    { key: "potassium", label: "Potassium", color: "#ea580c", data: sensorTrends.map((t) => ({ recordedAt: new Date(t.time), value: t.potassium })) },
+  ];
 
   // Group alerts by type
   const alertTypeCounts = new Map<
@@ -367,6 +386,45 @@ export default async function AnalyticsPage({
           )}
         </CardContent>
       </Card>
+
+     {/* Light + NPK trends */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Light intensity</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">
+              Average light intensity over time.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {sensorTrends.length === 0 ? (
+              <div className="text-center py-12 text-sm text-gray-500">
+                No sensor data in this range.
+              </div>
+            ) : (
+              <SensorLineChart series={lightSeries} range={range} unit=" lux" />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Nutrients (NPK)</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">
+              Average nitrogen, phosphorus, and potassium over time.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {sensorTrends.length === 0 ? (
+              <div className="text-center py-12 text-sm text-gray-500">
+                No sensor data in this range.
+              </div>
+            ) : (
+              <SensorLineChart series={npkSeries} range={range} unit=" mg/kg" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Two charts side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
