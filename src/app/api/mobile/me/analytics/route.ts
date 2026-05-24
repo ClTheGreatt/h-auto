@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 
 type Range = "24h" | "7d" | "30d" | "all";
+type Granularity = "hour" | "day" | "month";
 type Bucket = { key: string; label: string };
-type Granularity = "hour" | "day";
 type ReadingField =
   | "soilMoisture"
   | "temperature"
@@ -46,7 +46,6 @@ export async function GET(req: NextRequest) {
       select: { id: true, status: true },
     });
 
-    // Narrow to a specific plot if requested and accessible
     const targetPlots =
       plotIdParam && accessiblePlots.some((p) => p.id === plotIdParam)
         ? accessiblePlots.filter((p) => p.id === plotIdParam)
@@ -62,10 +61,17 @@ export async function GET(req: NextRequest) {
       range,
       plotIds
     );
+    const keyOf = (d: Date) => bucketKey(d, granularity);
 
     if (plotIds.length === 0) {
-     const emptyAvg = buckets.map((b) => ({ label: b.label, value: null }));
+      const emptyAvg = buckets.map((b) => ({ label: b.label, value: null }));
       const emptyCount = buckets.map((b) => ({ label: b.label, value: 0 }));
+      const emptyAlerts = buckets.map((b) => ({
+        label: b.label,
+        critical: 0,
+        warning: 0,
+        info: 0,
+      }));
       return NextResponse.json({
         range,
         summary: emptySummary(),
@@ -77,6 +83,7 @@ export async function GET(req: NextRequest) {
         nitrogenByDay: emptyAvg,
         phosphorusByDay: emptyAvg,
         potassiumByDay: emptyAvg,
+        alertsByDay: emptyAlerts,
         statusDistribution,
       });
     }
@@ -89,12 +96,17 @@ export async function GET(req: NextRequest) {
       plotId: { in: string[] };
       createdAt?: { gte: Date };
     } = { plotId: { in: plotIds } };
+    const alertWhere: {
+      plotId: { in: string[] };
+      createdAt?: { gte: Date };
+    } = { plotId: { in: plotIds } };
     if (startDate) {
       readingWhere.recordedAt = { gte: startDate };
       obsWhere.createdAt = { gte: startDate };
+      alertWhere.createdAt = { gte: startDate };
     }
 
-    const [readings, observations] = await Promise.all([
+    const [readings, observations, alerts] = await Promise.all([
       prisma.sensorReading.findMany({
         where: readingWhere,
         select: {
@@ -112,9 +124,11 @@ export async function GET(req: NextRequest) {
         where: obsWhere,
         select: { createdAt: true },
       }),
+      prisma.alert.findMany({
+        where: alertWhere,
+        select: { createdAt: true, severity: true },
+      }),
     ]);
-
-    const keyOf = (d: Date) => bucketKey(d, granularity);
 
     function bucketReadings(field: ReadingField) {
       const acc: Record<string, { sum: number; count: number }> = {};
@@ -128,7 +142,7 @@ export async function GET(req: NextRequest) {
       }
       return buckets.map((b) => ({
         label: b.label,
-       value: acc[b.key] ? acc[b.key].sum / acc[b.key].count : 0,
+        value: acc[b.key] ? acc[b.key].sum / acc[b.key].count : null,
       }));
     }
 
@@ -139,6 +153,26 @@ export async function GET(req: NextRequest) {
         acc[k] = (acc[k] ?? 0) + 1;
       }
       return buckets.map((b) => ({ label: b.label, value: acc[b.key] ?? 0 }));
+    }
+
+    function bucketAlerts() {
+      const acc: Record<
+        string,
+        { critical: number; warning: number; info: number }
+      > = {};
+      for (const a of alerts) {
+        const k = keyOf(a.createdAt);
+        if (!acc[k]) acc[k] = { critical: 0, warning: 0, info: 0 };
+        if (a.severity === "CRITICAL") acc[k].critical++;
+        else if (a.severity === "WARNING") acc[k].warning++;
+        else acc[k].info++;
+      }
+      return buckets.map((b) => ({
+        label: b.label,
+        critical: acc[b.key]?.critical ?? 0,
+        warning: acc[b.key]?.warning ?? 0,
+        info: acc[b.key]?.info ?? 0,
+      }));
     }
 
     const avg = (vals: (number | null)[]) => {
@@ -153,6 +187,7 @@ export async function GET(req: NextRequest) {
       summary: {
         totalReadings: readings.length,
         totalObservations: observations.length,
+        totalAlerts: alerts.length,
         avgSoilMoisture: avg(readings.map((r) => r.soilMoisture)),
         avgTemperature: avg(readings.map((r) => r.temperature)),
         avgHumidity: avg(readings.map((r) => r.humidity)),
@@ -169,6 +204,7 @@ export async function GET(req: NextRequest) {
       nitrogenByDay: bucketReadings("nitrogen"),
       phosphorusByDay: bucketReadings("phosphorus"),
       potassiumByDay: bucketReadings("potassium"),
+      alertsByDay: bucketAlerts(),
       statusDistribution,
     });
   } catch (error) {
@@ -180,60 +216,98 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// ---- Bucketing: UTC-consistent so it works on ANY server timezone ----
+// (this is the fix: bucket keys AND item keys are both derived from UTC,
+// so items always land in a bucket and nothing disappears.)
+
 function bucketKey(d: Date, granularity: Granularity) {
-  const iso = d.toISOString();
-  return granularity === "hour" ? iso.slice(0, 13) : iso.slice(0, 10);
+  const iso = d.toISOString(); // always UTC
+  if (granularity === "hour") return iso.slice(0, 13); // YYYY-MM-DDTHH
+  if (granularity === "month") return iso.slice(0, 7); // YYYY-MM
+  return iso.slice(0, 10); // YYYY-MM-DD
 }
 
 async function buildBuckets(
   range: Range,
   plotIds: string[]
-): Promise<{ startDate: Date | null; buckets: Bucket[]; granularity: Granularity }> {
+): Promise<{
+  startDate: Date | null;
+  buckets: Bucket[];
+  granularity: Granularity;
+}> {
   const now = new Date();
+  const HOUR = 60 * 60 * 1000;
+  const DAY = 24 * HOUR;
 
-  // 24 hours → hourly buckets
+  // 24h -> hourly (UTC hour buckets)
   if (range === "24h") {
-    const startDate = new Date(now.getTime() - 23 * 60 * 60 * 1000);
-    startDate.setMinutes(0, 0, 0);
+    const base = new Date(now);
+    base.setUTCMinutes(0, 0, 0); // top of current UTC hour
     const buckets: Bucket[] = [];
     for (let i = 23; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 60 * 60 * 1000);
-      d.setMinutes(0, 0, 0);
+      const d = new Date(base.getTime() - i * HOUR);
       buckets.push({
         key: d.toISOString().slice(0, 13),
         label: d.toLocaleTimeString("en-US", { hour: "numeric" }),
       });
     }
-    return { startDate, buckets, granularity: "hour" };
+    return { startDate: new Date(base.getTime() - 23 * HOUR), buckets, granularity: "hour" };
   }
 
-  // Daily buckets
-  let days = 7;
-  if (range === "30d") days = 30;
+  // all -> monthly (UTC month buckets) from earliest data to now = HISTORY
   if (range === "all") {
-    days = 30;
+    let earliest: Date | null = null;
     if (plotIds.length) {
-      const earliest = await prisma.sensorReading.findFirst({
-        where: { plotId: { in: plotIds } },
-        orderBy: { recordedAt: "asc" },
-        select: { recordedAt: true },
-      });
-      if (earliest) {
-        const diffDays =
-          Math.ceil(
-            (now.getTime() - earliest.recordedAt.getTime()) /
-              (1000 * 60 * 60 * 24)
-          ) + 1;
-        days = Math.min(Math.max(diffDays, 7), 60);
+      const [r, o, a] = await Promise.all([
+        prisma.sensorReading.findFirst({
+          where: { plotId: { in: plotIds } },
+          orderBy: { recordedAt: "asc" },
+          select: { recordedAt: true },
+        }),
+        prisma.growthLog.findFirst({
+          where: { plotId: { in: plotIds } },
+          orderBy: { createdAt: "asc" },
+          select: { createdAt: true },
+        }),
+        prisma.alert.findFirst({
+          where: { plotId: { in: plotIds } },
+          orderBy: { createdAt: "asc" },
+          select: { createdAt: true },
+        }),
+      ]);
+      const candidates = [r?.recordedAt, o?.createdAt, a?.createdAt].filter(
+        (d): d is Date => !!d
+      );
+      if (candidates.length) {
+        earliest = new Date(Math.min(...candidates.map((d) => d.getTime())));
       }
     }
+    const anchor = earliest ?? now;
+    const startMonth = new Date(
+      Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1)
+    );
+    const buckets: Bucket[] = [];
+    const cursor = new Date(startMonth);
+    while (cursor.getTime() <= now.getTime()) {
+      buckets.push({
+        key: cursor.toISOString().slice(0, 7),
+        label: cursor.toLocaleDateString("en-US", {
+          month: "short",
+          year: "2-digit",
+        }),
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+    return { startDate: startMonth, buckets, granularity: "month" };
   }
 
+  // 7d / 30d -> daily (UTC day buckets)
+  const days = range === "30d" ? 30 : 7;
+  const base = new Date(now);
+  base.setUTCHours(0, 0, 0, 0); // start of current UTC day
   const buckets: Bucket[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
+    const d = new Date(base.getTime() - i * DAY);
     buckets.push({
       key: d.toISOString().slice(0, 10),
       label:
@@ -242,22 +316,18 @@ async function buildBuckets(
           : d.toLocaleDateString("en-US", { month: "numeric", day: "numeric" }),
     });
   }
-
-  // "all" → don't bound the query (totals are all-time); chart shows recent buckets
-  let startDate: Date | null = null;
-  if (range !== "all") {
-    startDate = new Date();
-    startDate.setDate(startDate.getDate() - (days - 1));
-    startDate.setHours(0, 0, 0, 0);
-  }
-
-  return { startDate, buckets, granularity: "day" };
+  return {
+    startDate: new Date(base.getTime() - (days - 1) * DAY),
+    buckets,
+    granularity: "day",
+  };
 }
 
 function emptySummary() {
   return {
     totalReadings: 0,
     totalObservations: 0,
+    totalAlerts: 0,
     avgSoilMoisture: null,
     avgTemperature: null,
     avgHumidity: null,
