@@ -15,6 +15,7 @@ import { AlertsByTypeChart } from "@/components/analytics/alerts-by-type-chart";
 import { SensorTrendsChart } from "@/components/analytics/sensor-trends-chart";
 import { AlertsOverTimeChart } from "@/components/analytics/alerts-over-time-chart";
 import { SensorLineChart } from "@/components/analytics/sensor-line-chart";
+import { ObservationsChart } from "@/components/analytics/observations-chart";
 import { PlotFilter } from "@/components/analytics/plot-filter";
 import {
   getDateFromRange,
@@ -149,9 +150,32 @@ function aggregateAlertsByDate(alerts: RawAlert[]) {
         month: "short",
         day: "numeric",
       }),
-      critical: b.critical,
+ critical: b.critical,
       warning: b.warning,
       info: b.info,
+    }));
+}
+
+function aggregateObservationsByDate(logs: { createdAt: Date }[]) {
+  if (logs.length === 0) return [];
+
+  const buckets = new Map<number, { date: number; count: number }>();
+  for (const l of logs) {
+    const d = new Date(l.createdAt);
+    d.setHours(0, 0, 0, 0);
+    const key = d.getTime();
+    if (!buckets.has(key)) buckets.set(key, { date: key, count: 0 });
+    buckets.get(key)!.count++;
+  }
+
+  return Array.from(buckets.values())
+    .sort((a, b) => a.date - b.date)
+    .map((b) => ({
+      label: new Date(b.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      count: b.count,
     }));
 }
 
@@ -199,7 +223,8 @@ export default async function AnalyticsPage({
   });
 
   // Fetch summary data scoped to filter
-  const [totalReadings, alerts, totalLogs, allReadings] = await Promise.all([
+  const [totalReadings, alerts, totalLogs, allReadings, observationLogs] =
+    await Promise.all([
     prisma.sensorReading.count({
       where: {
         ...(since && { recordedAt: { gte: since } }),
@@ -237,10 +262,19 @@ export default async function AnalyticsPage({
         temperature: true,
         humidity: true,
         lightIntensity: true,
-        nitrogen: true,
+  nitrogen: true,
         phosphorus: true,
         potassium: true,
       },
+    }),
+    prisma.growthLog.findMany({
+      where: {
+        ...(since && { createdAt: { gte: since } }),
+        plot: combinedPlotFilter,
+      },
+      orderBy: { createdAt: "asc" },
+      take: 2000,
+      select: { createdAt: true },
     }),
   ]);
 
@@ -249,8 +283,9 @@ export default async function AnalyticsPage({
     (a) => !a.resolved && a.severity === "CRITICAL"
   ).length;
 
-   const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
+  const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
   const alertsByDate = aggregateAlertsByDate(alerts);
+  const observationsByDate = aggregateObservationsByDate(observationLogs);
 
   const lightSeries = [
     {
@@ -425,6 +460,27 @@ export default async function AnalyticsPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Two charts side by side */}
+{/* Observations / daily activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Observations</CardTitle>
+          <p className="text-xs text-gray-500 mt-1">
+            Growth log entries recorded over time
+            {selectedPlot && ` for ${selectedPlot.name}`}.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {observationsByDate.length === 0 ? (
+            <div className="text-center py-12 text-sm text-gray-500">
+              No observations in this range.
+            </div>
+          ) : (
+            <ObservationsChart data={observationsByDate} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Two charts side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
