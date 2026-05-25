@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   MapPinned,
   Sprout,
   Calendar,
@@ -243,7 +244,7 @@ export default async function PlotDetailPage({
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+      <CardContent>
           {!plot.device ? (
             <div className="text-sm text-gray-500">
               No device linked to this plot.{" "}
@@ -258,6 +259,17 @@ export default async function PlotDetailPage({
             </div>
           ) : (
             <LatestReadings reading={latestReading} stage={plot.currentStage} />
+          )}
+          {latestReading && (
+            <div className="mt-4 pt-4 border-t">
+              <Link
+                href={`/dashboard/plots/${plot.id}/readings`}
+                className="text-sm font-medium text-green-600 hover:text-green-700 inline-flex items-center gap-1"
+              >
+                View all readings
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           )}
         </CardContent>
       </Card>
