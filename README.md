@@ -5,7 +5,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![License](https://img.shields.io/badge/license-Academic-orange)
 
-> Online Smart Gardening Monitoring System for Vegetables using Microcontrollers — a capstone project by IT students at Bataan Peninsula State University.
+> Online Smart Gardening Monitoring System for Vegetables using Microcontrollers  capstone project by IT students at Bataan Peninsula State University.
 
 H-Auto combines IoT sensor technology with a modern web platform to enable real-time monitoring, data analytics, and automated alerting for vegetable cultivation in educational gardens.
 
