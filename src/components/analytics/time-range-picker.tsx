@@ -8,12 +8,12 @@ export function TimeRangePicker({ current }: { current: TimeRange }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  function handleClick(range: TimeRange) {
+function handleClick(range: TimeRange) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("range", range);
+    params.delete("month");
     router.push(`${pathname}?${params.toString()}`);
   }
-
   return (
     <div className="inline-flex items-center bg-gray-100 rounded-md p-1 gap-1">
       {TIME_RANGES.map((r) => (

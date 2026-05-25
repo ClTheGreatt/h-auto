@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { TimeRangePicker } from "@/components/analytics/time-range-picker";
+import { MonthPicker } from "@/components/analytics/month-picker";
 import { StatCard } from "@/components/analytics/stat-card";
 import { AlertsByTypeChart } from "@/components/analytics/alerts-by-type-chart";
 import { SensorTrendsChart } from "@/components/analytics/sensor-trends-chart";
@@ -17,14 +18,14 @@ import { AlertsOverTimeChart } from "@/components/analytics/alerts-over-time-cha
 import { SensorLineChart } from "@/components/analytics/sensor-line-chart";
 import { ObservationsChart } from "@/components/analytics/observations-chart";
 import { PlotFilter } from "@/components/analytics/plot-filter";
-import {
-  getDateFromRange,
-  parseRange,
-} from "@/lib/analytics/time-range";
+import { getDateFromRange, parseRange } from "@/lib/analytics/time-range";
 import {
   calculateOptimalPercent,
   ALERT_TYPE_LABELS,
 } from "@/lib/analytics/aggregator";
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * 60 * 60 * 1000;
 
 type RawReading = {
   recordedAt: Date;
@@ -43,6 +44,44 @@ type RawAlert = {
   resolved: boolean;
   type: string;
 };
+
+function labelFor(time: number, bucketMs: number) {
+  return new Date(time).toLocaleString(
+    "en-US",
+    bucketMs < DAY
+      ? { hour: "numeric", hour12: true }
+      : { month: "short", day: "numeric" }
+  );
+}
+
+// Module-level (labas sa render) para hindi tumama ang React Compiler purity rule
+function pickBucketMs(month: string | null, since: Date | null): number {
+  if (month) return DAY;
+  if (since) {
+    const days = (Date.now() - since.getTime()) / DAY;
+    if (days <= 1) return HOUR;
+  }
+  return DAY;
+}
+
+function listAvailableMonths(earliest: Date | null): string[] {
+  const months: string[] = [];
+  if (!earliest) return months;
+  const now = new Date();
+  let y = now.getUTCFullYear();
+  let m = now.getUTCMonth();
+  const sy = earliest.getUTCFullYear();
+  const sm = earliest.getUTCMonth();
+  while (y > sy || (y === sy && m >= sm)) {
+    months.push(`${y}-${String(m + 1).padStart(2, "0")}`);
+    m--;
+    if (m < 0) {
+      m = 11;
+      y--;
+    }
+  }
+  return months;
+}
 
 function aggregateSensorReadings(
   readings: RawReading[],
@@ -120,7 +159,7 @@ function aggregateSensorReadings(
     }));
 }
 
-function aggregateAlertsByDate(alerts: RawAlert[]) {
+function aggregateAlertsByDate(alerts: RawAlert[], bucketMs: number) {
   if (alerts.length === 0) return [];
 
   const buckets = new Map<
@@ -128,14 +167,11 @@ function aggregateAlertsByDate(alerts: RawAlert[]) {
     { date: number; critical: number; warning: number; info: number }
   >();
 
-const dayMs = 24 * 60 * 60 * 1000;
   for (const a of alerts) {
-    const key = Math.floor(new Date(a.createdAt).getTime() / dayMs) * dayMs;
-
+    const key = Math.floor(new Date(a.createdAt).getTime() / bucketMs) * bucketMs;
     if (!buckets.has(key)) {
       buckets.set(key, { date: key, critical: 0, warning: 0, info: 0 });
     }
-
     const b = buckets.get(key)!;
     if (a.severity === "CRITICAL") b.critical++;
     else if (a.severity === "WARNING") b.warning++;
@@ -145,23 +181,22 @@ const dayMs = 24 * 60 * 60 * 1000;
   return Array.from(buckets.values())
     .sort((a, b) => a.date - b.date)
     .map((b) => ({
-      label: new Date(b.date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
- critical: b.critical,
+      label: labelFor(b.date, bucketMs),
+      critical: b.critical,
       warning: b.warning,
       info: b.info,
     }));
 }
 
-function aggregateObservationsByDate(logs: { createdAt: Date }[]) {
+function aggregateObservationsByDate(
+  logs: { createdAt: Date }[],
+  bucketMs: number
+) {
   if (logs.length === 0) return [];
 
   const buckets = new Map<number, { date: number; count: number }>();
-const dayMs = 24 * 60 * 60 * 1000;
   for (const l of logs) {
-    const key = Math.floor(new Date(l.createdAt).getTime() / dayMs) * dayMs;
+    const key = Math.floor(new Date(l.createdAt).getTime() / bucketMs) * bucketMs;
     if (!buckets.has(key)) buckets.set(key, { date: key, count: 0 });
     buckets.get(key)!.count++;
   }
@@ -169,10 +204,7 @@ const dayMs = 24 * 60 * 60 * 1000;
   return Array.from(buckets.values())
     .sort((a, b) => a.date - b.date)
     .map((b) => ({
-      label: new Date(b.date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
+      label: labelFor(b.date, bucketMs),
       count: b.count,
     }));
 }
@@ -180,14 +212,41 @@ const dayMs = 24 * 60 * 60 * 1000;
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; plotId?: string }>;
+  searchParams: Promise<{ range?: string; plotId?: string; month?: string }>;
 }) {
   const session = await requireAuth();
   const sp = await searchParams;
   const range = parseRange(sp.range);
-  const since = getDateFromRange(range);
   const role = session.user.role;
   const selectedPlotId = sp.plotId;
+  const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : null;
+
+  // Date window: month overrides range
+  let since: Date | null;
+  let until: Date | null;
+  if (month) {
+    const [y, m] = month.split("-").map(Number);
+    since = new Date(Date.UTC(y, m - 1, 1));
+    until = new Date(Date.UTC(y, m, 1));
+  } else {
+    since = getDateFromRange(range);
+    until = null;
+  }
+
+  const readingWindow =
+    since && until
+      ? { recordedAt: { gte: since, lt: until } }
+      : since
+      ? { recordedAt: { gte: since } }
+      : {};
+  const createdWindow =
+    since && until
+      ? { createdAt: { gte: since, lt: until } }
+      : since
+      ? { createdAt: { gte: since } }
+      : {};
+
+  const bucketMs = pickBucketMs(month, since);
 
   // Role-aware base filter
   const plotFilter =
@@ -199,12 +258,10 @@ export default async function AnalyticsPage({
         }
       : {};
 
-  // Combined filter (role + selected plot)
   const combinedPlotFilter = selectedPlotId
     ? { ...plotFilter, id: selectedPlotId }
     : plotFilter;
 
-  // Fetch plots for dropdown (always all role-visible plots)
   const plots = await prisma.plot.findMany({
     where: plotFilter,
     orderBy: { name: "asc" },
@@ -220,20 +277,21 @@ export default async function AnalyticsPage({
     },
   });
 
-  // Fetch summary data scoped to filter
-  const [totalReadings, alerts, totalLogs, allReadings, observationLogs] =
-    await Promise.all([
+  const [
+    totalReadings,
+    alerts,
+    totalLogs,
+    allReadings,
+    observationLogs,
+    earliestReading,
+    earliestLog,
+    earliestAlert,
+  ] = await Promise.all([
     prisma.sensorReading.count({
-      where: {
-        ...(since && { recordedAt: { gte: since } }),
-        plot: combinedPlotFilter,
-      },
+      where: { ...readingWindow, plot: combinedPlotFilter },
     }),
     prisma.alert.findMany({
-      where: {
-        ...(since && { createdAt: { gte: since } }),
-        plot: combinedPlotFilter,
-      },
+      where: { ...createdWindow, plot: combinedPlotFilter },
       select: {
         createdAt: true,
         severity: true,
@@ -242,17 +300,11 @@ export default async function AnalyticsPage({
       },
     }),
     prisma.growthLog.count({
-      where: {
-        ...(since && { createdAt: { gte: since } }),
-        plot: combinedPlotFilter,
-      },
+      where: { ...createdWindow, plot: combinedPlotFilter },
     }),
     prisma.sensorReading.findMany({
-      where: {
-        ...(since && { recordedAt: { gte: since } }),
-        plot: combinedPlotFilter,
-      },
-     orderBy: { recordedAt: "asc" },
+      where: { ...readingWindow, plot: combinedPlotFilter },
+      orderBy: { recordedAt: "asc" },
       take: 2000,
       select: {
         recordedAt: true,
@@ -260,21 +312,43 @@ export default async function AnalyticsPage({
         temperature: true,
         humidity: true,
         lightIntensity: true,
-  nitrogen: true,
+        nitrogen: true,
         phosphorus: true,
         potassium: true,
       },
     }),
     prisma.growthLog.findMany({
-      where: {
-        ...(since && { createdAt: { gte: since } }),
-        plot: combinedPlotFilter,
-      },
+      where: { ...createdWindow, plot: combinedPlotFilter },
       orderBy: { createdAt: "asc" },
       take: 2000,
       select: { createdAt: true },
     }),
+    prisma.sensorReading.findFirst({
+      where: { plot: combinedPlotFilter },
+      orderBy: { recordedAt: "asc" },
+      select: { recordedAt: true },
+    }),
+    prisma.growthLog.findFirst({
+      where: { plot: combinedPlotFilter },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    }),
+    prisma.alert.findFirst({
+      where: { plot: combinedPlotFilter },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    }),
   ]);
+
+  const earliestDates = [
+    earliestReading?.recordedAt,
+    earliestLog?.createdAt,
+    earliestAlert?.createdAt,
+  ].filter((d): d is Date => !!d);
+  const earliest = earliestDates.length
+    ? new Date(Math.min(...earliestDates.map((d) => d.getTime())))
+    : null;
+  const availableMonths = listAvailableMonths(earliest);
 
   const openAlerts = alerts.filter((a) => !a.resolved).length;
   const criticalAlerts = alerts.filter(
@@ -282,8 +356,8 @@ export default async function AnalyticsPage({
   ).length;
 
   const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
-  const alertsByDate = aggregateAlertsByDate(alerts);
-  const observationsByDate = aggregateObservationsByDate(observationLogs);
+  const alertsByDate = aggregateAlertsByDate(alerts, bucketMs);
+  const observationsByDate = aggregateObservationsByDate(observationLogs, bucketMs);
 
   const lightSeries = [
     {
@@ -299,7 +373,6 @@ export default async function AnalyticsPage({
     { key: "potassium", label: "Potassium", color: "#ea580c", data: sensorTrends.map((t) => ({ recordedAt: new Date(t.time), value: t.potassium })) },
   ];
 
-  // Group alerts by type
   const alertTypeCounts = new Map<
     string,
     {
@@ -324,7 +397,6 @@ export default async function AnalyticsPage({
     }
   }
 
-  // Plot health per plot
   const plotHealth: Record<string, number> = {};
   for (const plot of plots) {
     if (!plot.currentStage) {
@@ -332,9 +404,7 @@ export default async function AnalyticsPage({
       continue;
     }
     const readings = await prisma.sensorReading.findMany({
-      where: since
-        ? { plotId: plot.id, recordedAt: { gte: since } }
-        : { plotId: plot.id },
+      where: { plotId: plot.id, ...readingWindow },
       take: 200,
       orderBy: { recordedAt: "desc" },
     });
@@ -344,9 +414,11 @@ export default async function AnalyticsPage({
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
   const plotCount = selectedPlotId ? 1 : plots.length;
 
+  // Preserve active filter (month or range) sa plot health links
+  const filterQs = month ? `month=${month}` : `range=${range}`;
+
   return (
     <div className="space-y-6">
-      {/* Header with filters */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
@@ -362,10 +434,10 @@ export default async function AnalyticsPage({
             current={selectedPlotId}
           />
           <TimeRangePicker current={range} />
+          <MonthPicker current={month ?? undefined} availableMonths={availableMonths} />
         </div>
       </div>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label={selectedPlot ? "Selected plot" : "Plots"}
@@ -400,7 +472,6 @@ export default async function AnalyticsPage({
         />
       </div>
 
-      {/* Sensor trends */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Sensor trends</CardTitle>
@@ -420,7 +491,6 @@ export default async function AnalyticsPage({
         </CardContent>
       </Card>
 
-     {/* Light + NPK trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
@@ -459,8 +529,6 @@ export default async function AnalyticsPage({
         </Card>
       </div>
 
-      {/* Two charts side by side */}
-{/* Observations / daily activity */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Observations</CardTitle>
@@ -480,13 +548,12 @@ export default async function AnalyticsPage({
         </CardContent>
       </Card>
 
-      {/* Two charts side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Alerts over time</CardTitle>
             <p className="text-xs text-gray-500 mt-1">
-              Daily alert count by severity.
+              Alert count by severity.
             </p>
           </CardHeader>
           <CardContent>
@@ -513,7 +580,6 @@ export default async function AnalyticsPage({
         </Card>
       </div>
 
-      {/* Plot health summary - inline filtering, no redirects */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Plot health summary</CardTitle>
@@ -522,7 +588,7 @@ export default async function AnalyticsPage({
               <>
                 Showing one plot.{" "}
                 <Link
-                  href={`/dashboard/analytics?range=${range}`}
+                  href={`/dashboard/analytics?${filterQs}`}
                   className="text-green-600 hover:underline"
                 >
                   Clear filter to see all
@@ -553,7 +619,7 @@ export default async function AnalyticsPage({
                 return (
                   <Link
                     key={plot.id}
-                    href={`/dashboard/analytics?plotId=${plot.id}&range=${range}`}
+                    href={`/dashboard/analytics?plotId=${plot.id}&${filterQs}`}
                     className={
                       "flex items-center gap-4 p-4 transition " +
                       (isSelected
