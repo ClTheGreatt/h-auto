@@ -9,19 +9,19 @@
 
 H-Auto combines IoT sensor technology with a modern web platform to enable real-time monitoring, data analytics, and automated alerting for vegetable cultivation in educational gardens.
 
-## ✨ Features
+##  Features
 
-- 📊 **Real-time Sensor Monitoring** — soil moisture, temperature, humidity, light intensity, and NPK levels via ESP32-based IoT devices
-- 📱 **SMS Alerts** — automated notifications via Semaphore when readings fall outside optimal ranges
-- 🌱 **Crop Profiling** — define crops with growth stages and per-stage optimal sensor thresholds
-- 👥 **Role-based Access** — Super Admin, Admin, Faculty, and Student Farmer roles with appropriate permissions
-- 📸 **Growth Logs** — photo-based observation tracking with up to 4 images per log
-- 📈 **Visual Analytics** — interactive charts for sensor trends, growth progression, and alert patterns
-- 📄 **Comprehensive Reports** — export to PDF and Excel: sensor readings, plot performance, growth logs, alerts, system activity
-- 📦 **Bulk Import** — CSV-based user import with validation preview
-- 📱 **Mobile Responsive** — works on phones, tablets, and desktops
+-  **Real-time Sensor Monitoring** — soil moisture, temperature, humidity, light intensity, and NPK levels via ESP32-based IoT devices
+-  **SMS Alerts** — automated notifications via Semaphore when readings fall outside optimal ranges
+-  **Crop Profiling** — define crops with growth stages and per-stage optimal sensor thresholds
+-  **Role-based Access** — Super Admin, Admin, Faculty, and Student Farmer roles with appropriate permissions
+-  **Growth Logs** — photo-based observation tracking with up to 4 images per log
+-  **Visual Analytics** — interactive charts for sensor trends, growth progression, and alert patterns
+-  **Comprehensive Reports** — export to PDF and Excel: sensor readings, plot performance, growth logs, alerts, system activity
+-  **Bulk Import** — CSV-based user import with validation preview
+-  **Mobile Responsive** — works on phones, tablets, and desktops
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 **Frontend**
 - Next.js 16 (App Router, Turbopack)
@@ -52,7 +52,7 @@ H-Auto combines IoT sensor technology with a modern web platform to enable real-
 - BH1750 (light intensity)
 - NPK sensor (RS485)
 
-## 🚀 Setup
+##  Setup
 
 ### Prerequisites
 
@@ -197,7 +197,7 @@ The endpoint:
 
 Firmware for ESP32 is maintained separately (see hardware/firmware repo).
 
-## 📊 Database Schema
+##  Database Schema
 
 13 tables:
 
@@ -213,7 +213,7 @@ Firmware for ESP32 is maintained separately (see hardware/firmware repo).
 
 Full schema in `prisma/schema.prisma`.
 
-## 🧪 Testing the System (Without Hardware)
+##  Testing the System (Without Hardware)
 
 Use PowerShell to simulate ESP32 readings:
 
@@ -231,11 +231,11 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/sensors/ingest" `
 
 Low `soilMoisture` (15%) will trigger a critical alert.
 
-## 📜 License
+##  License
 
 This project is developed as an academic capstone and is provided as-is for educational purposes.
 
-## 👥 Team
+##  Team
 
 Developed by Information Technology students at:
 
@@ -251,7 +251,7 @@ Academic Year 2025–2026
 | Geoffrey Perello | Frontend / UI Design |
 | Jhan Criss Alba | Documentation / Research |
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Faculty advisors for guidance throughout the project
 - Bataan Peninsula State University for the platform
