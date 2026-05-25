@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { LogOut, User as UserIcon, ChevronDown } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,11 +24,13 @@ export function Header({
   lastName,
   email,
   role,
+  image,
 }: {
   firstName: string;
   lastName: string;
   email: string;
   role: UserRole;
+  image?: string | null;
 }) {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -58,7 +60,8 @@ export function Header({
             variant="ghost"
             className="flex items-center gap-3 h-auto py-1.5 px-2 hover:bg-gray-100"
           >
-            <Avatar className="w-9 h-9">
+        <Avatar className="w-9 h-9">
+              {image && <AvatarImage src={image} alt={fullName} />}
               <AvatarFallback className="bg-green-100 text-green-700 font-medium text-sm">
                 {initials}
               </AvatarFallback>
