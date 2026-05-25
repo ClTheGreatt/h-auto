@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { requireAuth } from "@/lib/auth-helpers";
 import {
   updateProfileSchema,
@@ -102,4 +103,40 @@ export async function changePassword(input: ChangePasswordInput) {
   }
 
   return { success: true };
+}
+
+export async function updateProfileImage(formData: FormData) {
+  const session = await requireAuth();
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "No image selected." };
+  }
+  if (!file.type.startsWith("image/")) {
+    return { error: "Please choose an image file." };
+  }
+
+  const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+  if (file.size > MAX_BYTES) {
+    return { error: "Image is too large. Maximum size is 5MB." };
+  }
+
+  const upload = await uploadImageToCloudinary(file, "h-auto/avatars");
+  if (!upload.success || !upload.url) {
+    return { error: upload.error ?? "Upload failed. Please try again." };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { profileImage: upload.url },
+    });
+  } catch (error) {
+    console.error("updateProfileImage error:", error);
+    return { error: "Failed to save your photo. Please try again." };
+  }
+
+  revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard");
+  return { success: true, url: upload.url };
 }

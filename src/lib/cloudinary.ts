@@ -24,7 +24,10 @@ function getCloudinary() {
   return cloudinary;
 }
 
-export async function uploadImageToCloudinary(file: File): Promise<{
+export async function uploadImageToCloudinary(
+  file: File,
+  folder: string = "h-auto/growth-logs"
+): Promise<{
   success: boolean;
   url?: string;
   error?: string;
@@ -34,7 +37,7 @@ export async function uploadImageToCloudinary(file: File): Promise<{
     const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
     const result = await getCloudinary().uploader.upload(base64, {
-      folder: "h-auto/growth-logs",
+   folder,
       resource_type: "image",
       transformation: [{ quality: "auto", fetch_format: "auto" }],
     });
