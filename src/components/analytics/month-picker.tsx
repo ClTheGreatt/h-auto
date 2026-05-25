@@ -1,7 +1,17 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Calendar } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Module-level (labas sa render) para iwas React Compiler purity rule.
+// Fallback lang ito kapag wala pang anumang datos.
+const THIS_YEAR = new Date().getUTCFullYear();
 
 function formatMonth(ym: string) {
   const [y, m] = ym.split("-").map(Number);
@@ -10,6 +20,10 @@ function formatMonth(ym: string) {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+function yearOf(ym: string) {
+  return Number(ym.split("-")[0]);
 }
 
 export function MonthPicker({
@@ -23,45 +37,142 @@ export function MonthPicker({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  function handleChange(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (!value) {
-      params.delete("month");
-    } else {
-      params.set("month", value);
-      params.delete("range");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const availableSet = new Set(availableMonths);
+  const years = Array.from(new Set(availableMonths.map(yearOf))).sort(
+    (a, b) => b - a
+  );
+  const maxYear = years[0] ?? THIS_YEAR;
+  const minYear = years[years.length - 1] ?? THIS_YEAR;
+
+  const defaultYear = current ? yearOf(current) : maxYear;
+  const [viewYear, setViewYear] = useState(defaultYear);
+
+  // Isara kapag nag-click sa labas
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
     }
-    const qs = params.toString();
-    router.push(`${pathname}${qs ? "?" + qs : ""}`);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  function toggle() {
+    if (!open) setViewYear(current ? yearOf(current) : maxYear);
+    setOpen((o) => !o);
   }
 
+  function selectMonth(ym: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", ym);
+    params.delete("range");
+    const qs = params.toString();
+    router.push(`${pathname}${qs ? "?" + qs : ""}`);
+    setOpen(false);
+  }
+
+  function clearMonth() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("month");
+    const qs = params.toString();
+    router.push(`${pathname}${qs ? "?" + qs : ""}`);
+    setOpen(false);
+  }
+
+  const label = current ? formatMonth(current) : "By month";
+
   return (
-    <div className="relative">
-      <select
-        value={current ?? ""}
-        onChange={(e) => handleChange(e.target.value)}
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={toggle}
         className={
-          "appearance-none pl-8 pr-7 py-1.5 rounded-md text-xs border cursor-pointer transition " +
+          "inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-md text-xs border cursor-pointer transition " +
           (current
-            ? "bg-green-600 text-white border-green-600"
+            ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
             : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")
         }
       >
-        <option value="" className="text-gray-900">
-          By month
-        </option>
-        {availableMonths.map((m) => (
-          <option key={m} value={m} className="text-gray-900">
-            {formatMonth(m)}
-          </option>
-        ))}
-      </select>
-      <Calendar
-        className={
-          "w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none " +
-          (current ? "text-white" : "text-gray-400")
-        }
-      />
+        <Calendar
+          className={"w-3.5 h-3.5 " + (current ? "text-white" : "text-gray-400")}
+        />
+        {label}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1 z-50 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+          {/* Year stepper */}
+          <div className="flex items-center justify-between mb-2">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y - 1)}
+              disabled={viewYear <= minYear}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous year"
+            >
+              <ChevronLeft className="w-4 h-4 text-gray-600" />
+            </button>
+            <span className="text-sm font-semibold text-gray-900">
+              {viewYear}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y + 1)}
+              disabled={viewYear >= maxYear}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next year"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
+
+          {/* 12-month grid */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {MONTH_LABELS.map((m, i) => {
+              const ym = `${viewYear}-${String(i + 1).padStart(2, "0")}`;
+              const enabled = availableSet.has(ym);
+              const isSelected = ym === current;
+              return (
+                <button
+                  key={ym}
+                  type="button"
+                  disabled={!enabled}
+                  onClick={() => selectMonth(ym)}
+                  className={
+                    "py-1.5 rounded-md text-xs font-medium transition " +
+                    (isSelected
+                      ? "bg-green-600 text-white"
+                      : enabled
+                      ? "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                      : "text-gray-300 cursor-not-allowed")
+                  }
+                >
+                  {m}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Clear */}
+          {current && (
+            <button
+              type="button"
+              onClick={clearMonth}
+              className="mt-2 w-full text-center text-xs text-gray-500 hover:text-gray-700 py-1"
+            >
+              Clear month filter
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
