@@ -162,8 +162,15 @@ export async function GET(req: NextRequest) {
 function labelFor(time: number, bucketMs: number) {
   const d = new Date(time);
   return bucketMs < DAY
-    ? d.toLocaleTimeString("en-US", { hour: "numeric" }) // "9 AM"
-    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); // "May 16"
+    ? d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        timeZone: "Asia/Manila",
+      }) // "5 PM" (Manila)
+    : d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: "Asia/Manila",
+      }); // "May 16"
 }
 
 async function getAvailableMonths(plotIds: string[]): Promise<string[]> {
