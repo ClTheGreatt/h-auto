@@ -120,10 +120,10 @@ export async function processSensorReading(readingId: string) {
 if (tokens.length > 0) {
         const severityLabel =
           v.severity === "CRITICAL"
-            ? "Critical alert"
+            ? "🔴 Critical"
             : v.severity === "WARNING"
-            ? "Warning"
-            : "Notice";
+            ? "🟡 Warning"
+            : "🔵 Info";
         const pushResult = await sendExpoPush(
           tokens.map((t) => ({
             to: t.token,
