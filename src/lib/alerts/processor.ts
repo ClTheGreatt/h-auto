@@ -117,12 +117,18 @@ export async function processSensorReading(readingId: string) {
         where: { userId: user.id },
         select: { token: true },
       });
-      if (tokens.length > 0) {
+if (tokens.length > 0) {
+        const severityLabel =
+          v.severity === "CRITICAL"
+            ? "Critical alert"
+            : v.severity === "WARNING"
+            ? "Warning"
+            : "Notice";
         const pushResult = await sendExpoPush(
           tokens.map((t) => ({
             to: t.token,
-            title: `H-Auto Alert (${v.severity})`,
-            body: `${reading.plot.name} - ${v.message}`,
+            title: `${severityLabel} · ${reading.plot.name}`,
+            body: v.message,
             sound: "default" as const,
             priority: "high" as const,
             data: { alertId: alert.id, plotId: reading.plotId, type: v.type },
