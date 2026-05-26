@@ -4,7 +4,6 @@ import { ProfileInfoForm } from "@/components/profile/profile-info-form";
 import { PasswordChangeForm } from "@/components/profile/password-change-form";
 import { AppearanceForm } from "@/components/profile/appearance-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AvatarUploadForm } from "@/components/profile/avatar-upload-form";
 import { Badge } from "@/components/ui/badge";
 
@@ -56,14 +55,10 @@ export default async function ProfilePage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
-         <Avatar className="w-16 h-16">
-              {user.profileImage && (
-                <AvatarImage src={user.profileImage} alt="Profile photo" />
-              )}
-              <AvatarFallback className="bg-green-100 text-green-700 text-xl font-medium">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+       <AvatarUploadForm
+              currentImage={user.profileImage}
+              initials={initials}
+            />
             <div className="flex-1">
               <h2 className="text-lg font-semibold">
                 {user.firstName} {user.lastName}
@@ -85,11 +80,6 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-{/* Profile photo upload */}
-      <AvatarUploadForm
-        currentImage={user.profileImage}
-        initials={initials}
-      />
       {/* Edit profile */}
       <ProfileInfoForm
         defaultValues={{
