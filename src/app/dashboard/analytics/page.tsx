@@ -49,8 +49,8 @@ function labelFor(time: number, bucketMs: number) {
   return new Date(time).toLocaleString(
     "en-US",
     bucketMs < DAY
-      ? { hour: "numeric", hour12: true }
-      : { month: "short", day: "numeric" }
+      ? { hour: "numeric", hour12: true, timeZone: "Asia/Manila" }
+      : { month: "short", day: "numeric", timeZone: "Asia/Manila" }
   );
 }
 
@@ -59,7 +59,7 @@ function pickBucketMs(month: string | null, since: Date | null): number {
   if (month) return DAY;
   if (since) {
     const days = (Date.now() - since.getTime()) / DAY;
-    if (days <= 1) return HOUR;
+    if (days < 2) return HOUR; // 24h view → hourly (hindi na maaapektuhan ng drift)
   }
   return DAY;
 }
@@ -83,18 +83,10 @@ function listAvailableMonths(earliest: Date | null): string[] {
   return months;
 }
 
-function aggregateSensorReadings(
-  readings: RawReading[],
-  since: Date | null,
-  now: Date
-) {
+function aggregateSensorReadings(readings: RawReading[], bucketSize: number) {
   if (readings.length === 0) return [];
 
   const dayMs = 24 * 60 * 60 * 1000;
-  const rangeMs =
-    now.getTime() - (since?.getTime() ?? readings[0].recordedAt.getTime());
-  const totalDays = rangeMs / dayMs;
-  const bucketSize = totalDays <= 1 ? 60 * 60 * 1000 : dayMs;
 
   type Bucket = {
     time: number;
@@ -146,8 +138,8 @@ function aggregateSensorReadings(
       label: new Date(b.time).toLocaleString(
         "en-US",
         bucketSize < dayMs
-          ? { hour: "numeric", hour12: true }
-          : { month: "short", day: "numeric" }
+          ? { hour: "numeric", hour12: true, timeZone: "Asia/Manila" }
+          : { month: "short", day: "numeric", timeZone: "Asia/Manila" }
       ),
       moisture: avg(b.moistureSum, b.moistureCount),
       temperature: avg(b.tempSum, b.tempCount),
@@ -355,7 +347,7 @@ export default async function AnalyticsPage({
     (a) => !a.resolved && a.severity === "CRITICAL"
   ).length;
 
-  const sensorTrends = aggregateSensorReadings(allReadings, since, new Date());
+const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
   const alertsByDate = aggregateAlertsByDate(alerts, bucketMs);
   const observationsByDate = aggregateObservationsByDate(observationLogs, bucketMs);
 

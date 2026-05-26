@@ -31,7 +31,15 @@ export function parseRange(raw: string | undefined): TimeRange {
 export function formatChartDate(date: Date, range: TimeRange): string {
   const d = new Date(date);
   if (range === "24h") {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      hour12: true,
+      timeZone: "Asia/Manila",
+    });
   }
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "Asia/Manila",
+  });
 }
