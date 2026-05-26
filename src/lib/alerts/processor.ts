@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/sms/semaphore";
 import { sendEmail } from "@/lib/email/send-email";
+import { sendExpoPush } from "@/lib/push/expo";
 import { checkThresholds } from "./threshold-checker";
 
 type Recipient = {
@@ -110,6 +111,34 @@ export async function processSensorReading(readingId: string) {
           sentAt: emailResult.success ? new Date() : null,
         },
       });
+
+      // 4) Push — to all of this user's registered devices
+      const tokens = await prisma.pushToken.findMany({
+        where: { userId: user.id },
+        select: { token: true },
+      });
+      if (tokens.length > 0) {
+        const pushResult = await sendExpoPush(
+          tokens.map((t) => ({
+            to: t.token,
+            title: `H-Auto Alert (${v.severity})`,
+            body: `${reading.plot.name} - ${v.message}`,
+            sound: "default" as const,
+            priority: "high" as const,
+            data: { alertId: alert.id, plotId: reading.plotId, type: v.type },
+          }))
+        );
+        await prisma.alertNotification.create({
+          data: {
+            alertId: alert.id,
+            userId: user.id,
+            channel: "PUSH",
+            status: pushResult.success ? "SENT" : "FAILED",
+            errorMessage: pushResult.error ?? null,
+            sentAt: pushResult.success ? new Date() : null,
+          },
+        });
+      }
     }
   }
 
