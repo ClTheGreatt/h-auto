@@ -52,3 +52,8 @@ Thumbs.db
 # Testing artifacts (just in case)
 test-results/
 playwright-report/
+
+# Environment secrets
+.env
+.env*
+!.env.example
