@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AlertsBadge } from "./alerts-badge";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -116,8 +117,9 @@ export function Sidebar({
             : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:translate-x-0.5"
         )}
       >
-        <Icon className="w-4 h-4 flex-shrink-0" />
+  <Icon className="w-4 h-4 flex-shrink-0" />
         <span className="truncate">{item.label}</span>
+        {item.href === "/dashboard/alerts" && <AlertsBadge />}
       </Link>
     );
   }
