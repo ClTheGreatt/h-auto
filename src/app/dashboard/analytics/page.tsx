@@ -198,6 +198,7 @@ function aggregateObservationsByDate(
     .map((b) => ({
       label: labelFor(b.date, bucketMs),
       count: b.count,
+      date: b.date,
     }));
 }
 
@@ -535,7 +536,11 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
               No observations in this range.
             </div>
           ) : (
-            <ObservationsChart data={observationsByDate} />
+            <ObservationsChart
+              data={observationsByDate}
+              bucketMs={bucketMs}
+              plotId={selectedPlotId}
+            />
           )}
         </CardContent>
       </Card>

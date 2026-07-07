@@ -7,6 +7,7 @@ export default async function ReportsPage() {
   const session = await requireAuth();
   const role = session.user.role;
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
+  const isFacultyOrAdmin = isAdmin || role === "FACULTY";
 
   const plotFilter =
     role === "STUDENT_FARMER"
@@ -92,6 +93,16 @@ export default async function ReportsPage() {
             description="Audit log of system events: user creations, imports, plot setup, device registrations, and assignments. Admin only."
             icon="filetext"
             iconColor="bg-gray-100 text-gray-700"
+          />
+        )}
+
+        {isFacultyOrAdmin && (
+          <ReportCard
+            type="student-activity"
+            title="Student Activity"
+            description="Per-student summary of logging activity: observations recorded, plots assigned, photos submitted, and last activity date. For faculty monitoring of student farmers."
+            icon="filetext"
+            iconColor="bg-indigo-100 text-indigo-700"
           />
         )}
       </div>

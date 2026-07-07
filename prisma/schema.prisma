@@ -355,6 +355,17 @@ model GrowthLog {
   stageId       String?
   plantHeightCm Float?
   leafCount     Int?
+
+  // Sensor snapshot at time of logging (Option A — immutable)
+  soilMoisture    Float?
+  temperature     Float?
+  humidity        Float?
+  lightIntensity  Float?
+  nitrogen        Float?
+  phosphorus      Float?
+  potassium       Float?
+  sensorReadingId String?
+
   observations  String?  @db.Text
   notes         String?  @db.Text
   createdAt     DateTime @default(now())

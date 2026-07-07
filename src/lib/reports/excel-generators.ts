@@ -517,3 +517,85 @@ export async function generateActivityExcel(
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
+
+// =============================================================
+// REPORT 6: STUDENT ACTIVITY
+// =============================================================
+
+export async function generateStudentActivityExcel(
+  data: Array<{
+    studentName: string;
+    idNumber: string;
+    department: string;
+    section: string;
+    plotsAssigned: number;
+    observationsInRange: number;
+    totalObservations: number;
+    photoCount: number;
+    lastLogAt: Date | null;
+  }>,
+  rangeLabel: string
+) {
+  const wb = new ExcelJS.Workbook();
+  applyBranding(wb);
+  const sheet = wb.addWorksheet("Student Activity");
+
+  const meta = [
+    `Time range: ${rangeLabel}`,
+    `Total students: ${data.length}`,
+    `Generated: ${formatDateTime(new Date())}`,
+  ];
+
+  const headerRowIndex = addTitleRows(sheet, "Student Activity Report", meta);
+
+  const headers = [
+    "Student",
+    "ID Number",
+    "Department",
+    "Section",
+    "Plots Assigned",
+    "Observations (range)",
+    "Total Observations",
+    "Photos",
+    "Last Log",
+  ];
+  sheet.getRow(headerRowIndex).values = headers;
+  styleHeaderRow(sheet.getRow(headerRowIndex));
+
+  sheet.columns = [
+    { width: 24 },
+    { width: 16 },
+    { width: 20 },
+    { width: 12 },
+    { width: 16 },
+    { width: 20 },
+    { width: 18 },
+    { width: 12 },
+    { width: 16 },
+  ];
+
+  let row = headerRowIndex + 1;
+  for (const r of data) {
+    sheet.getRow(row).values = [
+      r.studentName,
+      r.idNumber,
+      r.department,
+      r.section,
+      r.plotsAssigned,
+      r.observationsInRange,
+      r.totalObservations,
+      r.photoCount,
+      formatDate(r.lastLogAt),
+    ];
+    if (row % 2 === 0) {
+      sheet.getRow(row).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF9FAFB" },
+      };
+    }
+    row++;
+  }
+
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}

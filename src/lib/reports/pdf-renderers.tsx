@@ -5,6 +5,7 @@ import {
   GrowthLogPDF,
   AlertsPDF,
   ActivityPDF,
+  StudentActivityPDF,
 } from "./pdf-generators";
 
 // Types for the data each renderer accepts
@@ -13,6 +14,7 @@ type PlotPerformanceData = Parameters<typeof PlotPerformancePDF>[0]["data"];
 type GrowthLogData = Parameters<typeof GrowthLogPDF>[0]["data"];
 type AlertsData = Parameters<typeof AlertsPDF>[0]["data"];
 type ActivityData = Parameters<typeof ActivityPDF>[0]["data"];
+type StudentActivityData = Parameters<typeof StudentActivityPDF>[0]["data"];
 
 export async function renderSensorReadingsPDF(
   data: SensorReadingsData,
@@ -59,5 +61,14 @@ export async function renderActivityPDF(
 ): Promise<Buffer> {
   return await renderToBuffer(
     <ActivityPDF data={data} rangeLabel={rangeLabel} />
+  );
+}
+
+export async function renderStudentActivityPDF(
+  data: StudentActivityData,
+  rangeLabel: string
+): Promise<Buffer> {
+  return await renderToBuffer(
+    <StudentActivityPDF data={data} rangeLabel={rangeLabel} />
   );
 }

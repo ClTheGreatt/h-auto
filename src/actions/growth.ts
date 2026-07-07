@@ -26,6 +26,11 @@ export async function createGrowthLog(plotId: string, input: GrowthLogFormValues
   const parsed = growthLogSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid input" };
 
+  const latestReading = await prisma.sensorReading.findFirst({
+    where: { plotId },
+    orderBy: { recordedAt: "desc" },
+  });
+
   await prisma.growthLog.create({
     data: {
       plotId,
@@ -33,6 +38,14 @@ export async function createGrowthLog(plotId: string, input: GrowthLogFormValues
       stageId: parsed.data.stageId || null,
       plantHeightCm: parsed.data.plantHeightCm ?? null,
       leafCount: parsed.data.leafCount ?? null,
+      soilMoisture: latestReading?.soilMoisture ?? null,
+      temperature: latestReading?.temperature ?? null,
+      humidity: latestReading?.humidity ?? null,
+      lightIntensity: latestReading?.lightIntensity ?? null,
+      nitrogen: latestReading?.nitrogen ?? null,
+      phosphorus: latestReading?.phosphorus ?? null,
+      potassium: latestReading?.potassium ?? null,
+      sensorReadingId: latestReading?.id ?? null,
       observations: parsed.data.observations || null,
       notes: parsed.data.notes || null,
       images: {

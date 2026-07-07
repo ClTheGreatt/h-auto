@@ -8,6 +8,7 @@ import {
   fetchGrowthLogData,
   fetchAlertsData,
   fetchActivityData,
+  fetchStudentActivityData,
 } from "@/lib/reports/data-fetchers";
 import {
   renderSensorReadingsPDF,
@@ -15,6 +16,7 @@ import {
   renderGrowthLogPDF,
   renderAlertsPDF,
   renderActivityPDF,
+  renderStudentActivityPDF,
 } from "@/lib/reports/pdf-renderers";
 import {
   generateSensorReadingsExcel,
@@ -22,6 +24,7 @@ import {
   generateGrowthLogExcel,
   generateAlertsExcel,
   generateActivityExcel,
+  generateStudentActivityExcel,
 } from "@/lib/reports/excel-generators";
 
 export const runtime = "nodejs";
@@ -33,6 +36,7 @@ const VALID_TYPES = [
   "growth-log",
   "alerts",
   "activity",
+  "student-activity",
 ];
 
 const EXCEL_MIME =
@@ -56,6 +60,15 @@ export async function GET(
     type === "activity" &&
     session.user.role !== "SUPER_ADMIN" &&
     session.user.role !== "ADMIN"
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (
+    type === "student-activity" &&
+    session.user.role !== "SUPER_ADMIN" &&
+    session.user.role !== "ADMIN" &&
+    session.user.role !== "FACULTY"
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -146,6 +159,19 @@ export async function GET(
           buffer = await renderActivityPDF(data, rangeLabel);
           mimeType = "application/pdf";
           filename = `system-activity-${timestamp}.pdf`;
+        }
+        break;
+      }
+      case "student-activity": {
+        const data = await fetchStudentActivityData({ range });
+        if (format === "excel") {
+          buffer = await generateStudentActivityExcel(data, rangeLabel);
+          mimeType = EXCEL_MIME;
+          filename = `student-activity-${timestamp}.xlsx`;
+        } else {
+          buffer = await renderStudentActivityPDF(data, rangeLabel);
+          mimeType = "application/pdf";
+          filename = `student-activity-${timestamp}.pdf`;
         }
         break;
       }

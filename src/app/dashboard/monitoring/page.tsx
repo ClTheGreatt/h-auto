@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { PlotFilter } from "@/components/analytics/plot-filter";
 import { AuthorFilter } from "@/components/monitoring/author-filter";
+import { DateFilter } from "@/components/monitoring/date-filter";
 import { LogFeedItem } from "@/components/monitoring/log-feed-item";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -12,7 +13,7 @@ const PAGE_SIZE = 10;
 export default async function MonitoringPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plotId?: string; authorId?: string; page?: string }>;
+  searchParams: Promise<{ plotId?: string; authorId?: string; page?: string; date?: string }>;
 }) {
   const session = await requireAuth();
   const sp = await searchParams;
@@ -20,6 +21,17 @@ export default async function MonitoringPage({
   const selectedPlotId = sp.plotId;
   const selectedAuthorId = sp.authorId;
   const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+
+  const selectedDate =
+    sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : undefined;
+
+  // Day window sa Asia/Manila (+08:00), converted to UTC boundaries
+  let dateWindow: { gte: Date; lt: Date } | undefined;
+  if (selectedDate) {
+    const start = new Date(`${selectedDate}T00:00:00+08:00`);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    dateWindow = { gte: start, lt: end };
+  }
 
   // Role-aware base filter
   const plotFilter =
@@ -36,6 +48,7 @@ export default async function MonitoringPage({
     plot: plotFilter,
     ...(selectedPlotId && { plotId: selectedPlotId }),
     ...(selectedAuthorId && { userId: selectedAuthorId }),
+    ...(dateWindow && { createdAt: dateWindow }),
   };
 
   // Fetch plots for filter dropdown
@@ -77,7 +90,7 @@ export default async function MonitoringPage({
         },
       },
       stage: { select: { name: true } },
-      user: { select: { firstName: true, lastName: true } },
+      user: { select: { firstName: true, lastName: true, profileImage: true } },
       images: { select: { id: true, imageUrl: true } },
     },
   });
@@ -90,15 +103,23 @@ export default async function MonitoringPage({
     stageName: log.stage?.name ?? null,
     authorName: `${log.user.firstName} ${log.user.lastName}`,
     authorInitials: `${log.user.firstName[0]}${log.user.lastName[0]}`.toUpperCase(),
+    authorImage: log.user.profileImage,
     createdAt: log.createdAt,
     observations: log.observations,
     notes: log.notes,
     plantHeightCm: log.plantHeightCm,
     leafCount: log.leafCount,
+    soilMoisture: log.soilMoisture,
+    temperature: log.temperature,
+    humidity: log.humidity,
+    lightIntensity: log.lightIntensity,
+    nitrogen: log.nitrogen,
+    phosphorus: log.phosphorus,
+    potassium: log.potassium,
     images: log.images,
   }));
 
-  const hasFilters = selectedPlotId || selectedAuthorId;
+  const hasFilters = selectedPlotId || selectedAuthorId || selectedDate;
   const filteredEmpty = totalLogs === 0 && hasFilters;
   const completelyEmpty = totalLogs === 0 && !hasFilters;
 
@@ -115,6 +136,7 @@ export default async function MonitoringPage({
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <DateFilter current={selectedDate} />
           <PlotFilter plots={plots} current={selectedPlotId} />
           <AuthorFilter
             authors={authors.map((a) => ({
@@ -140,6 +162,16 @@ export default async function MonitoringPage({
               by{" "}
               {authors.find((a) => a.id === selectedAuthorId)?.firstName}{" "}
               {authors.find((a) => a.id === selectedAuthorId)?.lastName}
+            </span>
+          )}
+          {selectedDate && (
+            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+              {new Date(`${selectedDate}T00:00:00+08:00`).toLocaleDateString("en-PH", {
+                timeZone: "Asia/Manila",
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
             </span>
           )}
           <Link

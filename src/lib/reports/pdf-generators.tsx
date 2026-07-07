@@ -642,3 +642,106 @@ export function ActivityPDF({
     </Document>
   );
 }
+
+// ============================================================================
+// REPORT 6: STUDENT ACTIVITY
+// ============================================================================
+
+export function StudentActivityPDF({
+  data,
+  rangeLabel,
+}: {
+  data: Array<{
+    studentName: string;
+    idNumber: string;
+    department: string;
+    section: string;
+    plotsAssigned: number;
+    observationsInRange: number;
+    totalObservations: number;
+    photoCount: number;
+    lastLogAt: Date | null;
+  }>;
+  rangeLabel: string;
+}) {
+  const meta = [
+    `Time range: ${rangeLabel}`,
+    `Total students: ${data.length}`,
+    `Generated: ${formatDateTime(new Date())}`,
+  ];
+
+  const cols = [
+    { label: "Student", width: "20%" },
+    { label: "ID Number", width: "12%" },
+    { label: "Department", width: "14%" },
+    { label: "Section", width: "8%" },
+    { label: "Plots", width: "7%" },
+    { label: "Logs (range)", width: "11%" },
+    { label: "Total Logs", width: "10%" },
+    { label: "Photos", width: "8%" },
+    { label: "Last Log", width: "10%" },
+  ];
+
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <ReportHeader title="Student Activity Report" meta={meta} />
+
+        {data.length === 0 ? (
+          <Text style={styles.emptyState}>
+            No student farmers found.
+          </Text>
+        ) : (
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              {cols.map((c, i) => (
+                <Text
+                  key={i}
+                  style={[styles.tableHeaderCell, { width: c.width }]}
+                >
+                  {c.label}
+                </Text>
+              ))}
+            </View>
+            {data.map((row, i) => (
+              <View
+                key={i}
+                style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
+              >
+                <Text style={[styles.tableCell, { width: "20%" }]}>
+                  {row.studentName}
+                </Text>
+                <Text style={[styles.tableCell, { width: "12%" }]}>
+                  {row.idNumber}
+                </Text>
+                <Text style={[styles.tableCell, { width: "14%" }]}>
+                  {row.department}
+                </Text>
+                <Text style={[styles.tableCell, { width: "8%" }]}>
+                  {row.section}
+                </Text>
+                <Text style={[styles.tableCell, { width: "7%" }]}>
+                  {row.plotsAssigned}
+                </Text>
+                <Text style={[styles.tableCell, { width: "11%" }]}>
+                  {row.observationsInRange}
+                </Text>
+                <Text style={[styles.tableCell, { width: "10%" }]}>
+                  {row.totalObservations}
+                </Text>
+                <Text style={[styles.tableCell, { width: "8%" }]}>
+                  {row.photoCount}
+                </Text>
+                <Text style={[styles.tableCell, { width: "10%" }]}>
+                  {formatDate(row.lastLogAt)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <ReportFooter />
+      </Page>
+    </Document>
+  );
+}

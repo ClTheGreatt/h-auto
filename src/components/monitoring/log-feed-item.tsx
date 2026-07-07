@@ -3,8 +3,18 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Ruler, Leaf, ChevronRight, X } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Ruler,
+  Leaf,
+  ChevronRight,
+  X,
+  Droplets,
+  Thermometer,
+  Wind,
+  Sun,
+  FlaskConical,
+} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/format-date";
 
@@ -16,11 +26,19 @@ type LogProps = {
   stageName?: string | null;
   authorName: string;
   authorInitials: string;
+  authorImage: string | null;
   createdAt: Date;
   observations: string | null;
   notes: string | null;
   plantHeightCm: number | null;
   leafCount: number | null;
+  soilMoisture: number | null;
+  temperature: number | null;
+  humidity: number | null;
+  lightIntensity: number | null;
+  nitrogen: number | null;
+  phosphorus: number | null;
+  potassium: number | null;
   images: { id: string; imageUrl: string }[];
 };
 
@@ -54,6 +72,9 @@ export function LogFeedItem({ log }: { log: LogProps }) {
         <div className="p-3 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <Avatar className="w-8 h-8 flex-shrink-0">
+              {log.authorImage && (
+                <AvatarImage src={log.authorImage} alt={log.authorName} />
+              )}
               <AvatarFallback className="bg-green-100 text-green-700 text-xs font-medium">
                 {log.authorInitials}
               </AvatarFallback>
@@ -174,6 +195,54 @@ export function LogFeedItem({ log }: { log: LogProps }) {
                   {log.leafCount} leaves
                 </span>
               )}
+            </div>
+          )}
+
+          {(log.soilMoisture != null ||
+            log.temperature != null ||
+            log.humidity != null ||
+            log.lightIntensity != null ||
+            log.nitrogen != null ||
+            log.phosphorus != null ||
+            log.potassium != null) && (
+            <div className="pt-1.5 border-t mt-1.5">
+              <div className="text-[10px] font-medium text-gray-400 uppercase mb-1">
+                Conditions at time of log
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+                {log.soilMoisture != null && (
+                  <span className="flex items-center gap-1">
+                    <Droplets className="w-3 h-3 text-blue-400" />
+                    {log.soilMoisture}% soil
+                  </span>
+                )}
+                {log.temperature != null && (
+                  <span className="flex items-center gap-1">
+                    <Thermometer className="w-3 h-3 text-red-400" />
+                    {log.temperature}°C
+                  </span>
+                )}
+                {log.humidity != null && (
+                  <span className="flex items-center gap-1">
+                    <Wind className="w-3 h-3 text-cyan-400" />
+                    {log.humidity}% humidity
+                  </span>
+                )}
+                {log.lightIntensity != null && (
+                  <span className="flex items-center gap-1">
+                    <Sun className="w-3 h-3 text-amber-400" />
+                    {log.lightIntensity} lux
+                  </span>
+                )}
+                {(log.nitrogen != null ||
+                  log.phosphorus != null ||
+                  log.potassium != null) && (
+                  <span className="flex items-center gap-1">
+                    <FlaskConical className="w-3 h-3 text-green-500" />
+                    NPK: {log.nitrogen ?? "—"}/{log.phosphorus ?? "—"}/{log.potassium ?? "—"} mg/kg
+                  </span>
+                )}
+              </div>
             </div>
           )}
 

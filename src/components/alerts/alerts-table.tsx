@@ -14,6 +14,7 @@ import {
   BellRing,
   Mail,
   MailX,
+  Loader2
 } from "lucide-react";
 import {
   Table,
@@ -70,6 +71,17 @@ function timeAgo(date: Date): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function formatResolvedDate(date: Date): string {
+  return new Date(date).toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 export function AlertsTable({
@@ -195,13 +207,20 @@ export function AlertsTable({
                   </TableCell>
                   <TableCell>
                     {alert.resolved ? (
-                      <Badge
-                        variant="secondary"
-                        className="bg-gray-100 text-gray-700"
-                      >
-                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                        Resolved
-                      </Badge>
+                      <div className="flex flex-col gap-0.5">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-100 text-gray-700 w-fit"
+                        >
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Resolved
+                        </Badge>
+                        {alert.resolvedAt && (
+                          <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                            {formatResolvedDate(alert.resolvedAt)}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <Badge
                         variant="secondary"
@@ -303,12 +322,6 @@ export function AlertsTable({
                             </div>
                           )}
                         </div>
-
-                        {alert.resolved && alert.resolvedAt && (
-                          <div className="text-xs text-gray-500">
-                            Resolved {new Date(alert.resolvedAt).toLocaleString()}
-                          </div>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>

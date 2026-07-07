@@ -282,3 +282,63 @@ export async function fetchActivityData(filters: ReportFilters) {
 
   return events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 }
+
+export async function fetchStudentActivityData(filters: ReportFilters) {
+  const since = getDateFromRange(filters.range);
+
+  const students = await prisma.user.findMany({
+    where: { role: "STUDENT_FARMER" },
+    orderBy: { firstName: "asc" },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      idNumber: true,
+      department: true,
+      section: true,
+      _count: {
+        select: {
+          growthLogs: since ? { where: { createdAt: { gte: since } } } : true,
+          studentAssignments: { where: { status: "ACTIVE" } },
+        },
+      },
+    },
+  });
+
+  const result = [];
+  for (const s of students) {
+    const totalObservations = await prisma.growthLog.count({
+      where: { userId: s.id },
+    });
+
+    const photoCount = await prisma.growthImage.count({
+      where: {
+        growthLog: {
+          userId: s.id,
+          ...(since ? { createdAt: { gte: since } } : {}),
+        },
+      },
+    });
+
+    const latestLog = await prisma.growthLog.findFirst({
+      where: { userId: s.id },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+
+    result.push({
+      studentName: `${s.firstName} ${s.lastName}`,
+      idNumber: s.idNumber ?? "-",
+      department: s.department ?? "-",
+      section: s.section ?? "-",
+      plotsAssigned: s._count.studentAssignments,
+      observationsInRange: s._count.growthLogs,
+      totalObservations,
+      photoCount,
+      lastLogAt: latestLog?.createdAt ?? null,
+    });
+  }
+
+  // Sort by activity sa range (pinaka-aktibo sa taas)
+  return result.sort((a, b) => b.observationsInRange - a.observationsInRange);
+}

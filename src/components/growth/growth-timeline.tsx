@@ -10,6 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Droplets,
+  Thermometer,
+  Wind,
+  Sun,
+  FlaskConical,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +25,13 @@ type LogItem = {
   id: string;
   plantHeightCm: number | null;
   leafCount: number | null;
+  soilMoisture: number | null;
+  temperature: number | null;
+  humidity: number | null;
+  lightIntensity: number | null;
+  nitrogen: number | null;
+  phosphorus: number | null;
+  potassium: number | null;
   observations: string | null;
   notes: string | null;
   createdAt: Date;
@@ -146,6 +158,54 @@ export function GrowthTimeline({
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">
                         {log.notes}
                       </p>
+                    </div>
+                  )}
+
+                  {(log.soilMoisture != null ||
+                    log.temperature != null ||
+                    log.humidity != null ||
+                    log.lightIntensity != null ||
+                    log.nitrogen != null ||
+                    log.phosphorus != null ||
+                    log.potassium != null) && (
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 mb-1.5">
+                        CONDITIONS AT TIME OF LOG
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-gray-600">
+                        {log.soilMoisture != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Droplets className="w-4 h-4 text-blue-400" />
+                            {log.soilMoisture}% soil
+                          </span>
+                        )}
+                        {log.temperature != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Thermometer className="w-4 h-4 text-red-400" />
+                            {log.temperature}°C
+                          </span>
+                        )}
+                        {log.humidity != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Wind className="w-4 h-4 text-cyan-400" />
+                            {log.humidity}% humidity
+                          </span>
+                        )}
+                        {log.lightIntensity != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Sun className="w-4 h-4 text-amber-400" />
+                            {log.lightIntensity} lux
+                          </span>
+                        )}
+                        {(log.nitrogen != null ||
+                          log.phosphorus != null ||
+                          log.potassium != null) && (
+                          <span className="flex items-center gap-1.5">
+                            <FlaskConical className="w-4 h-4 text-green-500" />
+                            NPK: {log.nitrogen ?? "—"}/{log.phosphorus ?? "—"}/{log.potassium ?? "—"} mg/kg
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 
