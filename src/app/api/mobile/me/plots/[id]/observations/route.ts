@@ -99,6 +99,12 @@ if (locationName) {
     : gpsLine;
 }
 
+    // Snapshot the plot's latest sensor reading (if any) onto this log
+    const latestReading = await prisma.sensorReading.findFirst({
+      where: { plotId },
+      orderBy: { recordedAt: "desc" },
+    });
+
     // Create GrowthLog + GrowthImage in a transaction
     const log = await prisma.$transaction(async (tx) => {
       const created = await tx.growthLog.create({
@@ -108,6 +114,14 @@ if (locationName) {
           stageId: plot.currentStageId,
           plantHeightCm,
           leafCount,
+          soilMoisture: latestReading?.soilMoisture ?? null,
+          temperature: latestReading?.temperature ?? null,
+          humidity: latestReading?.humidity ?? null,
+          lightIntensity: latestReading?.lightIntensity ?? null,
+          nitrogen: latestReading?.nitrogen ?? null,
+          phosphorus: latestReading?.phosphorus ?? null,
+          potassium: latestReading?.potassium ?? null,
+          sensorReadingId: latestReading?.id ?? null,
           observations: observationText || null,
           notes: notes?.trim() || null,
         },
