@@ -3,12 +3,25 @@ import * as bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
-import { createUserSchema } from "@/lib/validations/user";
+import {
+  createUserSchema,
+  createStudentSchema,
+  createFacultySchema,
+} from "@/lib/validations/user";
 import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
+// STUDENT_FARMER / FACULTY get strict, role-specific validation (same
+// rule as the web createUser action). Other roles (ADMIN/SUPER_ADMIN)
+// keep the lenient schema.
+function pickCreateSchema(role: unknown) {
+  if (role === "STUDENT_FARMER") return createStudentSchema;
+  if (role === "FACULTY") return createFacultySchema;
+  return createUserSchema;
 }
 
 // Maps Prisma unique-constraint errors to friendly messages (same idea as web)
@@ -105,9 +118,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate with the SAME schema as web: BPSU email, password >= 6,
-    // status enum, and all role-specific fields. Default status to ACTIVE.
-    const parsed = createUserSchema.safeParse({
+    // Validate with the SAME role-based schema as the web createUser
+    // action: strict for STUDENT_FARMER/FACULTY, lenient fallback
+    // otherwise. Default status to ACTIVE.
+    const schema = pickCreateSchema(body.role);
+    const parsed = schema.safeParse({
       ...body,
       status: body.status || "ACTIVE",
     });
@@ -116,7 +131,10 @@ export async function POST(req: NextRequest) {
       const fieldErrors = parsed.error.flatten().fieldErrors;
       const firstError =
         Object.values(fieldErrors).flat().find(Boolean) ?? "Invalid input";
-      return NextResponse.json({ error: firstError }, { status: 400 });
+      return NextResponse.json(
+        { error: firstError, fieldErrors },
+        { status: 400 }
+      );
     }
 
     const { password, ...rest } = parsed.data;
