@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { buildAlertSuggestion, type AlertSuggestion } from "@/lib/alerts/suggestions";
 
 // No reading within this window → device considered offline
 const OFFLINE_THRESHOLD_MINUTES = 30;
@@ -82,12 +83,21 @@ export async function GET(req: NextRequest) {
       where: { plotId: device.plotId, type: "DEVICE_OFFLINE", resolved: false },
     });
     if (!existing) {
+      let suggestion: AlertSuggestion | null = null;
+      try {
+        suggestion = buildAlertSuggestion({ type: "DEVICE_OFFLINE" });
+      } catch (err) {
+        console.warn("[cron/daily] suggestion builder failed:", err);
+      }
+
       await prisma.alert.create({
         data: {
           plotId: device.plotId,
           type: "DEVICE_OFFLINE",
           severity: "WARNING",
           message: `Device ${device.deviceCode} stopped reporting and is now offline.`,
+          suggestionTitle: suggestion?.title ?? null,
+          suggestionSteps: suggestion?.steps ?? [],
         },
       });
       result.offlineAlertsCreated++;

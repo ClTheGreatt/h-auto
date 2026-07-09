@@ -14,7 +14,8 @@ import {
   BellRing,
   Mail,
   MailX,
-  Loader2
+  Loader2,
+  Lightbulb
 } from "lucide-react";
 import {
   Table,
@@ -38,6 +39,8 @@ type AlertRow = {
   resolved: boolean;
   resolvedAt: Date | null;
   createdAt: Date;
+  suggestionTitle: string | null;
+  suggestionSteps: string[];
   plot: { id: string; name: string };
   notifications: {
     id: string;
@@ -185,6 +188,24 @@ export function AlertsTable({
                   </TableCell>
                   <TableCell className="text-sm text-gray-700 max-w-md">
                     {alert.message}
+                    {alert.suggestionTitle && (
+                      <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 p-3">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 uppercase tracking-wide">
+                          <Lightbulb className="h-3.5 w-3.5" />
+                          Suggested action
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-emerald-900">
+                          {alert.suggestionTitle}
+                        </div>
+                        {alert.suggestionSteps.length > 0 && (
+                          <ol className="mt-1.5 list-decimal list-inside space-y-0.5 text-sm text-emerald-900/90">
+                            {alert.suggestionSteps.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {total === 0 ? (

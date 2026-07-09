@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
         resolved: true,
         resolvedAt: true,
         createdAt: true,
+        suggestionTitle: true,
+        suggestionSteps: true,
         plot: { select: { id: true, name: true } },
       },
     });

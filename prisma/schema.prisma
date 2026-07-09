@@ -304,6 +304,9 @@ model Alert {
   resolvedAt DateTime?
   createdAt DateTime      @default(now())
 
+  suggestionTitle String?
+  suggestionSteps String[] @default([])
+
   plot         Plot                @relation(fields: [plotId], references: [id], onDelete: Cascade)
   reading      SensorReading?      @relation(fields: [readingId], references: [id])
   notifications AlertNotification[]

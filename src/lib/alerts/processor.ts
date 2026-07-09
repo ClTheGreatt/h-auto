@@ -3,6 +3,7 @@ import { sendSMS } from "@/lib/sms/semaphore";
 import { sendEmail } from "@/lib/email/send-email";
 import { sendExpoPush } from "@/lib/push/expo";
 import { checkThresholds } from "./threshold-checker";
+import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
 
 type Recipient = {
   id: string;
@@ -48,6 +49,17 @@ export async function processSensorReading(readingId: string) {
     });
     if (existing) continue;
 
+    let suggestion: AlertSuggestion | null = null;
+    try {
+      suggestion = buildAlertSuggestion({
+        type: v.type,
+        currentValue: v.value,
+        threshold: v.type.startsWith("LOW_") ? v.min : v.max,
+      });
+    } catch (err) {
+      console.warn("[processSensorReading] suggestion builder failed:", err);
+    }
+
     const alert = await prisma.alert.create({
       data: {
         plotId: reading.plotId,
@@ -55,6 +67,8 @@ export async function processSensorReading(readingId: string) {
         type: v.type,
         severity: v.severity,
         message: v.message,
+        suggestionTitle: suggestion?.title ?? null,
+        suggestionSteps: suggestion?.steps ?? [],
       },
     });
 
@@ -128,7 +142,7 @@ if (tokens.length > 0) {
           tokens.map((t) => ({
             to: t.token,
             title: `${severityLabel} · ${reading.plot.name}`,
-            body: v.message,
+            body: `${v.message}${suggestion ? ` · ${suggestion.title}` : ""}`,
             sound: "default" as const,
             priority: "high" as const,
             data: { alertId: alert.id, plotId: reading.plotId, type: v.type },
