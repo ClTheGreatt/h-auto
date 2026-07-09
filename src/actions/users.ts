@@ -9,10 +9,20 @@ import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
 import {
   createUserSchema,
+  createStudentSchema,
+  createFacultySchema,
   updateUserSchema,
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations/user";
+
+// STUDENT_FARMER / FACULTY get strict, role-specific validation (adviser
+// request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema.
+function pickCreateSchema(role: unknown) {
+  if (role === "STUDENT_FARMER") return createStudentSchema;
+  if (role === "FACULTY") return createFacultySchema;
+  return createUserSchema;
+}
 
 // Maps Prisma unique constraint field names to user-friendly messages
 function handlePrismaError(error: unknown): { error: string } | null {
@@ -43,7 +53,8 @@ function handlePrismaError(error: unknown): { error: string } | null {
 export async function createUser(input: CreateUserInput) {
   await requireAdmin();
 
-  const parsed = createUserSchema.safeParse(input);
+  const schema = pickCreateSchema(input?.role);
+  const parsed = schema.safeParse(input);
   if (!parsed.success) {
     return {
       error: "Invalid input",

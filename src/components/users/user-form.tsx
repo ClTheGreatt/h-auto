@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -37,7 +37,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  createUserSchema,
+  createStudentSchema,
+  createFacultySchema,
   updateUserSchema,
+  YEAR_LEVELS,
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations/user";
@@ -75,8 +79,27 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     users: SimilarUser[];
   }>({ key: "", users: [] });
 
+  // EDIT stays lenient (updateUserSchema) so existing incomplete users can
+  // still be saved. CREATE picks the strict, role-specific schema so
+  // Add User/Add Faculty can't submit with missing required fields.
+  const resolver: Resolver<FormValues> = (values, context, options) => {
+    const schema =
+      mode === "create"
+        ? values.role === "STUDENT_FARMER"
+          ? createStudentSchema
+          : values.role === "FACULTY"
+          ? createFacultySchema
+          : createUserSchema
+        : updateUserSchema;
+    return zodResolver(schema as unknown as typeof updateUserSchema)(
+      values,
+      context,
+      options
+    );
+  };
+
   const form = useForm<FormValues>({
-    resolver: zodResolver(updateUserSchema),
+    resolver,
     mode: "onBlur", // Validate when user leaves a field (modern UX)
     defaultValues: {
       firstName: defaultValues?.firstName ?? "",
@@ -96,6 +119,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     },
   });
 
+  const isCreate = mode === "create";
   const watchedRole = useWatch({ control: form.control, name: "role" });
   const watchedFirstName = useWatch({
     control: form.control,
@@ -143,15 +167,6 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   }, [similarFirstName, similarLastName, similarKey, userId]);
 
   async function onSubmit(values: FormValues) {
-    if (mode === "create") {
-      if (!values.password || values.password.length < 6) {
-        form.setError("password", {
-          message: "Password is required and must be at least 6 characters",
-        });
-        return;
-      }
-    }
-
     setSubmitting(true);
     const result =
       mode === "create"
@@ -283,12 +298,17 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="phoneNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone number</FormLabel>
+                    <FormLabel>
+                      Phone number
+                      {isCreate && watchedRole === "STUDENT_FARMER" && (
+                        <RequiredMark />
+                      )}
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="+639171234567" {...field} />
+                      <Input placeholder="09171234567" {...field} />
                     </FormControl>
                     <FormDescription className="text-xs">
-                      Format: +63 followed by 10 digits
+                      Format: 09XXXXXXXXX or +639XXXXXXXXX
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -299,7 +319,12 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="idNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ID number</FormLabel>
+                    <FormLabel>
+                      {watchedRole === "FACULTY" ? "Employee ID" : "ID number"}
+                      {isCreate &&
+                        (watchedRole === "STUDENT_FARMER" ||
+                          watchedRole === "FACULTY") && <RequiredMark />}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -380,7 +405,11 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                     <Input type="password" {...field} />
                   </FormControl>
                   <FormDescription className="text-xs">
-                    Minimum 6 characters
+                    {isCreate &&
+                    (watchedRole === "STUDENT_FARMER" ||
+                      watchedRole === "FACULTY")
+                      ? "Minimum 8 characters, with at least 1 letter and 1 number"
+                      : "Minimum 6 characters"}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -400,7 +429,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="department"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Department</FormLabel>
+                    <FormLabel>
+                      Department
+                      {isCreate && <RequiredMark />}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -413,7 +445,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="position"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Position</FormLabel>
+                    <FormLabel>
+                      Position
+                      {isCreate && <RequiredMark />}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -436,7 +471,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="course"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Course</FormLabel>
+                    <FormLabel>
+                      Course
+                      {isCreate && <RequiredMark />}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -449,10 +487,24 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="yearLevel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Year level</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormLabel>
+                      Year level
+                      {isCreate && <RequiredMark />}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select year level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {YEAR_LEVELS.map((yl) => (
+                          <SelectItem key={yl} value={yl}>
+                            {yl}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -462,7 +514,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 name="section"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Section</FormLabel>
+                    <FormLabel>
+                      Section
+                      {isCreate && <RequiredMark />}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
