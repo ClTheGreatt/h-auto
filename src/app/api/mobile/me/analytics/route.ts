@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
         range,
         month,
         availableMonths,
+        bucketMs,
         summary: emptySummary(),
         observationsByDay: [],
         soilMoistureByDay: [],
@@ -130,6 +131,7 @@ export async function GET(req: NextRequest) {
       range,
       month,
       availableMonths,
+      bucketMs,
       summary: {
         totalReadings: readings.length,
         totalObservations: observations.length,
@@ -270,7 +272,11 @@ function aggregateCounts(dates: Date[], bucketMs: number) {
   }
   return Array.from(buckets.entries())
     .sort((a, b) => a[0] - b[0])
-    .map(([time, value]) => ({ label: labelFor(time, bucketMs), value }));
+    .map(([time, value]) => ({
+      label: labelFor(time, bucketMs),
+      value,
+      bucketStart: new Date(time).toISOString(),
+    }));
 }
 
 function aggregateAlerts(alerts: { createdAt: Date; severity: string }[], bucketMs: number) {

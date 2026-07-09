@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
+import { findGrowthLogsInBucket } from "@/lib/analytics/observations-by-date";
 
 export async function getObservationsForDate(
   bucketStart: number,
@@ -11,33 +11,12 @@ export async function getObservationsForDate(
   const session = await requireAuth();
   const role = session.user.role;
 
-  const plotFilter =
-    role === "STUDENT_FARMER"
-      ? {
-          assignments: {
-            some: { studentId: session.user.id, status: "ACTIVE" as const },
-          },
-        }
-      : {};
-  const combinedPlotFilter = plotId ? { ...plotFilter, id: plotId } : plotFilter;
-
-  const logs = await prisma.growthLog.findMany({
-    where: {
-      createdAt: {
-        gte: new Date(bucketStart),
-        lt: new Date(bucketStart + bucketMs),
-      },
-      plot: combinedPlotFilter,
-    },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      observations: true,
-      createdAt: true,
-      user: { select: { firstName: true, lastName: true } },
-      plot: { select: { id: true, name: true } },
-      stage: { select: { name: true } },
-    },
+  const logs = await findGrowthLogsInBucket({
+    role,
+    userId: session.user.id,
+    bucketStart,
+    bucketMs,
+    plotId,
   });
 
   // day string sa Asia/Manila para sa Monitoring drill-down link
