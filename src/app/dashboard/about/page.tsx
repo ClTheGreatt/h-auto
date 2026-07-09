@@ -113,7 +113,7 @@ export default function AboutPage() {
         </p>
         <div className="flex items-center justify-center gap-2 mt-4">
           <Badge variant="secondary" className="bg-green-100 text-green-700">
-            v1.0 · Production
+            v1.0 ·
           </Badge>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function AboutPage() {
                 Bataan Peninsula State University
               </h3>
               <p className="text-sm text-gray-600">
-                College of Information and Communications Technology
+                College of Computer Studies
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 Bachelor of Science in Information Technology
@@ -295,7 +295,7 @@ export default function AboutPage() {
 
       {/* Footer */}
       <div className="text-center text-sm text-gray-500 pt-4 pb-8">
-        <p>Capstone Project · AY 2025-2026</p>
+        <p>AY 2025-2026</p>
         <p className="mt-1">© 2026 H-Auto Development Team</p>
         <p className="mt-1">Bataan Peninsula State University</p>
       </div>
