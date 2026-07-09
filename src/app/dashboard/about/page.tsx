@@ -5,8 +5,9 @@ import {
   Heart,
   Cpu,
   Database,
-  Globe,
   Smartphone,
+  BellRing,
+  Target,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,55 +16,83 @@ import { Badge } from "@/components/ui/badge";
 // EDIT: Replace with your actual team members
 const TEAM = [
   {
-    name: "Said Hussin",
-    role: "Project Lead / Full-stack Developer",
-    initials: "GA",
+    name: "Chrislord Dizon",
+    role: "Lead Developer & System Architect",
+    initials: "CD",
+    isDeveloper: true,
   },
   {
-    name: "Chrislord Dizon",
-    role: "Backend / IoT Integration",
-    initials: "M2",
+    name: "Said Hussin",
+    role: "Documentation & Research",
+    initials: "SH",
+    isDeveloper: false,
   },
   {
     name: "Geoffrey Perello",
-    role: "Frontend / UI Design",
-    initials: "M3",
+    role: "Documentation & Research",
+    initials: "GP",
+    isDeveloper: false,
   },
   {
     name: "Jhan Criss Alba",
-    role: "Documentation / Research",
-    initials: "M4",
+    role: "Documentation & Research",
+    initials: "JA",
+    isDeveloper: false,
   },
 ];
 
 const TECH_STACK = [
-  { category: "Frontend", items: ["Next.js 16", "React 19", "TypeScript", "Tailwind CSS", "shadcn/ui"] },
-  { category: "Backend", items: ["Node.js", "Prisma ORM", "PostgreSQL", "NextAuth v5"] },
-  { category: "Cloud Services", items: ["Neon Database", "Cloudinary", "Semaphore SMS"] },
-  { category: "Hardware", items: ["ESP32 Microcontroller", "Soil Moisture Sensor", "DHT22", "BH1750 Light Sensor", "NPK Sensor"] },
-  { category: "Reporting", items: ["Recharts", "React-PDF", "ExcelJS"] },
+  {
+    category: "Web Platform",
+    items: ["Next.js 16", "React 19", "TypeScript", "Tailwind CSS", "shadcn/ui"],
+  },
+  {
+    category: "Mobile Platform",
+    items: ["React Native", "Expo", "NativeWind", "TanStack Query"],
+  },
+  {
+    category: "Backend & Data",
+    items: ["Node.js", "Prisma ORM", "PostgreSQL (Neon)", "NextAuth v5"],
+  },
+  {
+    category: "Cloud Services",
+    items: ["Vercel", "Neon Database", "Cloudinary", "Expo Push Notifications"],
+  },
+  {
+    category: "IoT Hardware",
+    items: [
+      "ESP32 DevKit",
+      "YL-69 Soil Moisture Sensor",
+      "DHT22 Temperature/Humidity",
+      "NPK RS485 Modbus Sensor",
+    ],
+  },
+  {
+    category: "Reporting & Charts",
+    items: ["Recharts", "React-PDF", "ExcelJS"],
+  },
 ];
 
 const FEATURES = [
   {
     icon: Cpu,
     title: "Real-time IoT Monitoring",
-    description: "ESP32-based sensors continuously track soil moisture, temperature, humidity, light intensity, and NPK levels.",
+    description: "ESP32 microcontroller with soil moisture, temperature, humidity, and NPK sensors continuously stream readings to the cloud.",
+  },
+  {
+    icon: BellRing,
+    title: "Smart Alerts with Suggestions",
+    description: "Automatic alerts when readings cross thresholds, each accompanied by actionable step-by-step guidance for the user.",
   },
   {
     icon: Smartphone,
-    title: "SMS Alert System",
-    description: "Automated SMS notifications via Semaphore alert farmers and faculty when readings fall outside optimal ranges.",
+    title: "Mobile Companion App",
+    description: "React Native app for field workers to log observations, view analytics, and receive push notifications on the go.",
   },
   {
     icon: Database,
     title: "Comprehensive Reporting",
-    description: "Export PDF and Excel reports for sensor data, plot performance, growth logs, alerts, and system activity.",
-  },
-  {
-    icon: Globe,
-    title: "Role-based Access",
-    description: "Four user roles (Super Admin, Admin, Faculty, Student Farmer) with appropriate permissions and data visibility.",
+    description: "Role-based PDF and Excel exports for sensor data, plot performance, growth logs, alerts, and student activity.",
   },
 ];
 
@@ -84,9 +113,8 @@ export default function AboutPage() {
         </p>
         <div className="flex items-center justify-center gap-2 mt-4">
           <Badge variant="secondary" className="bg-green-100 text-green-700">
-            Version 1.0
+            v1.0 · Production
           </Badge>
-          <Badge variant="secondary">Production</Badge>
         </div>
       </div>
 
@@ -110,9 +138,30 @@ export default function AboutPage() {
             challenge of effective garden management in academic settings,
             where multiple students share responsibility for plot care under
             faculty supervision. By providing continuous environmental
-            monitoring and instant SMS notifications, H-Auto helps prevent
+            monitoring and instant alert notifications, H-Auto helps prevent
             crop loss and improves learning outcomes through data-driven
             cultivation.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Project Purpose */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-green-600" />
+            Project purpose
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-gray-700 leading-relaxed">
+          <p>
+            H-Auto addresses the challenge of collaborative garden management
+            in academic settings, where students share responsibility for
+            plot care under faculty supervision. By combining continuous
+            environmental monitoring with actionable alert guidance, the
+            system reduces crop loss, teaches data-driven cultivation, and
+            creates a shared, transparent record of plant care that faculty
+            can review at any time.
           </p>
         </CardContent>
       </Card>
@@ -132,7 +181,7 @@ export default function AboutPage() {
                 Bataan Peninsula State University
               </h3>
               <p className="text-sm text-gray-600">
-                College of Computer Studies
+                College of Information and Communications Technology
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 Bachelor of Science in Information Technology
@@ -158,7 +207,9 @@ export default function AboutPage() {
             {TEAM.map((member, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-3 p-3 border rounded-md"
+                className={`flex items-center gap-3 p-3 border rounded-md ${
+                  member.isDeveloper ? "bg-green-50/60 border-green-200" : ""
+                }`}
               >
                 <Avatar className="w-12 h-12">
                   <AvatarFallback className="bg-green-100 text-green-700 font-medium">
@@ -166,7 +217,17 @@ export default function AboutPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-medium text-sm">{member.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium text-sm">{member.name}</span>
+                    {member.isDeveloper && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0"
+                      >
+                        Developer
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-gray-500">{member.role}</div>
                 </div>
               </div>
@@ -234,7 +295,8 @@ export default function AboutPage() {
 
       {/* Footer */}
       <div className="text-center text-sm text-gray-500 pt-4 pb-8">
-        <p>© 2026 H-Auto Development Team</p>
+        <p>Capstone Project · AY 2025-2026</p>
+        <p className="mt-1">© 2026 H-Auto Development Team</p>
         <p className="mt-1">Bataan Peninsula State University</p>
       </div>
     </div>

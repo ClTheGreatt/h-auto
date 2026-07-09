@@ -11,6 +11,7 @@ import {
   ClipboardList,
   AlertCircle,
   Lightbulb,
+  Smartphone,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,13 +100,14 @@ const FACULTY_SECTIONS: Section[] = [
     ],
   },
   {
-    title: "Track plot performance",
+    title: "Track plot performance with drill-down",
     icon: BarChart3,
     steps: [
       "Click 'Analytics' in the sidebar",
-      "View sensor trends, growth progression, and alert patterns",
-      "Filter by time range (24h, 7d, 30d, etc.)",
-      "Click on a specific plot for detailed analytics",
+      "View sensor trends, observation activity, and alert patterns",
+      "Filter by time range (24h, 7d, 30d, all-time)",
+      "Click any bar on the Daily Activity chart to see who logged observations that day",
+      "Follow through to the Monitoring page (filtered by that date) for full context",
     ],
   },
 ];
@@ -131,18 +133,52 @@ const STUDENT_SECTIONS: Section[] = [
       "Enter plant height and leaf count",
       "Write observations and any notes",
       "Upload up to 4 photos of the plants",
-      "Click 'Save Log' — entry is recorded with timestamp",
+      "Click 'Save Log' — the current sensor readings are automatically captured as a snapshot with your entry, giving you a permanent record of the conditions at that moment",
     ],
   },
   {
-    title: "Respond to alerts",
+    title: "Respond to alerts with guidance",
     icon: BellRing,
     steps: [
-      "Critical alerts trigger SMS to your registered phone number",
-      "View all open alerts in 'Alerts' tab",
-      "Click an alert to see plot details and current readings",
-      "Take corrective action (water, shade, fertilize, etc.)",
-      "Sensor readings will auto-resolve the alert when values return to optimal range",
+      "Critical alerts appear in the Alerts tab and send a push notification to your mobile app",
+      "Tap or click any alert to see the full context — sensor readings, plot details, and time",
+      "Every alert now includes a 'Suggested action' with step-by-step guidance on how to respond",
+      "Follow the suggested steps (water, shade, ventilate, fertilize, depending on the alert type)",
+      "Sensor readings will auto-resolve the alert when values return to the optimal range, or you can manually resolve it",
+    ],
+  },
+];
+
+const MOBILE_SECTIONS: Section[] = [
+  {
+    title: "Install the mobile companion app",
+    icon: Smartphone,
+    steps: [
+      "Ask your administrator for the H-Auto mobile app APK",
+      "On your Android device, tap the APK to install (you may need to allow 'Install from unknown sources')",
+      "Open the app and log in with your H-Auto credentials",
+      "Allow notifications when prompted — this enables push alerts",
+    ],
+  },
+  {
+    title: "Log observations from the field",
+    icon: Camera,
+    steps: [
+      "Open the app and tap a plot from your plots list",
+      "Tap 'Log observation'",
+      "Take photos directly with your phone camera",
+      "Add growth stage, plant height, leaves, and notes",
+      "Save — the entry syncs to the web dashboard immediately",
+    ],
+  },
+  {
+    title: "Analytics on your phone",
+    icon: BarChart3,
+    steps: [
+      "Tap the Analytics tab at the bottom",
+      "Choose a time range (24h, 7 days, 30 days, all time)",
+      "Tap a bar on the Daily Activity chart to see the observations logged that day",
+      "Tap an observation row to jump directly to that plot",
     ],
   },
 ];
@@ -183,6 +219,7 @@ export default async function HelpPage() {
     { title: "Administration", items: ADMIN_SECTIONS, visible: isAdmin },
     { title: "Faculty", items: FACULTY_SECTIONS, visible: isAdmin || isFaculty },
     { title: "Student Farmers", items: STUDENT_SECTIONS, visible: isAdmin || isFaculty || isStudent },
+    { title: "Mobile app", items: MOBILE_SECTIONS, visible: true },
     { title: "Common tasks", items: COMMON_SECTIONS, visible: true },
   ];
 
@@ -262,6 +299,73 @@ export default async function HelpPage() {
           </div>
         ))}
 
+      {/* FAQ */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">
+          Frequently asked questions
+        </h2>
+        <div className="space-y-3">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-green-600" />
+                Why does my sensor show 0% soil moisture?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-700 leading-relaxed">
+              A reading of 0% means the sensor is in dry air or not fully
+              inserted into moist soil. Push the sensor probes deeper into
+              the soil (at least 3-4 cm) and check readings after 30 seconds.
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-green-600" />
+                My ESP32 shows OFFLINE. What do I do?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-700 leading-relaxed">
+              Check that (1) the device has power, (2) it&apos;s within Wi-Fi
+              range, and (3) the Wi-Fi network is a 2.4GHz network — ESP32
+              does not support 5GHz. Devices are marked ONLINE within a
+              few minutes of powering on.
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-green-600" />
+                Why don&apos;t I see NPK values on some plots?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-700 leading-relaxed">
+              NPK values only appear on plots whose assigned ESP32 device has
+              an NPK sensor connected. Plots with soil moisture and DHT22
+              only will show blank for the NPK fields.
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-green-600" />
+                Can I edit an observation after saving?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-700 leading-relaxed">
+              Growth log entries are immutable once saved to preserve the
+              integrity of the historical record. The sensor snapshot
+              captured with each entry is also permanent. If you made a
+              mistake, log a new entry with the correction and note the
+              reason.
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
       {/* Support */}
       <Card className="border-amber-200 bg-amber-50/50">
         <CardContent className="p-4">
@@ -270,9 +374,11 @@ export default async function HelpPage() {
             <div className="text-sm">
               <div className="font-medium text-amber-900">Need more help?</div>
               <p className="text-amber-800 mt-1">
-                Contact your system administrator for issues that aren&apos;t
-                covered here, including: account access problems, hardware
-                installation, sensor calibration, or training requests.
+                Contact your system administrator for physical hardware
+                installation and setup, sensor calibration, adding new ESP32
+                devices to plots, or troubleshooting persistent offline
+                devices. Reach out to your assigned faculty or the system
+                administrator through your usual campus channels.
               </p>
             </div>
           </div>
