@@ -56,7 +56,14 @@ const TECH_STACK = [
   },
   {
     category: "Cloud Services",
-    items: ["Vercel", "Neon Database", "Cloudinary", "Expo Push Notifications"],
+    items: [
+      "Vercel",
+      "Neon Database",
+      "Cloudinary",
+      "Expo Push Notifications",
+      "Semaphore SMS",
+      "Resend Email",
+    ],
   },
   {
     category: "IoT Hardware",
@@ -81,8 +88,8 @@ const FEATURES = [
   },
   {
     icon: BellRing,
-    title: "Smart Alerts with Suggestions",
-    description: "Automatic alerts when readings cross thresholds, each accompanied by actionable step-by-step guidance for the user.",
+    title: "Multi-channel Smart Alerts",
+    description: "Automatic alerts when readings cross thresholds, delivered via SMS, push notifications, email, and in-app inbox. Each alert includes actionable step-by-step guidance for the user.",
   },
   {
     icon: Smartphone,
