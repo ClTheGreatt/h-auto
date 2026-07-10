@@ -14,7 +14,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { RequiredMark } from "@/components/ui/form-helpers";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -107,7 +109,7 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name *</FormLabel>
+                  <FormLabel>Name <RequiredMark /></FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Tomato" {...field} />
                   </FormControl>
@@ -133,7 +135,7 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
               name="daysToHarvest"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Days to harvest *</FormLabel>
+                  <FormLabel>Days to harvest <RequiredMark /></FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -165,10 +167,10 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
                 <FormItem className="md:col-span-2">
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <textarea
+                    <Textarea
                       {...field}
                       rows={2}
-                      className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                      className="resize-none"
                       placeholder="Short description of this crop"
                     />
                   </FormControl>
@@ -183,10 +185,10 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
                 <FormItem className="md:col-span-2">
                   <FormLabel>Cultivation guide</FormLabel>
                   <FormControl>
-                    <textarea
+                    <Textarea
                       {...field}
                       rows={4}
-                      className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                      className="resize-none"
                       placeholder="Planting, watering, fertilization, and harvest instructions"
                     />
                   </FormControl>
@@ -275,7 +277,7 @@ function StageBasicFields({
         name={`stages.${index}.name`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Stage name *</FormLabel>
+            <FormLabel>Stage name <RequiredMark /></FormLabel>
             <FormControl>
               <Input placeholder="e.g. Germination" {...field} />
             </FormControl>
@@ -288,7 +290,7 @@ function StageBasicFields({
         name={`stages.${index}.durationDays`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Duration (days) *</FormLabel>
+            <FormLabel>Duration (days) <RequiredMark /></FormLabel>
             <FormControl>
               <Input
                 type="number"

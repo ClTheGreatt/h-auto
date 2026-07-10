@@ -41,6 +41,22 @@
   --radius-xl: calc(var(--radius) + 4px);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+
+  /* Semantic status colors — used by <StatusBadge>. Registering these under
+     --color-* makes Tailwind v4 generate bg-success-bg / text-success-text /
+     border-success-border etc. utilities automatically. */
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
+  --color-success-border: var(--success-border);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-text: var(--warning-text);
+  --color-warning-border: var(--warning-border);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+  --color-danger-border: var(--danger-border);
+  --color-info-bg: var(--info-bg);
+  --color-info-text: var(--info-text);
+  --color-info-border: var(--info-border);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -80,6 +96,20 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.58 0.14 145);
+
+  /* Semantic status colors (light) */
+  --success-bg: #dcfce7;
+  --success-text: #15803d;
+  --success-border: #86efac;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --warning-border: #fcd34d;
+  --danger-bg: #fee2e2;
+  --danger-text: #991b1b;
+  --danger-border: #fca5a5;
+  --info-bg: #dbeafe;
+  --info-text: #1e40af;
+  --info-border: #93c5fd;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -118,6 +148,21 @@
   --sidebar-accent-foreground: oklch(0.96 0 0);
   --sidebar-border: oklch(0.24 0.005 250);
   --sidebar-ring: oklch(0.7 0.17 145);
+
+  /* Semantic status colors (dark) — same values as the ".dark .bg-green-100"
+     style overrides below, so <StatusBadge> matches the rest of the app. */
+  --success-bg: rgb(20 83 45 / 0.4);
+  --success-text: rgb(74 222 128);
+  --success-border: rgb(20 83 45 / 0.5);
+  --warning-bg: rgb(120 53 15 / 0.4);
+  --warning-text: rgb(251 191 36);
+  --warning-border: rgb(120 53 15 / 0.5);
+  --danger-bg: rgb(127 29 29 / 0.4);
+  --danger-text: rgb(248 113 113);
+  --danger-border: rgb(127 29 29 / 0.5);
+  --info-bg: rgb(30 58 138 / 0.4);
+  --info-text: rgb(96 165 250);
+  --info-border: rgb(30 58 138 / 0.5);
 }
 
 /* ═══════════════════════════════════════════════════════════

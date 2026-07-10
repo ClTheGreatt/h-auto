@@ -38,6 +38,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DeleteCropDialog } from "./delete-crop-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type CropRow = {
   id: string;
@@ -187,19 +190,21 @@ export function CropsTable({
 
       {/* Table / empty state */}
       {crops.length === 0 ? (
-        <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
-          <Sprout className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-          {query ? (
-            <>No crops match &quot;{query}&quot;. Try a different search.</>
-          ) : (
-            <>No crops yet. Click &quot;Add crop&quot; to create one.</>
-          )}
-        </div>
+        <EmptyState
+          icon={Sprout}
+          title={query ? "No crops match your search" : "No crops yet"}
+          description={
+            query
+              ? `No crops match "${query}". Try a different search.`
+              : 'Click "Add crop" to create one.'
+          }
+        />
       ) : (
-        <div
-          className={`border rounded-md bg-white transition-opacity ${
-            isPending ? "opacity-60" : ""
-          }`}
+        <Card
+          className={cn(
+            "overflow-x-auto p-0 transition-opacity",
+            isPending && "opacity-60"
+          )}
         >
           <Table>
             <TableHeader>
@@ -278,7 +283,7 @@ export function CropsTable({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       )}
 
 {/* Bottom count (consistency w/ Plots) */}

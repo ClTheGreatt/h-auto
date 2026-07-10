@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { QuickActions } from "@/components/dashboard/quick-actions";
@@ -296,10 +297,12 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             {recentAlerts.length === 0 ? (
-              <div className="text-center py-8 text-sm text-gray-500">
-                <BellRing className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                No open alerts. All plots within optimal range.
-              </div>
+              <EmptyState
+                icon={BellRing}
+                title="No open alerts"
+                description="All plots within optimal range."
+                compact
+              />
             ) : (
               <div className="space-y-2">
                 {recentAlerts.map((alert) => (
@@ -365,10 +368,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             {recentLogs.length === 0 ? (
-              <div className="text-center py-8 text-sm text-gray-500">
-                <Camera className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                No growth logs yet.
-              </div>
+              <EmptyState icon={Camera} title="No growth logs yet" compact />
             ) : (
               <div className="space-y-3">
                 {recentLogs.map((log) => {

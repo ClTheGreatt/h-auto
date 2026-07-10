@@ -22,8 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,11 +60,11 @@ type DeviceRow = {
   _count: { readings: number };
 };
 
-const statusColors: Record<DeviceStatus, string> = {
-  ONLINE: "bg-green-100 text-green-700 hover:bg-green-100",
-  OFFLINE: "bg-gray-100 text-gray-700 hover:bg-gray-100",
-  MAINTENANCE: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  RETIRED: "bg-red-100 text-red-700 hover:bg-red-100",
+const statusVariant: Record<DeviceStatus, StatusVariant> = {
+  ONLINE: "success",
+  OFFLINE: "danger",
+  MAINTENANCE: "warning",
+  RETIRED: "neutral",
 };
 
 export function DevicesTable({
@@ -125,16 +127,17 @@ export function DevicesTable({
 
   if (devices.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
-        <Cpu className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-        No devices registered yet. Click &quot;Register device&quot; to add one.
-      </div>
+      <EmptyState
+        icon={Cpu}
+        title="No devices registered yet"
+        description='Click "Register device" to add one.'
+      />
     );
   }
 
   return (
     <>
-      <div className="border rounded-md bg-white">
+      <Card className="overflow-x-auto p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -165,9 +168,9 @@ export function DevicesTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="secondary" className={statusColors[d.status]}>
+                  <StatusBadge variant={statusVariant[d.status]}>
                     {d.status}
-                  </Badge>
+                  </StatusBadge>
                 </TableCell>
                 <TableCell className="text-sm text-gray-600">
                   {formatLastSeen(d.lastSeenAt)}
@@ -228,7 +231,7 @@ export function DevicesTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+      </Card>
 
       {/* Delete confirmation */}
       <AlertDialog

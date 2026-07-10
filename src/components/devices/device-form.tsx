@@ -9,11 +9,13 @@ import { Copy, Check, AlertCircle } from "lucide-react";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { RequiredMark } from "@/components/ui/form-helpers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -150,13 +152,13 @@ export function DeviceForm({
               name="deviceCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Device code *</FormLabel>
+                  <FormLabel>Device code <RequiredMark /></FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. ESP32-A1" {...field} />
                   </FormControl>
-                  <p className="text-xs text-gray-500">
+                  <FormDescription className="text-xs">
                     A unique identifier you give the physical device.
-                  </p>
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -166,7 +168,7 @@ export function DeviceForm({
               name="plotId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Linked plot *</FormLabel>
+                  <FormLabel>Linked plot <RequiredMark /></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>

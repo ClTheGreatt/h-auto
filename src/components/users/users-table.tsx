@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,10 +90,10 @@ const ROLE_META: Record<
   },
 };
 
-const statusColors: Record<UserStatus, string> = {
-  ACTIVE: "bg-green-100 text-green-700 hover:bg-green-100",
-  INACTIVE: "bg-gray-100 text-gray-700 hover:bg-gray-100",
-  SUSPENDED: "bg-red-100 text-red-700 hover:bg-red-100",
+const statusVariant: Record<UserStatus, StatusVariant> = {
+  ACTIVE: "success",
+  INACTIVE: "neutral",
+  SUSPENDED: "danger",
 };
 
 function groupByRole(users: UserRow[]): Record<UserRole, UserRow[]> {
@@ -194,15 +194,9 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
                   {user.email}
                 </TableCell>
                 <TableCell className="px-4 py-3">
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[11px] leading-4",
-                      statusColors[user.status]
-                    )}
-                  >
+                  <StatusBadge variant={statusVariant[user.status]}>
                     {user.status}
-                  </Badge>
+                  </StatusBadge>
                 </TableCell>
                 <TableCell className="px-4 py-3 text-gray-600">
                   {user.idNumber ?? "—"}

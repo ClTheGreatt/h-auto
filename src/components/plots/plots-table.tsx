@@ -10,8 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Card } from "@/components/ui/card";
 import { DeletePlotDialog } from "./delete-plot-dialog";
 import type { PlotStatus } from "@prisma/client";
 
@@ -41,13 +42,13 @@ const statusLabels: Record<PlotStatus, string> = {
   FALLOW: "Fallow",
 };
 
-const statusColors: Record<PlotStatus, string> = {
-  PREPARING: "bg-gray-100 text-gray-700 hover:bg-gray-100",
-  PLANTED: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  GROWING: "bg-green-100 text-green-700 hover:bg-green-100",
-  READY_FOR_HARVEST: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  HARVESTED: "bg-purple-100 text-purple-700 hover:bg-purple-100",
-  FALLOW: "bg-stone-100 text-stone-700 hover:bg-stone-100",
+const statusVariant: Record<PlotStatus, StatusVariant> = {
+  PREPARING: "neutral",
+  PLANTED: "info",
+  GROWING: "success",
+  READY_FOR_HARVEST: "warning",
+  HARVESTED: "success",
+  FALLOW: "neutral",
 };
 
 export function PlotsTable({
@@ -76,7 +77,7 @@ export function PlotsTable({
   }
 
   return (
-    <div className="border rounded-md bg-white overflow-x-auto">
+    <Card className="overflow-x-auto p-0">
       <Table>
         <TableHeader>
           <TableRow>
@@ -110,9 +111,9 @@ export function PlotsTable({
                 {plot.currentStage?.name ?? "—"}
               </TableCell>
               <TableCell>
-                <Badge variant="secondary" className={statusColors[plot.status]}>
+                <StatusBadge variant={statusVariant[plot.status]}>
                   {statusLabels[plot.status]}
-                </Badge>
+                </StatusBadge>
               </TableCell>
               <TableCell className="text-gray-600">
                 {plot._count.assignments > 0
@@ -163,6 +164,6 @@ export function PlotsTable({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }

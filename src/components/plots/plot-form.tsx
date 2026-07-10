@@ -8,11 +8,13 @@ import { toast } from "sonner";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { RequiredMark } from "@/components/ui/form-helpers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -129,7 +131,7 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name *</FormLabel>
+                  <FormLabel>Name <RequiredMark /></FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Plot A1" {...field} />
                   </FormControl>
@@ -177,7 +179,7 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
               name="status"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status *</FormLabel>
+                  <FormLabel>Status <RequiredMark /></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -295,9 +297,9 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
                     <Input type="date" {...field} value={field.value ?? ""} />
                   </FormControl>
                   {selectedCrop && (
-                    <p className="text-xs text-gray-500">
+                    <FormDescription className="text-xs">
                       Auto-calculated from planting date + {selectedCrop.daysToHarvest} days. Editable.
-                    </p>
+                    </FormDescription>
                   )}
                   <FormMessage />
                 </FormItem>
