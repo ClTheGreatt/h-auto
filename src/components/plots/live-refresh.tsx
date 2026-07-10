@@ -22,13 +22,10 @@ export function LiveRefresh({ intervalMs = 10000 }: { intervalMs?: number }) {
     return () => clearInterval(t);
   }, [active, intervalMs, router]);
 
-  return (
-    <span className="flex items-center gap-1.5 text-xs text-gray-500">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-      </span>
-      Live
-    </span>
-  );
+  // No visible output — this is a background auto-refresh timer. The
+  // actual device/reading status is shown by a single, accurate badge
+  // in the parent (computed from lastSeenAt), so this used to render a
+  // hardcoded "Live" label that misleadingly sat next to an "OFFLINE"
+  // badge even when the device wasn't actually online.
+  return null;
 }

@@ -287,33 +287,42 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                   <FormItem>
                   <FormLabel>Email <RequiredMark /></FormLabel>
                     <FormControl>
-                      <Input type="email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-          <FormField
-                control={form.control}
-                name="phoneNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Phone number
-                      {isCreate && watchedRole === "STUDENT_FARMER" && (
-                        <RequiredMark />
-                      )}
-                    </FormLabel>
-                    <FormControl>
-                      <Input placeholder="09171234567" {...field} />
+                      <Input
+                        type="email"
+                        placeholder="e.g. juan.delacruz@bpsu.edu.ph"
+                        {...field}
+                      />
                     </FormControl>
                     <FormDescription className="text-xs">
-                      Format: 09XXXXXXXXX or +639XXXXXXXXX
+                      Must be a BPSU email address (@bpsu.edu.ph)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              {watchedRole !== "FACULTY" && (
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Phone number
+                        {isCreate && watchedRole === "STUDENT_FARMER" && (
+                          <RequiredMark />
+                        )}
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="09171234567" {...field} />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Format: 09XXXXXXXXX or +639XXXXXXXXX
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={form.control}
                 name="idNumber"
@@ -326,7 +335,16 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                           watchedRole === "FACULTY") && <RequiredMark />}
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input
+                        placeholder={
+                          watchedRole === "FACULTY"
+                            ? "e.g. EMP-001"
+                            : watchedRole === "STUDENT_FARMER"
+                            ? "e.g. 20-12345"
+                            : undefined
+                        }
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -434,7 +452,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       {isCreate && <RequiredMark />}
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input
+                        placeholder="e.g. College of Information and Communications Technology"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -450,7 +471,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       {isCreate && <RequiredMark />}
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input
+                        placeholder="e.g. Instructor, Associate Professor"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -476,7 +500,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       {isCreate && <RequiredMark />}
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input placeholder="e.g. BS Information Technology" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -519,7 +543,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       {isCreate && <RequiredMark />}
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input placeholder="e.g. BSIT-3A" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

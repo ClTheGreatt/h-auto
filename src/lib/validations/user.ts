@@ -50,7 +50,7 @@ export const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year"] as c
 export const createStudentSchema = baseUserSchema.extend({
   role: z.literal("STUDENT_FARMER"),
   idNumber: z.string().trim().min(1, "ID number is required"),
-  course: z.string().trim().min(1, "Course/Department is required"),
+  course: z.string().trim().min(1, "Course is required"),
   section: z.string().trim().min(1, "Section is required"),
   yearLevel: z.enum(YEAR_LEVELS, { error: "Year level is required" }),
   phoneNumber: phPhone,

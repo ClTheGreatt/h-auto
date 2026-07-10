@@ -32,7 +32,28 @@ type Student = {
   lastName: string;
   email: string;
   course: string | null;
+  yearLevel: string | null;
+  section: string | null;
 };
+
+const COURSE_TRUNCATE_LENGTH = 24;
+
+// Prefers "yearLevel · section" (short, e.g. "3rd Year · BSIT-3A") over the
+// full course name, which can be long enough to overflow the dropdown.
+function studentOptionLabel(s: Student): { label: string; full: string } {
+  const name = `${s.firstName} ${s.lastName}`;
+  if (s.yearLevel && s.section) {
+    return { label: `${name} · ${s.yearLevel} · ${s.section}`, full: s.course ?? name };
+  }
+  if (s.course) {
+    const short =
+      s.course.length > COURSE_TRUNCATE_LENGTH
+        ? `${s.course.slice(0, COURSE_TRUNCATE_LENGTH)}…`
+        : s.course;
+    return { label: `${name} · ${short}`, full: s.course };
+  }
+  return { label: name, full: name };
+}
 
 type Assignment = {
   id: string;
@@ -132,12 +153,19 @@ export function PlotAssignments({
                           No available students
                         </div>
                       ) : (
-                        unassigned.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.firstName} {s.lastName}
-                            {s.course ? ` — ${s.course}` : ""}
-                          </SelectItem>
-                        ))
+                        unassigned.map((s) => {
+                          const { label, full } = studentOptionLabel(s);
+                          return (
+                            <SelectItem
+                              key={s.id}
+                              value={s.id}
+                              title={full}
+                              className="max-w-full"
+                            >
+                              <span className="truncate">{label}</span>
+                            </SelectItem>
+                          );
+                        })
                       )}
                     </SelectContent>
                   </Select>

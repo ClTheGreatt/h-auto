@@ -38,6 +38,22 @@ const statusColors: Record<PlotStatus, string> = {
   FALLOW: "bg-stone-100 text-stone-700",
 };
 
+// Same threshold the offline-detection cron uses (src/app/api/cron/daily/route.ts)
+const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000;
+
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+// Module-level (outside render) so it doesn't trip the React Compiler purity rule
+function isOnline(lastSeenAt: Date | null | undefined): boolean {
+  return !!lastSeenAt && Date.now() - lastSeenAt.getTime() < OFFLINE_THRESHOLD_MS;
+}
+
 export default async function PlotDetailPage({
   params,
 }: {
@@ -56,7 +72,9 @@ export default async function PlotDetailPage({
     include: {
       crop: true,
       currentStage: true,
-      device: { select: { id: true, deviceCode: true, status: true } },
+      device: {
+        select: { id: true, deviceCode: true, lastSeenAt: true },
+      },
       assignments: {
         where: { status: "ACTIVE" },
         orderBy: { assignedAt: "desc" },
@@ -68,6 +86,8 @@ export default async function PlotDetailPage({
               lastName: true,
               email: true,
               course: true,
+              yearLevel: true,
+              section: true,
             },
           },
           faculty: { select: { firstName: true, lastName: true } },
@@ -99,6 +119,8 @@ export default async function PlotDetailPage({
           lastName: true,
           email: true,
           course: true,
+          yearLevel: true,
+          section: true,
         },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       })
@@ -108,6 +130,10 @@ export default async function PlotDetailPage({
     where: { plotId: plot.id },
     orderBy: { recordedAt: "desc" },
   });
+
+  // Compute freshly from lastSeenAt rather than trusting device.status,
+  // which is only updated periodically by the offline-detection cron.
+  const isDeviceOnline = isOnline(plot.device?.lastSeenAt);
 
   const growthLogs = await prisma.growthLog.findMany({
     where: { plotId: plot.id },
@@ -229,16 +255,20 @@ export default async function PlotDetailPage({
             Sensor readings
             <div className="flex items-center gap-3">
               {plot.device && <LiveRefresh intervalMs={10000} />}
-              {plot.device && (
-                <Badge
-                  variant="secondary"
-                  className={
-                    plot.device.status === "ONLINE"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-700"
-                  }
-                >
-                  {plot.device.deviceCode} - {plot.device.status}
+              {plot.device && !latestReading && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                  Awaiting first reading
+                </Badge>
+              )}
+              {plot.device && latestReading && !isDeviceOnline && (
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                  Device offline · Last seen{" "}
+                  {plot.device.lastSeenAt ? timeAgo(plot.device.lastSeenAt) : "unknown"}
+                </Badge>
+              )}
+              {plot.device && latestReading && isDeviceOnline && (
+                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                  Live
                 </Badge>
               )}
             </div>
@@ -247,15 +277,21 @@ export default async function PlotDetailPage({
       <CardContent>
           {!plot.device ? (
             <div className="text-sm text-gray-500">
-              No device linked to this plot.{" "}
+              No device linked to this plot yet. Link one from the Devices tab
+              to start receiving readings.{" "}
               {canEditPlot && (
                 <Link
                   href="/dashboard/devices/new"
-                  className="text-green-600 hover:underline"
+                  className="text-green-600 hover:underline font-medium"
                 >
-                  Register a device
+                  Link a device
                 </Link>
               )}
+            </div>
+          ) : !latestReading ? (
+            <div className="text-sm text-gray-500">
+              Device {plot.device.deviceCode} is linked but hasn&apos;t
+              reported yet. First reading will appear here.
             </div>
           ) : (
             <LatestReadings reading={latestReading} stage={plot.currentStage} />
