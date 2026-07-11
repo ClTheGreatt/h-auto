@@ -21,12 +21,21 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
 import { createCrop, updateCrop } from "@/actions/crops";
+import { CROP_PRESETS } from "@/lib/crops/presets";
 
 type CropFormProps = {
   mode: "create" | "edit";
@@ -65,17 +74,36 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
       name: defaultValues?.name ?? "",
       variety: defaultValues?.variety ?? "",
       description: defaultValues?.description ?? "",
-      imageUrl: defaultValues?.imageUrl ?? "",
       daysToHarvest: defaultValues?.daysToHarvest ?? 30,
       cultivationGuide: defaultValues?.cultivationGuide ?? "",
       stages: defaultValues?.stages ?? [emptyStage],
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "stages",
   });
+
+  function handlePresetSelect(presetId: string) {
+    const preset = CROP_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+
+    // Don't set variety — it varies per seed brand, user's own input.
+    form.setValue("name", preset.name);
+    form.setValue("daysToHarvest", preset.daysToHarvest);
+    form.setValue("description", preset.description);
+    form.setValue("cultivationGuide", preset.cultivationGuide);
+
+    replace(
+      preset.stages.map((s, i) => ({
+        ...s,
+        orderIndex: i,
+      }))
+    );
+
+    toast.success(`Loaded ${preset.displayName} preset. Review and edit as needed.`);
+  }
 
   async function onSubmit(values: CropFormValues) {
     setSubmitting(true);
@@ -99,6 +127,32 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {mode === "create" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick start (optional)</CardTitle>
+              <CardDescription>
+                Select a common vegetable to auto-fill recommended values. You
+                can still edit any field before saving.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select onValueChange={handlePresetSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a preset..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {CROP_PRESETS.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Crop information</CardTitle>
@@ -142,19 +196,6 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
                       {...field}
                       onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Image URL</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

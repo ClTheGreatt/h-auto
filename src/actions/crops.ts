@@ -25,7 +25,6 @@ export async function createCrop(input: CropFormValues) {
       ...cropData,
       variety: cropData.variety || null,
       description: cropData.description || null,
-      imageUrl: cropData.imageUrl || null,
       cultivationGuide: cropData.cultivationGuide || null,
       stages: {
         create: stages.map((s, i) => ({
@@ -64,7 +63,6 @@ export async function updateCrop(id: string, input: CropFormValues) {
         ...cropData,
         variety: cropData.variety || null,
         description: cropData.description || null,
-        imageUrl: cropData.imageUrl || null,
         cultivationGuide: cropData.cultivationGuide || null,
         stages: {
           create: stages.map((s, i) => ({

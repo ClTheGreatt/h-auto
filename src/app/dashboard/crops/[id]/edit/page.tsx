@@ -45,7 +45,6 @@ export default async function EditCropPage({
           name: crop.name,
           variety: crop.variety ?? "",
           description: crop.description ?? "",
-          imageUrl: crop.imageUrl ?? "",
           daysToHarvest: crop.daysToHarvest,
           cultivationGuide: crop.cultivationGuide ?? "",
           stages: crop.stages.map((s) => ({

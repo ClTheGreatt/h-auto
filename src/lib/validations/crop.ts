@@ -25,7 +25,6 @@ export const cropSchema = z.object({
   name: z.string().min(1, "Crop name is required"),
   variety: z.string().optional().or(z.literal("")),
   description: z.string().optional().or(z.literal("")),
-  imageUrl: z.string().optional().or(z.literal("")),
   daysToHarvest: z.number().int().positive("Days to harvest must be positive"),
   cultivationGuide: z.string().optional().or(z.literal("")),
   stages: z.array(stageSchema).min(1, "At least one stage is required"),
