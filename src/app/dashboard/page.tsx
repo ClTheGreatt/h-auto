@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
+import { timeAgo } from "@/lib/format-date";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 export default async function DashboardPage() {
   // Mark this as dynamic - required for impure functions like Date.now()
@@ -111,14 +112,6 @@ export default async function DashboardPage() {
         })
       : Promise.resolve([]),
   ]);
-
-  function timeAgo(date: Date): string {
-    const seconds = Math.floor((nowMs - new Date(date).getTime()) / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
-  }
 
   return (
     <div className="space-y-6">

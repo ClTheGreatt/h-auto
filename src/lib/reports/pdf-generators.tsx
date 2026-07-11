@@ -6,6 +6,7 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { BRANDING } from "./branding";
+import { formatDate, formatDateTime } from "@/lib/format-date";
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 9, fontFamily: "Helvetica" },
@@ -139,20 +140,6 @@ function ReportFooter() {
       />
     </View>
   );
-}
-
-function formatDateTime(d: Date | null): string {
-  if (!d) return "-";
-  const date = new Date(d);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
-
-function formatDate(d: Date | null): string {
-  if (!d) return "-";
-  return new Date(d).toLocaleDateString();
 }
 
 function fmt(v: number | null, digits = 1): string {

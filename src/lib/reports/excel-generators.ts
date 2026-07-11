@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { BRANDING } from "./branding";
+import { formatDate, formatDateTime } from "@/lib/format-date";
 
 // =============================================================
 // SHARED HELPERS
@@ -58,20 +59,6 @@ function addTitleRows(
 
   sheet.getRow(row).height = 8; // spacer
   return row + 1; // first row for headers
-}
-
-function formatDateTime(d: Date | null): string {
-  if (!d) return "-";
-  const date = new Date(d);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
-
-function formatDate(d: Date | null): string {
-  if (!d) return "-";
-  return new Date(d).toLocaleDateString();
 }
 
 // =============================================================

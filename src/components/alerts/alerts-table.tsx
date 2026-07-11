@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { resolveAlert } from "@/actions/alerts";
+import { timeAgo } from "@/lib/format-date";
 import type { AlertSeverity, AlertType, NotificationStatus } from "@prisma/client";
 
 type AlertRow = {
@@ -67,14 +68,6 @@ const severityIconColors: Record<AlertSeverity, string> = {
   WARNING: "text-amber-500",
   CRITICAL: "text-red-500",
 };
-
-function timeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
 
 function formatResolvedDate(date: Date): string {
   return new Date(date).toLocaleString("en-PH", {
