@@ -15,16 +15,3 @@ export async function resolveAlert(id: string) {
   revalidatePath("/dashboard/alerts");
   return { success: true };
 }
-
-export async function resolveAllForPlot(plotId: string) {
-  await requireFaculty();
-
-  await prisma.alert.updateMany({
-    where: { plotId, resolved: false },
-    data: { resolved: true, resolvedAt: new Date() },
-  });
-
-  revalidatePath("/dashboard/alerts");
-  revalidatePath(`/dashboard/plots/${plotId}`);
-  return { success: true };
-}
