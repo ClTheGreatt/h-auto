@@ -1,3 +1,4 @@
+import type { AlertSeverity } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/sms/semaphore";
 import { sendEmail } from "@/lib/email/send-email";
@@ -5,7 +6,7 @@ import { sendExpoPush } from "@/lib/push/expo";
 import { checkThresholds } from "./threshold-checker";
 import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
 
-type Recipient = {
+export type Recipient = {
   id: string;
   firstName: string;
   lastName: string;
@@ -79,87 +80,14 @@ export async function processSensorReading(readingId: string) {
       recipientMap.set(a.faculty.id, a.faculty);
     }
 
-    for (const user of recipientMap.values()) {
-      // 1) In-app — always recorded so it shows inside the app (no external service)
-      await prisma.alertNotification.create({
-        data: {
-          alertId: alert.id,
-          userId: user.id,
-          channel: "IN_APP",
-          status: "DELIVERED",
-          sentAt: new Date(),
-        },
-      });
-
-      // 2) SMS — only if the user has a phone number
-      if (user.phoneNumber) {
-        const smsMessage = `H-Auto Alert (${v.severity}): ${reading.plot.name} - ${v.message}`;
-        const smsResult = await sendSMS(user.phoneNumber, smsMessage);
-        await prisma.alertNotification.create({
-          data: {
-            alertId: alert.id,
-            userId: user.id,
-            channel: "SMS",
-            status: smsResult.success ? "SENT" : "FAILED",
-            providerMessageId: smsResult.messageId ?? null,
-            errorMessage: smsResult.error ?? null,
-            sentAt: smsResult.success ? new Date() : null,
-          },
-        });
-      }
-
-      // 3) Email — best-effort (works to anyone once the Resend domain is verified)
-      const emailResult = await sendAlertEmail(
-        user,
-        reading.plot.name,
-        v.severity,
-        v.message
-      );
-      await prisma.alertNotification.create({
-        data: {
-          alertId: alert.id,
-          userId: user.id,
-          channel: "EMAIL",
-          status: emailResult.success ? "SENT" : "FAILED",
-          errorMessage: emailResult.error ?? null,
-          sentAt: emailResult.success ? new Date() : null,
-        },
-      });
-
-      // 4) Push — to all of this user's registered devices
-      const tokens = await prisma.pushToken.findMany({
-        where: { userId: user.id },
-        select: { token: true },
-      });
-if (tokens.length > 0) {
-        const severityLabel =
-          v.severity === "CRITICAL"
-            ? "🔴 Critical"
-            : v.severity === "WARNING"
-            ? "🟡 Warning"
-            : "🔵 Info";
-        const pushResult = await sendExpoPush(
-          tokens.map((t) => ({
-            to: t.token,
-            title: `${severityLabel} · ${reading.plot.name}`,
-            body: `${v.message}${suggestion ? ` · ${suggestion.title}` : ""}`,
-            sound: "default" as const,
-            priority: "high" as const,
-            data: { alertId: alert.id, plotId: reading.plotId, type: v.type },
-          }))
-        );
-        await prisma.alertNotification.create({
-          data: {
-            alertId: alert.id,
-            userId: user.id,
-            channel: "PUSH",
-            status: pushResult.success ? "SENT" : "FAILED",
-            errorMessage: pushResult.error ?? null,
-            sentAt: pushResult.success ? new Date() : null,
-          },
-        });
-      }
-    }
+    await sendAlertNotifications(alert, Array.from(recipientMap.values()), {
+      plotId: reading.plotId,
+      plotName: reading.plot.name,
+      alertType: v.type,
+      severity: v.severity,
+      message: v.message,
+      suggestion,
+    });
   }
 
   // === Auto-resolve alerts no longer violating ===
@@ -172,6 +100,101 @@ if (tokens.length > 0) {
       await prisma.alert.update({
         where: { id: alert.id },
         data: { resolved: true, resolvedAt: new Date() },
+      });
+    }
+  }
+}
+
+// Sends the 4-channel notification set (IN_APP, SMS, EMAIL, PUSH) for one
+// alert to a list of recipients. Shared by processSensorReading (threshold
+// violations) and the daily cron's device-offline detection.
+export async function sendAlertNotifications(
+  alert: { id: string },
+  recipients: Recipient[],
+  content: {
+    plotId: string;
+    plotName: string;
+    alertType: string;
+    severity: AlertSeverity;
+    message: string;
+    suggestion: AlertSuggestion | null;
+  }
+) {
+  const { plotId, plotName, alertType, severity, message, suggestion } = content;
+
+  for (const user of recipients) {
+    // 1) In-app — always recorded so it shows inside the app (no external service)
+    await prisma.alertNotification.create({
+      data: {
+        alertId: alert.id,
+        userId: user.id,
+        channel: "IN_APP",
+        status: "DELIVERED",
+        sentAt: new Date(),
+      },
+    });
+
+    // 2) SMS — only if the user has a phone number
+    if (user.phoneNumber) {
+      const smsMessage = `H-Auto Alert (${severity}): ${plotName} - ${message}`;
+      const smsResult = await sendSMS(user.phoneNumber, smsMessage);
+      await prisma.alertNotification.create({
+        data: {
+          alertId: alert.id,
+          userId: user.id,
+          channel: "SMS",
+          status: smsResult.success ? "SENT" : "FAILED",
+          providerMessageId: smsResult.messageId ?? null,
+          errorMessage: smsResult.error ?? null,
+          sentAt: smsResult.success ? new Date() : null,
+        },
+      });
+    }
+
+    // 3) Email — best-effort (works to anyone once the Resend domain is verified)
+    const emailResult = await sendAlertEmail(user, plotName, severity, message);
+    await prisma.alertNotification.create({
+      data: {
+        alertId: alert.id,
+        userId: user.id,
+        channel: "EMAIL",
+        status: emailResult.success ? "SENT" : "FAILED",
+        errorMessage: emailResult.error ?? null,
+        sentAt: emailResult.success ? new Date() : null,
+      },
+    });
+
+    // 4) Push — to all of this user's registered devices
+    const tokens = await prisma.pushToken.findMany({
+      where: { userId: user.id },
+      select: { token: true },
+    });
+    if (tokens.length > 0) {
+      const severityLabel =
+        severity === "CRITICAL"
+          ? "🔴 Critical"
+          : severity === "WARNING"
+          ? "🟡 Warning"
+          : "🔵 Info";
+      const pushResult = await sendExpoPush(
+        tokens.map((t) => ({
+          to: t.token,
+          title: `${severityLabel} · ${plotName}`,
+          body: `${message}${suggestion ? ` · ${suggestion.title}` : ""}`,
+          sound: "default" as const,
+          priority: "high" as const,
+          data: { alertId: alert.id, plotId, type: alertType },
+        }))
+      );
+      await prisma.alertNotification.create({
+        data: {
+          alertId: alert.id,
+          userId: user.id,
+          channel: "PUSH",
+          status: pushResult.success ? "SENT" : "FAILED",
+          errorMessage: pushResult.error ?? null,
+          sentAt: pushResult.success ? new Date() : null,
+        },
       });
     }
   }
