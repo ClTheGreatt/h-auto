@@ -43,6 +43,8 @@ type CropFormProps = {
   defaultValues?: Partial<CropFormValues>;
 };
 
+const NONE_PRESET = "__none__";
+
 const emptyStage = {
   name: "",
   orderIndex: 0,
@@ -86,6 +88,16 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
   });
 
   function handlePresetSelect(presetId: string) {
+    if (presetId === NONE_PRESET) {
+      form.setValue("name", "");
+      form.setValue("daysToHarvest", 30);
+      form.setValue("description", "");
+      form.setValue("cultivationGuide", "");
+      replace([emptyStage]);
+      toast.info("Cleared. Enter values manually.");
+      return;
+    }
+
     const preset = CROP_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
 
@@ -142,6 +154,9 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
                   <SelectValue placeholder="Choose a preset..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={NONE_PRESET} className="italic text-muted-foreground">
+                    — None (manual entry) —
+                  </SelectItem>
                   {CROP_PRESETS.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.displayName}
