@@ -153,11 +153,7 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a preset..." />
                 </SelectTrigger>
-                <SelectContent
-                  position="popper"
-                  sideOffset={4}
-                  className="w-(--radix-select-trigger-width)"
-                >
+                <SelectContent>
                   <SelectItem value={NONE_PRESET} className="italic text-muted-foreground">
                     — None (manual entry) —
                   </SelectItem>
