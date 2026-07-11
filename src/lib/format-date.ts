@@ -51,32 +51,3 @@ export function formatDateTime(date: Date | string | null | undefined): string {
     hour12: true,
   });
 }
-
-/**
- * Time only: "3:45 PM"
- *
- * Use for: same-day timeline items where the date is implied.
- */
-export function formatTime(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  return new Date(date).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-/**
- * ISO short date: "2025-11-17"
- *
- * Use for: CSV exports, filenames, date input fields, anywhere a
- * sortable / machine-readable date is needed.
- */
-export function formatDateISO(date: Date | string | null | undefined): string {
-  if (!date) return "";
-  const d = new Date(date);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
