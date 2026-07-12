@@ -8,6 +8,82 @@ function isAdmin(role: string) {
 
 const VALID_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"];
 
+// GET /api/mobile/me/users/[id] — fetch one user's full detail (admin only)
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const actor = await getMobileUser(req);
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isAdmin(actor.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        phoneNumber: true,
+        role: true,
+        idNumber: true,
+        department: true,
+        course: true,
+        yearLevel: true,
+        section: true,
+        position: true,
+        profileImage: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Same permission rules as PATCH: nobody views SUPER_ADMIN from mobile,
+    // and only SUPER_ADMIN can view ADMIN accounts.
+    if (user.role === "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Super Admin accounts can't be viewed from mobile" },
+        { status: 403 }
+      );
+    }
+    if (user.role === "ADMIN" && actor.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only Super Admins can view Admin accounts" },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.json({
+      user: {
+        ...user,
+        lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("[mobile/me/users/[id] GET] error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch user" },
+      { status: 500 }
+    );
+  }
+}
+
 // PATCH /api/mobile/me/users/[id] — update a user's status (admin only)
 export async function PATCH(
   req: NextRequest,
