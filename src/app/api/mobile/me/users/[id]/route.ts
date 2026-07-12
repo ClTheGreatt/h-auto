@@ -52,19 +52,24 @@ export async function GET(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Same permission rules as PATCH: nobody views SUPER_ADMIN from mobile,
-    // and only SUPER_ADMIN can view ADMIN accounts.
-    if (user.role === "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Super Admin accounts can't be viewed from mobile" },
-        { status: 403 }
-      );
-    }
-    if (user.role === "ADMIN" && actor.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Only Super Admins can view Admin accounts" },
-        { status: 403 }
-      );
+    // Self-view is always allowed, regardless of role hierarchy — an admin
+    // fetching their own record shouldn't be blocked by the ADMIN/SUPER_ADMIN
+    // target rules below. Everyone else goes through the same permission
+    // rules as PATCH: nobody views SUPER_ADMIN from mobile, and only
+    // SUPER_ADMIN can view ADMIN accounts.
+    if (id !== actor.id) {
+      if (user.role === "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Super Admin accounts can't be viewed from mobile" },
+          { status: 403 }
+        );
+      }
+      if (user.role === "ADMIN" && actor.role !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Only Super Admins can view Admin accounts" },
+          { status: 403 }
+        );
+      }
     }
 
     return NextResponse.json({
