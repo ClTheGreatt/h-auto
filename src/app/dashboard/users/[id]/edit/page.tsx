@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { UserForm } from "@/components/users/user-form";
+import { BackButton } from "@/components/analytics/back-button";
 
 export default async function EditUserPage({
   params,
@@ -19,13 +18,7 @@ export default async function EditUserPage({
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <Link
-          href={`/dashboard/users/${user.id}`}
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to user
-        </Link>
+        <BackButton label="Back" />
         <h1 className="text-2xl font-semibold text-gray-900">
           Edit {user.firstName} {user.lastName}
         </h1>

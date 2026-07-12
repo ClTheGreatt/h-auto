@@ -225,7 +225,8 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     }
 
     toast.success("User updated");
-    router.push(`/dashboard/users/${userId}`);
+    router.back();
+    // Refresh so the page we return to shows the updated data
     router.refresh();
   }
 
@@ -597,7 +598,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 return;
               }
               if (mode === "edit") {
-                router.push(`/dashboard/users/${userId}`);
+                router.back();
               } else {
                 router.push("/dashboard/users");
               }

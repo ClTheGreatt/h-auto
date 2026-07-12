@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { PlotForm } from "@/components/plots/plot-form";
+import { BackButton } from "@/components/analytics/back-button";
 
 function toDateInput(d: Date | null): string {
   if (!d) return "";
@@ -36,13 +35,7 @@ export default async function EditPlotPage({
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <Link
-          href={`/dashboard/plots/${plot.id}`}
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to plot
-        </Link>
+        <BackButton label="Back" />
         <h1 className="text-2xl font-semibold text-gray-900">Edit {plot.name}</h1>
       </div>
 

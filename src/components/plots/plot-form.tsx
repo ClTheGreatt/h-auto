@@ -126,7 +126,8 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
     }
 
     toast.success("Plot updated");
-    router.push(`/dashboard/plots/${plotId}`);
+    router.back();
+    // Refresh so the page we return to shows the updated data
     router.refresh();
   }
 
@@ -329,7 +330,7 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
             variant="outline"
             onClick={() => {
               if (mode === "edit") {
-                router.push(`/dashboard/plots/${plotId}`);
+                router.back();
               } else {
                 router.push("/dashboard/plots");
               }

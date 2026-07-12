@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { MoreHorizontal, Eye, Pencil, Trash2, MapPinned } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MoreHorizontal, Pencil, Trash2, MapPinned } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -58,6 +59,8 @@ export function PlotsTable({
   plots: PlotRow[];
   canManage: boolean;
 }) {
+  const router = useRouter();
+
   if (plots.length === 0) {
     return (
       <EmptyState
@@ -92,11 +95,16 @@ export function PlotsTable({
         </TableHeader>
         <TableBody>
           {plots.map((plot) => (
-            <TableRow key={plot.id}>
+            <TableRow
+              key={plot.id}
+              onClick={() => router.push(`/dashboard/plots/${plot.id}`)}
+              className="cursor-pointer hover:bg-muted/50"
+            >
               <TableCell className="font-medium whitespace-nowrap">
                 <Link
                   href={`/dashboard/plots/${plot.id}`}
                   className="hover:underline"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {plot.name}
                 </Link>
@@ -121,44 +129,43 @@ export function PlotsTable({
                   : "None"}
               </TableCell>
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/plots/${plot.id}`}>
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
-                      </Link>
-                    </DropdownMenuItem>
-                    {canManage && (
-                      <>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/plots/${plot.id}/edit`}>
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Edit
-                          </Link>
-                        </DropdownMenuItem>
-                        <DeletePlotDialog
-                          plotId={plot.id}
-                          plotName={plot.name}
-                          trigger={
-                            <DropdownMenuItem
-                              onSelect={(e) => e.preventDefault()}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          }
-                        />
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {canManage && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/plots/${plot.id}/edit`}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit
+                        </Link>
+                      </DropdownMenuItem>
+                      <DeletePlotDialog
+                        plotId={plot.id}
+                        plotName={plot.name}
+                        trigger={
+                          <DropdownMenuItem
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        }
+                      />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </TableCell>
             </TableRow>
           ))}
