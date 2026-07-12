@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
+import { Prisma, type UserRole, type UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import {
@@ -14,6 +14,14 @@ import { welcomeEmailTemplate } from "@/lib/email/templates";
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
 }
+
+const VALID_ROLES: UserRole[] = [
+  "SUPER_ADMIN",
+  "ADMIN",
+  "FACULTY",
+  "STUDENT_FARMER",
+];
+const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE", "SUSPENDED"];
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (same
 // rule as the web createUser action). Other roles (ADMIN/SUPER_ADMIN)
@@ -56,7 +64,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const sp = req.nextUrl.searchParams;
+    const roleParam = sp.get("role");
+    const statusParam = sp.get("status");
+
+    const where: Prisma.UserWhereInput = {
+      ...(roleParam && VALID_ROLES.includes(roleParam as UserRole)
+        ? { role: roleParam as UserRole }
+        : {}),
+      ...(statusParam && VALID_STATUSES.includes(statusParam as UserStatus)
+        ? { status: statusParam as UserStatus }
+        : {}),
+    };
+
     const users = await prisma.user.findMany({
+      where,
       orderBy: [{ role: "asc" }, { lastName: "asc" }, { firstName: "asc" }],
       select: {
         id: true,
