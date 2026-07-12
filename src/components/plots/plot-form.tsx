@@ -101,11 +101,23 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
 
   async function onSubmit(values: PlotFormValues) {
     setSubmitting(true);
-    const result =
-      mode === "create"
-        ? await createPlot(values)
-        : await updatePlot(plotId!, values);
 
+    if (mode === "create") {
+      const result = await createPlot(values);
+      setSubmitting(false);
+
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Plot created");
+      router.push(`/dashboard/plots/${result.id}`);
+      router.refresh();
+      return;
+    }
+
+    const result = await updatePlot(plotId!, values);
     setSubmitting(false);
 
     if (result?.error) {
@@ -113,8 +125,8 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
       return;
     }
 
-    toast.success(mode === "create" ? "Plot created" : "Plot updated");
-    router.push("/dashboard/plots");
+    toast.success("Plot updated");
+    router.push(`/dashboard/plots/${plotId}`);
     router.refresh();
   }
 
@@ -315,7 +327,13 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/dashboard/plots")}
+            onClick={() => {
+              if (mode === "edit") {
+                router.push(`/dashboard/plots/${plotId}`);
+              } else {
+                router.push("/dashboard/plots");
+              }
+            }}
           >
             Cancel
           </Button>

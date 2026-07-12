@@ -168,14 +168,43 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
-    const result =
-      mode === "create"
-        ? await createUser(values as CreateUserInput)
-        : await updateUser(userId!, values as UpdateUserInput);
 
+    if (mode === "create") {
+      const result = await createUser(values as CreateUserInput);
+      setSubmitting(false);
+
+      // Try server fieldErrors first (Zod validation that escaped client)
+      if (mapServerErrorsToForm(form, result)) {
+        toast.error(result.error ?? "Please fix the errors below");
+        return;
+      }
+
+      // Fall back to keyword mapping for friendly Prisma errors
+      if (result.error) {
+        const errorMsg = result.error.toLowerCase();
+        if (errorMsg.includes("email")) {
+          form.setError("email", { message: result.error });
+        } else if (errorMsg.includes("id number")) {
+          form.setError("idNumber", { message: result.error });
+        } else if (errorMsg.includes("phone")) {
+          form.setError("phoneNumber", { message: result.error });
+        }
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("User created");
+      if ("id" in result) {
+        router.push(`/dashboard/users/${result.id}`);
+      }
+      router.refresh();
+      return;
+    }
+
+    const result = await updateUser(userId!, values as UpdateUserInput);
     setSubmitting(false);
 
-// Try server fieldErrors first (Zod validation that escaped client)
+    // Try server fieldErrors first (Zod validation that escaped client)
     if (mapServerErrorsToForm(form, result ?? {})) {
       toast.error(result?.error ?? "Please fix the errors below");
       return;
@@ -195,8 +224,8 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
       return;
     }
 
-    toast.success(mode === "create" ? "User created" : "User updated");
-    router.push("/dashboard/users");
+    toast.success("User updated");
+    router.push(`/dashboard/users/${userId}`);
     router.refresh();
   }
 
@@ -567,7 +596,11 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               ) {
                 return;
               }
-              router.push("/dashboard/users");
+              if (mode === "edit") {
+                router.push(`/dashboard/users/${userId}`);
+              } else {
+                router.push("/dashboard/users");
+              }
             }}
           >
             Cancel

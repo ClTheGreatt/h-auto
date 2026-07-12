@@ -17,7 +17,7 @@ export async function createPlot(input: PlotFormValues) {
   if (!parsed.success) return { error: "Invalid input" };
 
   const data = parsed.data;
-  await prisma.plot.create({
+  const created = await prisma.plot.create({
     data: {
       name: data.name,
       location: data.location || null,
@@ -31,7 +31,7 @@ export async function createPlot(input: PlotFormValues) {
   });
 
   revalidatePath("/dashboard/plots");
-  return { success: true };
+  return { success: true, id: created.id };
 }
 
 export async function updatePlot(id: string, input: PlotFormValues) {

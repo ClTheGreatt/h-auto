@@ -118,7 +118,7 @@ const passwordHash = await bcrypt.hash(parsed.data.password, 10);
   }
 
   revalidatePath("/dashboard/users");
-  return { success: true };
+  return { success: true, id: createdUser.id };
 }
 
 export async function updateUser(id: string, input: UpdateUserInput) {
