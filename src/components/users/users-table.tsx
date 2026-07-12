@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   MoreHorizontal,
   Pencil,
@@ -137,6 +138,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
 }
 
 function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
+  const router = useRouter();
   const meta = ROLE_META[role];
   const Icon = meta.icon;
 
@@ -186,7 +188,11 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow
+                key={user.id}
+                onClick={() => router.push(`/dashboard/users/${user.id}`)}
+                className="cursor-pointer hover:bg-muted/50"
+              >
                 <TableCell className="px-4 py-3 font-medium">
                   {user.firstName} {user.lastName}
                 </TableCell>
@@ -204,11 +210,18 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
                 <TableCell className="px-3 py-2 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent
+                      align="end"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <DropdownMenuItem asChild>
                         <Link href={`/dashboard/users/${user.id}/edit`}>
                           <Pencil className="w-4 h-4 mr-2" />
