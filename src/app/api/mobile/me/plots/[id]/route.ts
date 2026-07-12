@@ -129,6 +129,7 @@ const observations = await prisma.growthLog.findMany({
     createdAt: true,
     user: {
       select: {
+        id: true,
         firstName: true,
         lastName: true,
       },
