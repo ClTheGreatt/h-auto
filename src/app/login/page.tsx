@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -54,6 +55,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
+      {/* Theme toggle - fixed so it stays visible over either panel at any breakpoint */}
+      <div className="fixed top-4 right-4 z-50 rounded-lg bg-white/10 dark:bg-black/20 backdrop-blur-sm">
+        <ThemeToggle />
+      </div>
+
       {/* Left side - Brand panel (hidden on mobile) */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-green-600 via-green-700 to-emerald-800 dark:from-green-900 dark:via-emerald-950 dark:to-gray-950 overflow-hidden">
         {/* Decorative pattern */}
