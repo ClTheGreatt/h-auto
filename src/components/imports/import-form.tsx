@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
+import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import {
   Upload,
@@ -31,6 +32,10 @@ import {
   type ImportRowType,
 } from "@/lib/validations/import";
 import { commitImport } from "@/actions/import";
+import {
+  generateFacultyTemplate,
+  generateStudentTemplate,
+} from "@/lib/imports/template-generator";
 
 type ParsedRow = {
   rowNumber: number;
@@ -46,13 +51,49 @@ type ImportResult = {
 
 type Phase = "idle" | "preview" | "committing" | "done";
 
-const FACULTY_TEMPLATE =
-  "firstName,middleName,lastName,email,phoneNumber,idNumber,department,position,password\n" +
-  "Juan,Cruz,Dela Cruz,juan.delacruz@bpsu.edu.ph,+639171234567,EMP-001,Agriculture,Professor,TempPass123!";
+// Shared by both the CSV and Excel parse paths: validates raw row objects
+// against the schema for the selected import type and flags duplicate emails.
+function buildParsedRows(
+  data: Record<string, string>[],
+  importType: ImportRowType
+): ParsedRow[] {
+  const schema =
+    importType === "FACULTY" ? facultyImportRowSchema : studentImportRowSchema;
 
-const STUDENT_TEMPLATE =
-  "firstName,middleName,lastName,email,phoneNumber,idNumber,course,yearLevel,section,password\n" +
-  "Maria,Santos,Reyes,maria.reyes@bpsu.edu.ph,+639181234567,23-04567,BSIT,3rd Year,A,TempPass123!";
+  const emailCounts = new Map<string, number>();
+  data.forEach((row) => {
+    const email = row.email?.trim().toLowerCase();
+    if (email) emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
+  });
+
+  return data.map((raw, idx) => {
+    const trimmed: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      trimmed[k] = typeof v === "string" ? v.trim() : String(v ?? "");
+    }
+
+    const result = schema.safeParse(trimmed);
+    const errors: string[] = [];
+
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const field = issue.path.join(".") || "row";
+        errors.push(`${field}: ${issue.message}`);
+      }
+    }
+
+    const email = trimmed.email?.toLowerCase();
+    if (email && (emailCounts.get(email) ?? 0) > 1) {
+      errors.push("Duplicate email within this file");
+    }
+
+    return {
+      rowNumber: idx + 2, // +2 because header is row 1 and rows are 1-indexed
+      raw: trimmed,
+      errors,
+    };
+  });
+}
 
 export function ImportForm() {
   const router = useRouter();
@@ -63,31 +104,22 @@ export function ImportForm() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
 
-  function downloadTemplate() {
-    const content = importType === "FACULTY" ? FACULTY_TEMPLATE : STUDENT_TEMPLATE;
-    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  async function downloadTemplate() {
+    const blob =
+      importType === "FACULTY"
+        ? await generateFacultyTemplate()
+        : await generateStudentTemplate();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download =
-      importType === "FACULTY" ? "faculty-template.csv" : "student-template.csv";
+    a.download = `h-auto-${importType}-template.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast.error("Please upload a CSV file (.csv)");
-      return;
-    }
-
-    setFileName(file.name);
-
+  function parseCsvFile(file: File) {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
@@ -100,53 +132,77 @@ export function ImportForm() {
           return;
         }
 
-        const schema =
-          importType === "FACULTY"
-            ? facultyImportRowSchema
-            : studentImportRowSchema;
-
-        // Detect duplicate emails within the CSV
-        const emailCounts = new Map<string, number>();
-        results.data.forEach((row) => {
-          const email = row.email?.trim().toLowerCase();
-          if (email) emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
-        });
-
-        const parsed: ParsedRow[] = results.data.map((raw, idx) => {
-          const trimmed: Record<string, string> = {};
-          for (const [k, v] of Object.entries(raw)) {
-            trimmed[k] = typeof v === "string" ? v.trim() : String(v ?? "");
-          }
-
-          const result = schema.safeParse(trimmed);
-          const errors: string[] = [];
-
-          if (!result.success) {
-            for (const issue of result.error.issues) {
-              const field = issue.path.join(".") || "row";
-              errors.push(`${field}: ${issue.message}`);
-            }
-          }
-
-          const email = trimmed.email?.toLowerCase();
-          if (email && (emailCounts.get(email) ?? 0) > 1) {
-            errors.push("Duplicate email within this CSV");
-          }
-
-          return {
-            rowNumber: idx + 2, // +2 because header is row 1 and rows are 1-indexed
-            raw: trimmed,
-            errors,
-          };
-        });
-
-        setRows(parsed);
+        setRows(buildParsedRows(results.data, importType));
         setPhase("preview");
       },
       error: (err) => {
         toast.error(`Failed to parse CSV: ${err.message}`);
       },
     });
+  }
+
+  async function parseExcelFile(file: File) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+
+      const sheet = workbook.getWorksheet("Data") ?? workbook.worksheets[0];
+      if (!sheet) {
+        toast.error("Could not find a sheet with data in this Excel file");
+        return;
+      }
+
+      const headers: string[] = [];
+      sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
+        headers[colNumber - 1] = String(cell.value ?? "").trim();
+      });
+
+      const data: Record<string, string>[] = [];
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // header row, already read above
+
+        const record: Record<string, string> = {};
+        let hasValue = false;
+        headers.forEach((header, idx) => {
+          if (!header) return;
+          const value = row.getCell(idx + 1).value;
+          const text = value == null ? "" : String(value);
+          record[header] = text;
+          if (text) hasValue = true;
+        });
+        if (hasValue) data.push(record);
+      });
+
+      setRows(buildParsedRows(data, importType));
+      setPhase("preview");
+    } catch (err) {
+      toast.error(
+        `Failed to parse Excel file: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const lowerName = file.name.toLowerCase();
+    const isCsv = lowerName.endsWith(".csv");
+    const isXlsx = lowerName.endsWith(".xlsx");
+
+    if (!isCsv && !isXlsx) {
+      toast.error("Please upload a CSV or Excel file (.csv, .xlsx)");
+      return;
+    }
+
+    setFileName(file.name);
+
+    if (isXlsx) {
+      void parseExcelFile(file);
+    } else {
+      parseCsvFile(file);
+    }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -254,14 +310,14 @@ export function ImportForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Step 2: Download the CSV template</CardTitle>
+            <CardTitle>Step 2: Download the template</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-gray-600">
-              The template shows the exact column headers you need. Open it in
-              Excel or Google Sheets, fill in your{" "}
-              {importType === "FACULTY" ? "faculty" : "student"} data, and save
-              as CSV.
+              The template shows the exact column headers you need, with an
+              Instructions sheet explaining each one. Fill in your{" "}
+              {importType === "FACULTY" ? "faculty" : "student"} data, and
+              upload it as .xlsx or export it to .csv.
             </p>
             <Button variant="outline" onClick={downloadTemplate}>
               <Download className="w-4 h-4 mr-2" />
@@ -272,13 +328,13 @@ export function ImportForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Step 3: Upload your filled CSV</CardTitle>
+            <CardTitle>Step 3: Upload your filled file</CardTitle>
           </CardHeader>
           <CardContent>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={handleFileSelect}
               className="hidden"
               id="csv-upload"
@@ -289,7 +345,7 @@ export function ImportForm() {
             >
               <Upload className="w-8 h-8 text-gray-400 mb-2" />
               <p className="text-sm font-medium text-gray-700">
-                Click to upload a CSV file
+                Click to upload a CSV or Excel file
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 You&apos;ll see a preview before anything is saved
