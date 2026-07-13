@@ -55,24 +55,24 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Brand panel (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-green-600 via-green-700 to-emerald-800 overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-green-600 via-green-700 to-emerald-800 dark:from-green-900 dark:via-emerald-950 dark:to-gray-950 overflow-hidden">
         {/* Decorative pattern */}
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-32 right-16 w-80 h-80 bg-green-300 rounded-full blur-3xl" />
-          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-emerald-400 rounded-full blur-3xl" />
+          <div className="absolute top-20 left-20 w-64 h-64 bg-white dark:bg-emerald-400/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-32 right-16 w-80 h-80 bg-green-300 dark:bg-emerald-700/30 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-emerald-400 dark:bg-emerald-600/20 rounded-full blur-3xl" />
         </div>
 
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           {/* Top: Logo + system name */}
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-white/15 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
               <Sprout className="w-7 h-7 text-white" />
             </div>
             <div>
               <div className="text-xl font-bold">H-Auto</div>
-              <div className="text-xs text-green-100">Smart Gardening</div>
+              <div className="text-xs text-green-100 dark:text-emerald-200">Smart Gardening</div>
             </div>
           </div>
 
@@ -81,7 +81,7 @@ export default function LoginPage() {
             <h1 className="text-4xl font-bold leading-tight">
               Cultivating the future of school gardens
             </h1>
-            <p className="text-green-100 text-lg leading-relaxed">
+            <p className="text-green-100 dark:text-emerald-200 text-lg leading-relaxed">
               Real-time monitoring of soil moisture, temperature, humidity, light,
               and nutrients — all from one intelligent platform.
             </p>
@@ -89,22 +89,22 @@ export default function LoginPage() {
             {/* Feature highlights */}
             <div className="grid grid-cols-3 gap-4 pt-4">
               <div className="space-y-2">
-                <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-white/15 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
                   <Droplets className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-green-100">Moisture tracking</div>
+                <div className="text-xs text-green-100 dark:text-emerald-200">Moisture tracking</div>
               </div>
               <div className="space-y-2">
-                <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-white/15 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
                   <Sun className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-green-100">Light analytics</div>
+                <div className="text-xs text-green-100 dark:text-emerald-200">Light analytics</div>
               </div>
               <div className="space-y-2">
-                <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-white/15 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
                   <Leaf className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-green-100">Growth monitoring</div>
+                <div className="text-xs text-green-100 dark:text-emerald-200">Growth monitoring</div>
               </div>
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-stone-50">
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-stone-50 dark:bg-gray-950">
         <div className="w-full max-w-md space-y-8 page-fade-in">
           {/* Mobile logo (only shown on small screens) */}
           <div className="lg:hidden flex items-center gap-3 justify-center">
@@ -128,15 +128,15 @@ export default function LoginPage() {
               <Sprout className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="text-lg font-bold text-gray-900">H-Auto</div>
-              <div className="text-xs text-gray-500">Smart Gardening</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-white">H-Auto</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Smart Gardening</div>
             </div>
           </div>
 
           {/* Header */}
           <div className="space-y-2">
-            <h2 className="text-3xl font-bold text-gray-900">Welcome back</h2>
-            <p className="text-gray-500">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h2>
+            <p className="text-gray-500 dark:text-gray-400">
               Sign in to access your monitoring dashboard
             </p>
           </div>
@@ -148,7 +148,7 @@ export default function LoginPage() {
                 Email address
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <Input
                   id="email"
                   type="email"
@@ -168,7 +168,7 @@ export default function LoginPage() {
                 Password
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -183,7 +183,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -197,8 +197,9 @@ export default function LoginPage() {
 
             <Button
               type="submit"
+              variant="default"
               disabled={submitting}
-              className="w-full h-11 bg-green-600 hover:bg-green-700 transition"
+              className="w-full h-11 transition"
             >
               {submitting ? (
                 <>
@@ -212,8 +213,8 @@ export default function LoginPage() {
           </form>
 
           {/* Footer */}
-          <div className="text-center pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
+          <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-800">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Need an account? Contact your system administrator.
             </p>
           </div>
