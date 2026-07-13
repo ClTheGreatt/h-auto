@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileSidebar } from "./mobile-sidebar";
 
 type UserRole = "SUPER_ADMIN" | "ADMIN" | "FACULTY" | "STUDENT_FARMER";
@@ -53,8 +54,10 @@ export function Header({
         <MobileSidebar role={role} />
       </div>
 
-      {/* Right: User dropdown */}
-      <DropdownMenu>
+      {/* Right: Theme toggle + user dropdown */}
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -105,7 +108,8 @@ export function Header({
             {signingOut ? "Signing out..." : "Sign out"}
           </DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }
