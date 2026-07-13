@@ -45,7 +45,7 @@ const navGroups: NavGroup[] = [
     label: "Manage",
     items: [
       { href: "/dashboard/users", label: "Users", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
-      { href: "/dashboard/crops", label: "Crops", icon: Sprout, roles: ["SUPER_ADMIN", "ADMIN", "FACULTY"] },
+      { href: "/dashboard/crops", label: "Crops", icon: Sprout, roles: ["SUPER_ADMIN", "ADMIN"] },
       { href: "/dashboard/plots", label: "Plots", icon: MapPinned, roles: "all" },
       { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardList, roles: "all" },
       { href: "/dashboard/devices", label: "Devices", icon: Cpu, roles: ["SUPER_ADMIN", "ADMIN"] },

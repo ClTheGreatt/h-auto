@@ -1,0 +1,49 @@
+/* driver.js popover theme, mapped onto this app's shadcn/ui CSS variables so
+   it follows light/dark mode automatically. NOTE: this project's variables
+   (--card, --border, --primary, etc., defined in globals.css) already hold
+   complete oklch(...) values, not bare "H S% L%" triples — so they're used
+   directly as var(--x), not wrapped in hsl(var(--x)). */
+
+.driver-popover.hauto-tour-popover {
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.hauto-tour-popover .driver-popover-title {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.hauto-tour-popover .driver-popover-description {
+  color: var(--muted-foreground);
+}
+
+.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-top {
+  border-top-color: var(--border);
+}
+.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-bottom {
+  border-bottom-color: var(--border);
+}
+.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-left {
+  border-left-color: var(--border);
+}
+.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-right {
+  border-right-color: var(--border);
+}
+
+.hauto-tour-popover .driver-popover-navigation-btns button {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+}
+
+.hauto-tour-popover .driver-popover-close-btn {
+  color: var(--muted-foreground);
+}
+
+.hauto-tour-popover .driver-popover-progress-text {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}

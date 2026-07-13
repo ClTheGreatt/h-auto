@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
+import { SessionProvider } from "next-auth/react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { TourProvider } from "@/lib/tour";
 
 
 export default async function DashboardLayout({
@@ -34,26 +36,30 @@ select: {
   }
 
   return (
-   <div className="flex min-h-screen bg-stone-50 dark:bg-gray-950">
-      {/* Desktop sidebar - hidden on mobile */}
-      <div className="hidden lg:block sticky top-0 h-screen">
-        <Sidebar role={user.role} />
-      </div>
+    <SessionProvider session={session}>
+      <TourProvider>
+        <div className="flex min-h-screen bg-stone-50 dark:bg-gray-950">
+          {/* Desktop sidebar - hidden on mobile */}
+          <div className="hidden lg:block sticky top-0 h-screen">
+            <Sidebar role={user.role} />
+          </div>
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0">
-<Header
-          firstName={user.firstName}
-          lastName={user.lastName}
-          email={user.email}
-          role={user.role}
-          image={user.profileImage}
-        />
-    <main id="main-content" className="flex-1 p-4 lg:p-6 page-fade-in">
-          <Breadcrumbs />
-          {children}
-        </main>
-      </div>
-    </div>
+          {/* Main content area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <Header
+              firstName={user.firstName}
+              lastName={user.lastName}
+              email={user.email}
+              role={user.role}
+              image={user.profileImage}
+            />
+            <main id="main-content" className="flex-1 p-4 lg:p-6 page-fade-in">
+              <Breadcrumbs />
+              {children}
+            </main>
+          </div>
+        </div>
+      </TourProvider>
+    </SessionProvider>
   );
 }
