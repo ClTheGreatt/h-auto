@@ -2,17 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Users as UsersIcon,
-  ShieldCheck,
-  Shield,
-  GraduationCap,
-  Sprout,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Users as UsersIcon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -56,38 +46,28 @@ const ROLE_META: Record<
   {
     label: string;
     description: string;
-    icon: LucideIcon;
-    iconBg: string;
-    iconColor: string;
+    badgeColor: string;
   }
 > = {
   SUPER_ADMIN: {
     label: "Super Admins",
     description: "Full system access",
-    icon: ShieldCheck,
-    iconBg: "bg-purple-100 dark:bg-purple-950/40",
-    iconColor: "text-purple-700 dark:text-purple-400",
+    badgeColor: "text-purple-700 dark:text-purple-400",
   },
   ADMIN: {
     label: "Admins",
     description: "Manage users and devices",
-    icon: Shield,
-    iconBg: "bg-blue-100 dark:bg-blue-950/40",
-    iconColor: "text-blue-700 dark:text-blue-400",
+    badgeColor: "text-blue-700 dark:text-blue-400",
   },
   FACULTY: {
     label: "Faculty",
     description: "Instructors and advisers",
-    icon: GraduationCap,
-    iconBg: "bg-amber-100 dark:bg-amber-950/40",
-    iconColor: "text-amber-700 dark:text-amber-400",
+    badgeColor: "text-amber-700 dark:text-amber-400",
   },
   STUDENT_FARMER: {
     label: "Student Farmers",
     description: "Field operators",
-    icon: Sprout,
-    iconBg: "bg-green-100 dark:bg-green-950/40",
-    iconColor: "text-green-700 dark:text-green-400",
+    badgeColor: "text-green-700 dark:text-green-400",
   },
 };
 
@@ -140,23 +120,14 @@ export function UsersTable({ users }: { users: UserRow[] }) {
 function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
   const router = useRouter();
   const meta = ROLE_META[role];
-  const Icon = meta.icon;
 
   return (
     <section className="overflow-hidden rounded-md border bg-white shadow-sm dark:bg-gray-900">
       {/* Section header */}
       <div className="flex items-center gap-3 border-b px-4 py-3">
-        <div
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
-            meta.iconBg
-          )}
-        >
-          <Icon className={cn("h-5 w-5", meta.iconColor)} />
-        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-gray-900">
+            <h2 className={cn("text-sm font-semibold", meta.badgeColor)}>
               {meta.label}
             </h2>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
