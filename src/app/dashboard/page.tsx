@@ -137,7 +137,7 @@ export default async function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card data-tour="dashboard.stat-my-plots">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="dashboard.stat-alerts">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
@@ -236,7 +236,7 @@ export default async function DashboardPage() {
 
       {/* Student plots */}
       {isStudent && myPlots.length > 0 && (
-        <Card>
+        <Card data-tour="dashboard.my-plots-grid">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="text-base">My assigned plots</span>

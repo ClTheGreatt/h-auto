@@ -110,6 +110,7 @@ export function Sidebar({
         key={item.href}
         href={item.href}
         onClick={onNavigate}
+        data-tour={item.href === "/dashboard/help" ? "profile.help-link" : undefined}
         className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all",
           isActive
@@ -125,7 +126,10 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full">
+    <aside
+      data-tour="sidebar.container"
+      className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full"
+    >
       <div className="p-6 border-b border-gray-200 dark:border-gray-800">
         <Link
           href="/dashboard"

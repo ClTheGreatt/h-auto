@@ -134,6 +134,7 @@ model User {
   profileImage String?
   status       UserStatus @default(ACTIVE)
   lastLoginAt  DateTime?
+  tourCompletedAt DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

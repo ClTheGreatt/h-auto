@@ -36,6 +36,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
+          tourCompletedAt: user.tourCompletedAt
+            ? user.tourCompletedAt.toISOString()
+            : null,
         };
       },
     }),
@@ -45,6 +48,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = user.role as UserRole;
+        token.tourCompletedAt = user.tourCompletedAt
+          ? new Date(user.tourCompletedAt).toISOString()
+          : null;
       }
       return token;
     },
@@ -52,6 +58,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
+        session.user.tourCompletedAt = (token.tourCompletedAt as string | null) ?? null;
       }
       return session;
     },

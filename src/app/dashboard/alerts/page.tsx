@@ -205,7 +205,7 @@ export default async function AlertsPage({
         <div className="flex-1 max-w-sm">
           <SearchBar placeholder="Search message or plot..." />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div data-tour="alerts.filters" className="flex gap-2 flex-wrap">
           <SeverityFilter current={severity} />
           <AlertTypeFilter current={type} />
           <AlertPlotFilter plots={plotsForFilter} current={plotId} />

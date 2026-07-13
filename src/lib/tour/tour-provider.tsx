@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -12,6 +13,7 @@ import { useSession } from "next-auth/react";
 import type { TourStep } from "./types";
 import { isTourCompleted, markTourCompleted, resetTour } from "./storage";
 import { createTourDriver } from "./driver-config";
+import { markTourCompletedAction, resetTourAction } from "@/actions/tour";
 
 type TourContextValue = {
   startTour: (steps: TourStep[]) => void;
@@ -22,11 +24,12 @@ type TourContextValue = {
 const TourContext = createContext<TourContextValue | undefined>(undefined);
 
 // useSyncExternalStore (not useState+useEffect) so reading localStorage after
-// mount doesn't trip the react-hooks/set-state-in-effect lint rule.
-function useMounted() {
+// mount doesn't trip the react-hooks/set-state-in-effect lint rule. Snapshot
+// is the real per-user "completed" flag once mounted; false before/without a user.
+function useLocalCompleted(userId: string | undefined) {
   return useSyncExternalStore(
     () => () => {},
-    () => true,
+    () => (userId ? isTourCompleted(userId) : false),
     () => false
   );
 }
@@ -34,13 +37,20 @@ function useMounted() {
 export function TourProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const mounted = useMounted();
+  const serverCompletedAt = session?.user?.tourCompletedAt ?? null;
 
-  // Bumped after markTourCompleted/resetTour to force isCompleted to
-  // re-read localStorage; it holds no data of its own.
-  const [, forceRecompute] = useState(0);
+  const localCompleted = useLocalCompleted(userId);
+  const [isCompleted, setIsCompleted] = useState(false);
 
-  const isCompleted = mounted && userId ? isTourCompleted(userId) : false;
+  // Server truth → localStorage, so a tour already completed (e.g. on another
+  // device, or before this browser's localStorage existed) doesn't fire again
+  // once the session/JWT reflects it here.
+  useEffect(() => {
+    if (!userId) return;
+    if (serverCompletedAt && !isTourCompleted(userId)) {
+      markTourCompleted(userId);
+    }
+  }, [userId, serverCompletedAt]);
 
   const startTour = useCallback(
     (steps: TourStep[]) => {
@@ -48,9 +58,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
         console.warn("[tour] startTour called with no signed-in user");
         return;
       }
+
+      const onComplete = async () => {
+        markTourCompleted(userId); // localStorage — instant
+        await markTourCompletedAction(); // DB — persistent, fire-and-forget errors already logged
+        setIsCompleted(true);
+      };
+
       const tourDriver = createTourDriver(steps, () => {
-        markTourCompleted(userId);
-        forceRecompute((n) => n + 1);
+        void onComplete();
       });
       tourDriver.drive();
     },
@@ -63,15 +79,22 @@ export function TourProvider({ children }: { children: ReactNode }) {
         console.warn("[tour] resetAndRestart called with no signed-in user");
         return;
       }
-      resetTour(userId);
-      forceRecompute((n) => n + 1);
+      resetTour(userId); // localStorage
+      void resetTourAction(); // DB — fire-and-forget, errors already logged
+      setIsCompleted(false);
       startTour(steps);
     },
     [userId, startTour]
   );
 
   return (
-    <TourContext.Provider value={{ startTour, resetAndRestart, isCompleted }}>
+    <TourContext.Provider
+      value={{
+        startTour,
+        resetAndRestart,
+        isCompleted: isCompleted || localCompleted || !!serverCompletedAt,
+      }}
+    >
       {children}
     </TourContext.Provider>
   );

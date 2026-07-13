@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth-helpers";
+import { RestartTourButton } from "@/components/tour/restart-tour-button";
 
 type Section = {
   title: string;
@@ -226,16 +227,19 @@ export default async function HelpPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm">
-          <HelpCircle className="w-6 h-6 text-white" />
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm">
+            <HelpCircle className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Help & Documentation</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Step-by-step guides for using H-Auto effectively.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Help & Documentation</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Step-by-step guides for using H-Auto effectively.
-          </p>
-        </div>
+        <RestartTourButton />
       </div>
 
       {/* Quick tip */}

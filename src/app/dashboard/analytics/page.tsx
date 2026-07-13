@@ -426,7 +426,9 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
             plots={plots.map((p) => ({ id: p.id, name: p.name }))}
             current={selectedPlotId}
           />
-          <TimeRangePicker current={range} />
+          <div data-tour="analytics.range-picker">
+            <TimeRangePicker current={range} />
+          </div>
           <MonthPicker current={month ?? undefined} availableMonths={availableMonths} />
         </div>
       </div>

@@ -144,7 +144,9 @@ export default async function PlotsPage({
       </div>
 
       {/* Table */}
-      <PlotsTable plots={plots} canManage={canManage} />
+      <div data-tour="plots.list-container">
+        <PlotsTable plots={plots} canManage={canManage} />
+      </div>
 
       {/* Pagination */}
       {totalPlots > 0 && (
