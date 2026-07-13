@@ -75,15 +75,15 @@ const chartData = Array.from(timeMap.values())
           data={chartData}
           margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
             dataKey="timeLabel"
-            stroke="#9ca3af"
+            stroke="var(--muted-foreground)"
             fontSize={11}
             tickLine={false}
           />
           <YAxis
-            stroke="#9ca3af"
+            stroke="var(--muted-foreground)"
             fontSize={11}
             tickLine={false}
             unit={unit}
@@ -93,8 +93,9 @@ const chartData = Array.from(timeMap.values())
             contentStyle={{
               fontSize: 12,
               borderRadius: 6,
-              border: "1px solid #e5e7eb",
-              backgroundColor: "white",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--card)",
+              color: "var(--foreground)",
             }}
             formatter={(value) => [`${value}${unit}`, ""]}
           />
@@ -105,9 +106,9 @@ const chartData = Array.from(timeMap.values())
             <ReferenceArea
               y1={optimalMin}
               y2={optimalMax}
-              fill="#22c55e"
+              fill="var(--chart-1)"
               fillOpacity={0.08}
-              stroke="#22c55e"
+              stroke="var(--chart-1)"
               strokeOpacity={0.2}
               strokeDasharray="3 3"
             />

@@ -49,16 +49,16 @@ export function GrowthProgressionChart({
           data={chartData}
           margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
             dataKey="timeLabel"
-            stroke="#9ca3af"
+            stroke="var(--muted-foreground)"
             fontSize={11}
             tickLine={false}
           />
           <YAxis
             yAxisId="left"
-            stroke="#22c55e"
+            stroke="var(--chart-1)"
             fontSize={11}
             tickLine={false}
             width={40}
@@ -66,7 +66,7 @@ export function GrowthProgressionChart({
           <YAxis
             yAxisId="right"
             orientation="right"
-            stroke="#3b82f6"
+            stroke="var(--chart-2)"
             fontSize={11}
             tickLine={false}
             width={30}
@@ -75,8 +75,9 @@ export function GrowthProgressionChart({
             contentStyle={{
               fontSize: 12,
               borderRadius: 6,
-              border: "1px solid #e5e7eb",
-              backgroundColor: "white",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--card)",
+              color: "var(--foreground)",
             }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} iconType="line" />
@@ -85,7 +86,7 @@ export function GrowthProgressionChart({
             type="monotone"
             dataKey="height"
             name="Height (cm)"
-            stroke="#22c55e"
+            stroke="var(--chart-1)"
             strokeWidth={2}
             dot={{ r: 4 }}
             connectNulls
@@ -95,7 +96,7 @@ export function GrowthProgressionChart({
             type="monotone"
             dataKey="leaves"
             name="Leaf count"
-            stroke="#3b82f6"
+            stroke="var(--chart-2)"
             strokeWidth={2}
             dot={{ r: 4 }}
             connectNulls

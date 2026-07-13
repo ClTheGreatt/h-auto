@@ -72,28 +72,30 @@ export function ObservationsChart({
           barCategoryGap="30%"
           onClick={handleChartClick}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            stroke="#e5e7eb"
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
           />
           <YAxis
             allowDecimals={false}
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            stroke="#e5e7eb"
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            stroke="var(--border)"
           />
           <Tooltip
             contentStyle={{
               fontSize: 12,
               borderRadius: 8,
-              border: "1px solid #e5e7eb",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--card)",
+              color: "var(--foreground)",
             }}
           />
           <Bar
             dataKey="count"
             name="Observations"
-            fill="#16a34a"
+            fill="var(--chart-1)"
             maxBarSize={48}
             radius={[4, 4, 0, 0]}
             cursor="pointer"

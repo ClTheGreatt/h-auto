@@ -44,10 +44,10 @@ export function AlertsByTypeChart({ data }: { data: AlertTypeCount[] }) {
           layout="vertical"
           margin={{ top: 5, right: 20, left: 60, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
             type="number"
-            stroke="#9ca3af"
+            stroke="var(--muted-foreground)"
             fontSize={11}
             tickLine={false}
             allowDecimals={false}
@@ -55,7 +55,7 @@ export function AlertsByTypeChart({ data }: { data: AlertTypeCount[] }) {
           <YAxis
             type="category"
             dataKey="label"
-            stroke="#9ca3af"
+            stroke="var(--muted-foreground)"
             fontSize={11}
             tickLine={false}
             width={120}
@@ -64,10 +64,11 @@ export function AlertsByTypeChart({ data }: { data: AlertTypeCount[] }) {
             contentStyle={{
               fontSize: 12,
               borderRadius: 6,
-              border: "1px solid #e5e7eb",
-              backgroundColor: "white",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--card)",
+              color: "var(--foreground)",
             }}
-            cursor={{ fill: "#f9fafb" }}
+            cursor={{ fill: "var(--muted)" }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
             {sorted.map((entry, i) => (

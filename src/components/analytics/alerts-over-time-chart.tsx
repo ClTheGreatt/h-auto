@@ -26,18 +26,24 @@ export function AlertsOverTimeChart({ data }: { data: DataPoint[] }) {
         margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
         barCategoryGap="30%"
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#6b7280" }} stroke="#e5e7eb" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+          stroke="var(--border)"
+        />
         <YAxis
           allowDecimals={false}
-          tick={{ fontSize: 11, fill: "#6b7280" }}
-          stroke="#e5e7eb"
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+          stroke="var(--border)"
         />
         <Tooltip
           contentStyle={{
             fontSize: 12,
             borderRadius: 8,
-            border: "1px solid #e5e7eb",
+            border: "1px solid var(--border)",
+            backgroundColor: "var(--card)",
+            color: "var(--foreground)",
           }}
         />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />

@@ -33,7 +33,7 @@ export function PlotHealthGauge({
             stroke="none"
           >
             <Cell fill={color} />
-            <Cell fill="#e5e7eb" />
+            <Cell fill="var(--border)" />
           </Pie>
         </PieChart>
       </ResponsiveContainer>
