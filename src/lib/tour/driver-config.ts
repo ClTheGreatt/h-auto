@@ -12,9 +12,6 @@ export function createTourDriver(
     showProgress: true,
     showButtons: ["next", "previous", "close"],
     allowClose: true,
-    overlayClickBehavior: () => {
-      // No-op: clicking overlay does nothing. User must use popover buttons.
-    },
     smoothScroll: true,
     overlayOpacity: 0.6,
     popoverClass: "hauto-tour-popover",

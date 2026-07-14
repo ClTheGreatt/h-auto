@@ -132,7 +132,9 @@ export default async function UsersPage({
       </div>
 
       {/* Grouped table */}
-      <UsersTable users={users} />
+      <div data-tour="users.list">
+        <UsersTable users={users} />
+      </div>
     </div>
   );
 }

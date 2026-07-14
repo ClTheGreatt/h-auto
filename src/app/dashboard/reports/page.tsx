@@ -87,23 +87,27 @@ export default async function ReportsPage() {
         ))}
 
         {isAdmin && (
-          <ReportCard
-            type="activity"
-            title="System Activity"
-            description="Audit log of system events: user creations, imports, plot setup, device registrations, and assignments. Admin only."
-            icon="filetext"
-            iconColor="bg-gray-100 text-gray-700"
-          />
+          <div data-tour="reports.system-activity">
+            <ReportCard
+              type="activity"
+              title="System Activity"
+              description="Audit log of system events: user creations, imports, plot setup, device registrations, and assignments. Admin only."
+              icon="filetext"
+              iconColor="bg-gray-100 text-gray-700"
+            />
+          </div>
         )}
 
         {isFacultyOrAdmin && (
-          <ReportCard
-            type="student-activity"
-            title="Student Activity"
-            description="Per-student summary of logging activity: observations recorded, plots assigned, photos submitted, and last activity date. For faculty monitoring of student farmers."
-            icon="filetext"
-            iconColor="bg-indigo-100 text-indigo-700"
-          />
+          <div data-tour="reports.student-activity">
+            <ReportCard
+              type="student-activity"
+              title="Student Activity"
+              description="Per-student summary of logging activity: observations recorded, plots assigned, photos submitted, and last activity date. For faculty monitoring of student farmers."
+              icon="filetext"
+              iconColor="bg-indigo-100 text-indigo-700"
+            />
+          </div>
         )}
       </div>
 

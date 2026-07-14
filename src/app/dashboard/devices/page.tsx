@@ -43,7 +43,9 @@ export default async function DevicesPage() {
         </div>
       </div>
 
-      <DevicesTable devices={devices} />
+      <div data-tour="devices.list">
+        <DevicesTable devices={devices} />
+      </div>
     </div>
   );
 }

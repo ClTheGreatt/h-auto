@@ -24,6 +24,7 @@ export function SkipConfirmationDialog({ open, onConfirm, onCancel }: Props) {
       <AlertDialogContent
         className="z-100010 pointer-events-auto"
         overlayClassName="z-100009 pointer-events-auto"
+        onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"

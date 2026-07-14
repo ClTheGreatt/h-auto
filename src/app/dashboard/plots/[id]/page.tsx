@@ -303,7 +303,7 @@ export default async function PlotDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="plot.assign-card">
         <CardHeader>
           <CardTitle>Monitoring assignments</CardTitle>
         </CardHeader>

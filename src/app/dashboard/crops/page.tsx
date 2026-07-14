@@ -93,15 +93,17 @@ export default async function CropsPage({
         </Button>
       </div>
 
-      <CropsTable
-        crops={crops}
-        total={total}
-        page={page}
-        totalPages={totalPages}
-        pageSize={PAGE_SIZE}
-        query={q}
-        sort={sort}
-      />
+      <div data-tour="crops.list">
+        <CropsTable
+          crops={crops}
+          total={total}
+          page={page}
+          totalPages={totalPages}
+          pageSize={PAGE_SIZE}
+          query={q}
+          sort={sort}
+        />
+      </div>
     </div>
   );
 }

@@ -2,10 +2,11 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import type { UserRole } from "@prisma/client";
 import type { TourStep } from "./types";
 import { createStudentTour } from "./tours/student";
+import { createFacultyTour } from "./tours/faculty";
+import { createAdminTour } from "./tours/admin";
 
 /**
  * Returns the tour script for the given role, or null if no tour is defined.
- * As more roles get tours (Faculty, Admin), extend this switch.
  */
 export function getTourForRole(
   role: UserRole,
@@ -15,9 +16,10 @@ export function getTourForRole(
     case "STUDENT_FARMER":
       return createStudentTour(router);
     case "FACULTY":
+      return createFacultyTour(router);
     case "ADMIN":
     case "SUPER_ADMIN":
-      return null; // TODO: added in next round
+      return createAdminTour(router);
     default:
       return null;
   }
@@ -25,6 +27,5 @@ export function getTourForRole(
 
 export function hasTourForRole(role: UserRole | undefined): boolean {
   if (!role) return false;
-  return role === "STUDENT_FARMER";
-  // TODO: add FACULTY / ADMIN / SUPER_ADMIN in next round
+  return ["STUDENT_FARMER", "FACULTY", "ADMIN", "SUPER_ADMIN"].includes(role);
 }
