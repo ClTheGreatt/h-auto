@@ -84,6 +84,24 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
         description:
           "Lahat ng users sa system, grouped by role. Click a row para makita ang detail (role, activity, ID). Yung 'Add user' button pang-manual add ng isa-isa, may 'Import' button din para sa CSV/Excel bulk-create ng maraming users at once.",
         side: "top",
+      },
+    },
+    {
+      element: '[data-tour="users.add-button"]',
+      popover: {
+        title: "Adding a single user",
+        description:
+          "Click mo yung 'Add User' button para mag-add ng isa-isa. Fill mo yung form: email, name, at role. Depende sa role, may specific fields — Course/Year/Section para sa Student, Department/Position para sa Faculty. Yung system automatically nag-generate ng temporary password, ini-send via email — hindi ka mag-set manually.",
+        side: "bottom",
+      },
+    },
+    {
+      element: '[data-tour="users.import-button"]',
+      popover: {
+        title: "Bulk import users",
+        description:
+          "Kung marami ang ia-add mo (buong section, buong batch), i-click yung 'Import' button. Nag-a-accept ng CSV o Excel file. May downloadable template kasama para malaman mo yung exact format. Handy sa beginning of semester pag i-o-onboard ka ng maraming students at once.",
+        side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
           "/dashboard/crops",
@@ -98,6 +116,15 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
         description:
           "Lahat ng crops na naka-configure sa system — with default growth stages, days-to-harvest, at threshold ranges. Admin-exclusive management. Yung threshold ranges dito ay ginagamit ng system para ma-trigger yung alerts.",
         side: "top",
+      },
+    },
+    {
+      element: '[data-tour="crops.add-button"]',
+      popover: {
+        title: "Adding a crop",
+        description:
+          "Add a new crop with its own growth stages, days-to-harvest, at ideal sensor threshold ranges (moisture, temperature, humidity, NPK). May preset library kaming 9 Philippine vegetables — puwede mong i-quick start galing doon para hindi manual lahat yung threshold entry.",
+        side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
           "/dashboard/plots",
@@ -111,6 +138,15 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
         title: "All Plots",
         description:
           "Lahat ng plots sa system. May 'Add plot' button ka (Admin+ only), at pwede mo i-edit or delete ang existing plots via yung per-row '⋯' menu. Click any plot to open its details.",
+        side: "bottom",
+      },
+    },
+    {
+      element: '[data-tour="plots.add-button"]',
+      popover: {
+        title: "Creating a plot",
+        description:
+          "I-click ito para mag-add ng plot. Fill in: plot name, location, yung crop na tatanim, at expected planting date. Once created, pupunta ka sa Plot Detail page para ma-assign yung students sa plot na yun.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -126,6 +162,15 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
         description:
           "Registered ESP32 devices na nag-a-ingest ng sensor data. May 'Register device' button para magdagdag ng bago (nag-ge-generate ng API key na ico-configure mo sa firmware). Per-row '⋯' menu ay may Simulate Reading (test data injection), Regenerate API key (kung na-compromise), at Edit / Delete.",
         side: "top",
+      },
+    },
+    {
+      element: '[data-tour="devices.register-button"]',
+      popover: {
+        title: "Registering an ESP32 device",
+        description:
+          "Yung 'Register Device' button ang gagamitin mo pag may bagong physical sensor unit na i-install. Nag-generate ito ng one-time API key na ico-configure mo sa firmware ng ESP32. Importante: yung API key hindi na uulit lumabas after mo i-close yung dialog — kailangan mo agad i-copy at i-save.",
+        side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
           "/dashboard/assignments",
@@ -219,6 +264,21 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
         description:
           "Manage yung account info mo, palitan ang password, at pumili ng theme. As Admin, nakikita mo rin yung 'Administration' section sa mobile app for Manage Users access on the go.",
         side: "left",
+        onNextClick: navigateAndAdvance(
+          router,
+          "/dashboard/download",
+          '[data-tour="sidebar.download-app"]'
+        ),
+      },
+    },
+    {
+      element: '[data-tour="sidebar.download-app"]',
+      popover: {
+        title: "Mobile app",
+        description:
+          "May mobile companion app din pala ang H-Auto. Sa field talaga mo ito gagamitin — mag-log ng observation habang katabi mo yung plot, may auto-captured GPS at direktang camera capture. Same account mo lang gamit. I-click ito para makita yung download instructions.",
+        side: "right",
+        align: "start",
         onNextClick: navigateAndAdvance(
           router,
           "/dashboard/help",

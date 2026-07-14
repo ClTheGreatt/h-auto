@@ -82,7 +82,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Plots I Oversee",
         description:
-          "Mas detalyadong view ng lahat ng plots mo. May search at filters (crop, status). Click a plot to open its detail page — dun mo ma-a-assign ang students.",
+          "Mas detalyadong view ng lahat ng plots mo. May search at filters (crop, status). Click any plot row para pumunta sa Plot Detail page — dun mo makikita ang 'Monitoring Assignments' card, kung saan mo ma-a-assign or ma-uunassign yung mga students per plot. Ito yung pangunahing tool mo bilang faculty adviser.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -168,6 +168,21 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
         description:
           "Manage yung account info mo, palitan ang password, at pumili ng theme. May Details section din — makikita mo ang role, employee ID, department, at position mo.",
         side: "left",
+        onNextClick: navigateAndAdvance(
+          router,
+          "/dashboard/download",
+          '[data-tour="sidebar.download-app"]'
+        ),
+      },
+    },
+    {
+      element: '[data-tour="sidebar.download-app"]',
+      popover: {
+        title: "Mobile app",
+        description:
+          "May mobile companion app din pala ang H-Auto. Sa field talaga mo ito gagamitin — mag-log ng observation habang katabi mo yung plot, may auto-captured GPS at direktang camera capture. Same account mo lang gamit. I-click ito para makita yung download instructions.",
+        side: "right",
+        align: "start",
         onNextClick: navigateAndAdvance(
           router,
           "/dashboard/help",

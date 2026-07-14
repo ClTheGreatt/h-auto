@@ -170,6 +170,21 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
         side: "left",
         onNextClick: navigateAndAdvance(
           router,
+          "/dashboard/download",
+          '[data-tour="sidebar.download-app"]'
+        ),
+      },
+    },
+    {
+      element: '[data-tour="sidebar.download-app"]',
+      popover: {
+        title: "Mobile app",
+        description:
+          "May mobile companion app din pala ang H-Auto. Sa field talaga mo ito gagamitin — mag-log ng observation habang katabi mo yung plot, may auto-captured GPS at direktang camera capture. Same account mo lang gamit. I-click ito para makita yung download instructions.",
+        side: "right",
+        align: "start",
+        onNextClick: navigateAndAdvance(
+          router,
           "/dashboard/help",
           '[data-tour="help.restart-tour-button"]'
         ),

@@ -83,13 +83,18 @@ export default async function UsersPage({
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" className="flex-1 sm:flex-none" asChild>
+          <Button
+            data-tour="users.import-button"
+            variant="outline"
+            className="flex-1 sm:flex-none"
+            asChild
+          >
             <Link href="/dashboard/users/import">
               <Upload className="w-4 h-4 mr-2" />
               Import CSV
             </Link>
           </Button>
-          <Button className="flex-1 sm:flex-none" asChild>
+          <Button data-tour="users.add-button" className="flex-1 sm:flex-none" asChild>
             <Link href="/dashboard/users/new">
               <Plus className="w-4 h-4 mr-2" />
               Add user

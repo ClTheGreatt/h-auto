@@ -25,7 +25,7 @@ export default async function DevicesPage() {
             Register ESP32 devices and link them to plots for real-time monitoring.
           </p>
         </div>
-        <Button asChild>
+        <Button data-tour="devices.register-button" asChild>
           <Link href="/dashboard/devices/new">
             <Plus className="w-4 h-4 mr-2" />
             Register device

@@ -110,7 +110,13 @@ export function Sidebar({
         key={item.href}
         href={item.href}
         onClick={onNavigate}
-        data-tour={item.href === "/dashboard/help" ? "profile.help-link" : undefined}
+        data-tour={
+          item.href === "/dashboard/help"
+            ? "profile.help-link"
+            : item.href === "/dashboard/download"
+            ? "sidebar.download-app"
+            : undefined
+        }
         className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all",
           isActive

@@ -85,7 +85,7 @@ export default async function CropsPage({
             Manage crop profiles and ideal thresholds for each growth stage.
           </p>
         </div>
-        <Button asChild>
+        <Button data-tour="crops.add-button" asChild>
           <Link href="/dashboard/crops/new">
             <Plus className="w-4 h-4 mr-2" />
             Add crop
