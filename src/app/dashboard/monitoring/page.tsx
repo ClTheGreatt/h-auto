@@ -185,21 +185,25 @@ export default async function MonitoringPage({
 
       {/* Feed */}
       {completelyEmpty ? (
-        <EmptyState
-          icon={Camera}
-          title="No observations yet"
-          description={
-            role === "STUDENT_FARMER"
-              ? "Start logging your plant growth with photos from your plot page."
-              : "Growth observations will appear here as student farmers log their plots."
-          }
-        />
+        <div data-tour="monitoring.feed">
+          <EmptyState
+            icon={Camera}
+            title="No observations yet"
+            description={
+              role === "STUDENT_FARMER"
+                ? "Start logging your plant growth with photos from your plot page."
+                : "Growth observations will appear here as student farmers log their plots."
+            }
+          />
+        </div>
       ) : filteredEmpty ? (
-        <EmptyState
-          icon={Camera}
-          title="No matches"
-          description="No observations match your current filters. Try clearing them."
-        />
+        <div data-tour="monitoring.feed">
+          <EmptyState
+            icon={Camera}
+            title="No matches"
+            description="No observations match your current filters. Try clearing them."
+          />
+        </div>
       ) : (
         <>
           <div className="text-xs text-gray-500">
@@ -207,7 +211,7 @@ export default async function MonitoringPage({
             {totalPages > 1 && ` • Page ${safePage} of ${totalPages}`}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div data-tour="monitoring.feed" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {feedItems.map((log) => (
               <LogFeedItem key={log.id} log={log} />
             ))}

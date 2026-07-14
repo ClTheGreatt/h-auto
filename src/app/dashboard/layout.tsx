@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { TourProvider } from "@/lib/tour";
+import { TourAutoStart } from "@/components/tour/tour-auto-start";
 
 
 export default async function DashboardLayout({
@@ -38,6 +39,7 @@ select: {
   return (
     <SessionProvider session={session}>
       <TourProvider>
+        <TourAutoStart />
         <div className="flex min-h-screen bg-stone-50 dark:bg-gray-950">
           {/* Desktop sidebar - hidden on mobile */}
           <div className="hidden lg:block sticky top-0 h-screen">

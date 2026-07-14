@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -14,6 +15,7 @@ import type { TourStep } from "./types";
 import { isTourCompleted, markTourCompleted, resetTour } from "./storage";
 import { createTourDriver } from "./driver-config";
 import { markTourCompletedAction, resetTourAction } from "@/actions/tour";
+import { SkipConfirmationDialog } from "@/components/tour/skip-confirmation-dialog";
 
 type TourContextValue = {
   startTour: (steps: TourStep[]) => void;
@@ -41,6 +43,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const localCompleted = useLocalCompleted(userId);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [pendingSkip, setPendingSkip] = useState(false);
+  const currentDriverRef = useRef<ReturnType<typeof createTourDriver> | null>(null);
 
   // Server truth → localStorage, so a tour already completed (e.g. on another
   // device, or before this browser's localStorage existed) doesn't fire again
@@ -63,11 +67,28 @@ export function TourProvider({ children }: { children: ReactNode }) {
         markTourCompleted(userId); // localStorage — instant
         await markTourCompletedAction(); // DB — persistent, fire-and-forget errors already logged
         setIsCompleted(true);
+        currentDriverRef.current = null;
       };
 
-      const tourDriver = createTourDriver(steps, () => {
-        void onComplete();
-      });
+      const onCloseClick = (isLastStep: boolean) => {
+        if (isLastStep) {
+          // User completed the tour naturally — no skip dialog, just mark done
+          if (currentDriverRef.current) {
+            currentDriverRef.current.destroy(); // triggers onDestroyed → onComplete
+            currentDriverRef.current = null;
+          }
+          return;
+        }
+        // Mid-tour close → show skip confirmation
+        setPendingSkip(true);
+      };
+
+      const tourDriver = createTourDriver(
+        steps,
+        () => void onComplete(),
+        onCloseClick
+      );
+      currentDriverRef.current = tourDriver;
       tourDriver.drive();
     },
     [userId]
@@ -87,6 +108,19 @@ export function TourProvider({ children }: { children: ReactNode }) {
     [userId, startTour]
   );
 
+  const handleSkipConfirm = () => {
+    setPendingSkip(false);
+    if (currentDriverRef.current) {
+      currentDriverRef.current.destroy();
+      currentDriverRef.current = null;
+    }
+  };
+
+  const handleSkipCancel = () => {
+    setPendingSkip(false);
+    // Tour continues where it left off — driver.js keeps the current step highlighted
+  };
+
   return (
     <TourContext.Provider
       value={{
@@ -96,6 +130,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <SkipConfirmationDialog
+        open={pendingSkip}
+        onConfirm={handleSkipConfirm}
+        onCancel={handleSkipCancel}
+      />
     </TourContext.Provider>
   );
 }

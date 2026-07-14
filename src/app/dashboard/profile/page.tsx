@@ -80,21 +80,21 @@ export default async function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Edit profile */}
-      <ProfileInfoForm
-        defaultValues={{
-          firstName: user.firstName,
-          middleName: user.middleName ?? "",
-          lastName: user.lastName,
-          phoneNumber: user.phoneNumber ?? "",
-        }}
-      />
+      {/* Profile & Settings — info, password, appearance */}
+      <div data-tour="profile.settings-card" className="space-y-6">
+        <ProfileInfoForm
+          defaultValues={{
+            firstName: user.firstName,
+            middleName: user.middleName ?? "",
+            lastName: user.lastName,
+            phoneNumber: user.phoneNumber ?? "",
+          }}
+        />
 
-  {/* Change password */}
-      <PasswordChangeForm />
+        <PasswordChangeForm />
 
-      {/* Appearance (light/dark/system) */}
-      <AppearanceForm />
+        <AppearanceForm />
+      </div>
 
       {/* Read-only account info */}
       <Card>

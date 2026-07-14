@@ -118,7 +118,10 @@ export default async function PlotsPage({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div
+        data-tour="plots.filter-bar"
+        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
+      >
         <div className="flex-1 max-w-sm">
           <SearchBar placeholder="Search name, location, crop..." />
         </div>
@@ -144,9 +147,7 @@ export default async function PlotsPage({
       </div>
 
       {/* Table */}
-      <div data-tour="plots.list-container">
-        <PlotsTable plots={plots} canManage={canManage} />
-      </div>
+      <PlotsTable plots={plots} canManage={canManage} />
 
       {/* Pagination */}
       {totalPlots > 0 && (

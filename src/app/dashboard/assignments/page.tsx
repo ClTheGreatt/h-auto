@@ -48,7 +48,10 @@ export default async function AssignmentsPage() {
       </div>
 
       {assignments.length === 0 ? (
-        <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
+        <div
+          data-tour="assignments.list"
+          className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md"
+        >
           <ClipboardList className="w-8 h-8 mx-auto text-gray-300 mb-2" />
           No active assignments yet.
           {(role === "FACULTY" ||
@@ -66,7 +69,7 @@ export default async function AssignmentsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div data-tour="assignments.list" className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {assignments.map((a) => {
             const initials =
               `${a.student.firstName[0]}${a.student.lastName[0]}`.toUpperCase();

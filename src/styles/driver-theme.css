@@ -1,49 +1,155 @@
-/* driver.js popover theme, mapped onto this app's shadcn/ui CSS variables so
-   it follows light/dark mode automatically. NOTE: this project's variables
-   (--card, --border, --primary, etc., defined in globals.css) already hold
-   complete oklch(...) values, not bare "H S% L%" triples — so they're used
-   directly as var(--x), not wrapped in hsl(var(--x)). */
+/* ============================================================
+   H-Auto tour popover — shadcn-aligned polish
+   ============================================================ */
 
+/* Base popover — attached to target elements */
 .driver-popover.hauto-tour-popover {
   background: var(--card);
   color: var(--card-foreground);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-left: 4px solid var(--primary);
+  border-radius: 0.5rem;
+  padding: 1.25rem 1.25rem 1rem;
+  max-width: 340px;
+  min-width: 280px;
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.12),
+    0 8px 10px -6px rgb(0 0 0 / 0.08);
+  font-family: inherit;
 }
 
-.hauto-tour-popover .driver-popover-title {
+/* Modal variant — for centered popovers with no target (welcome, end) */
+.driver-popover.hauto-tour-popover-modal {
+  max-width: 420px;
+  min-width: 340px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-left-width: 6px;
+}
+
+/* Title */
+.driver-popover.hauto-tour-popover .driver-popover-title {
   color: var(--foreground);
   font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 0;
+  margin: 0 0 0.5rem 0;
 }
 
-.hauto-tour-popover .driver-popover-description {
+.driver-popover.hauto-tour-popover-modal .driver-popover-title {
+  font-size: 1.125rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Description */
+.driver-popover.hauto-tour-popover .driver-popover-description {
   color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  padding: 0;
+  margin: 0 0 1rem 0;
 }
 
-.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-top {
-  border-top-color: var(--border);
-}
-.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-bottom {
-  border-bottom-color: var(--border);
-}
-.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-left {
-  border-left-color: var(--border);
-}
-.hauto-tour-popover .driver-popover-arrow.driver-popover-arrow-side-right {
-  border-right-color: var(--border);
+/* Footer container */
+.driver-popover.hauto-tour-popover .driver-popover-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
 }
 
-.hauto-tour-popover .driver-popover-navigation-btns button {
+/* Progress text (e.g. "3 of 10") */
+.driver-popover.hauto-tour-popover .driver-popover-progress-text {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* Button group */
+.driver-popover.hauto-tour-popover .driver-popover-navigation-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* All buttons */
+.driver-popover.hauto-tour-popover .driver-popover-navigation-btns button {
   background: var(--primary);
   color: var(--primary-foreground);
   border: none;
+  border-radius: 0.375rem;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-shadow: none;
+  transition: opacity 0.15s, background 0.15s;
+  line-height: 1;
 }
 
-.hauto-tour-popover .driver-popover-close-btn {
-  color: var(--muted-foreground);
+.driver-popover.hauto-tour-popover .driver-popover-navigation-btns button:hover {
+  opacity: 0.9;
 }
 
-.hauto-tour-popover .driver-popover-progress-text {
+/* Previous button override — outline style */
+.driver-popover.hauto-tour-popover .driver-popover-prev-btn {
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.driver-popover.hauto-tour-popover .driver-popover-prev-btn:hover {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+
+/* Close button (X) */
+.driver-popover.hauto-tour-popover .driver-popover-close-btn {
   color: var(--muted-foreground);
-  font-size: 0.75rem;
+  font-size: 1.125rem;
+  line-height: 1;
+  right: 0.75rem;
+  top: 0.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border-radius: 0.25rem;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.driver-popover.hauto-tour-popover .driver-popover-close-btn:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* Arrow — match popover background */
+.driver-popover.hauto-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: var(--card);
+}
+.driver-popover.hauto-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: var(--card);
+}
+.driver-popover.hauto-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: var(--card);
+}
+.driver-popover.hauto-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: var(--card);
+}
+
+/* Highlighted element outline */
+.driver-active-element {
+  border-radius: 0.5rem;
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 4px !important;
+  transition: outline 0.2s;
+}
+
+/* Overlay transition */
+.driver-overlay {
+  transition: opacity 0.25s ease;
 }

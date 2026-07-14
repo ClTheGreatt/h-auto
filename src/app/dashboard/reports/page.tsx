@@ -73,7 +73,7 @@ export default async function ReportsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div data-tour="reports.grid" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {reports.map((r) => (
           <ReportCard
             key={r.type}
