@@ -16,16 +16,12 @@ export function createTourDriver(
     smoothScroll: true,
     overlayOpacity: 0.6,
     popoverClass: "hauto-tour-popover",
-    onDestroyed: () => {
-      console.log("[tour] onDestroyed fired");
-      onComplete();
-    },
+    onDestroyed: () => onComplete(),
     onCloseClick: onCloseClick
       ? (_element, _step, opts) => {
           const activeIndex = opts.state.activeIndex ?? 0;
           const totalSteps = steps.length;
           const isLastStep = activeIndex === totalSteps - 1;
-          console.log("[tour] onCloseClick fired, activeIndex:", activeIndex, "isLast:", isLastStep);
           onCloseClick(isLastStep);
         }
       : undefined,

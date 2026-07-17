@@ -71,12 +71,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
       };
 
       const onCloseClick = (isLastStep: boolean) => {
-        console.log(
-          "[tour] provider.onCloseClick, isLastStep:",
-          isLastStep,
-          "pendingSkip becoming:",
-          !isLastStep
-        );
         if (isLastStep) {
           // User completed the tour naturally — no skip dialog, just mark done
           if (currentDriverRef.current) {

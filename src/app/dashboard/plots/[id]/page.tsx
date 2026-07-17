@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { timeAgo } from "@/lib/format-date";
+import { isDeviceOnline } from "@/lib/utils/device-status";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { LatestReadings } from "@/components/devices/latest-readings";
 import { LiveRefresh } from "@/components/plots/live-refresh";
@@ -38,14 +39,6 @@ const statusColors: Record<PlotStatus, string> = {
   HARVESTED: "bg-purple-100 text-purple-700",
   FALLOW: "bg-stone-100 text-stone-700",
 };
-
-// Same threshold the offline-detection cron uses (src/app/api/cron/daily/route.ts)
-const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000;
-
-// Module-level (outside render) so it doesn't trip the React Compiler purity rule
-function isOnline(lastSeenAt: Date | null | undefined): boolean {
-  return !!lastSeenAt && Date.now() - lastSeenAt.getTime() < OFFLINE_THRESHOLD_MS;
-}
 
 export default async function PlotDetailPage({
   params,
@@ -126,7 +119,7 @@ export default async function PlotDetailPage({
 
   // Compute freshly from lastSeenAt rather than trusting device.status,
   // which is only updated periodically by the offline-detection cron.
-  const isDeviceOnline = isOnline(plot.device?.lastSeenAt);
+  const deviceOnline = isDeviceOnline(plot.device?.lastSeenAt);
 
   const growthLogs = await prisma.growthLog.findMany({
     where: { plotId: plot.id },
@@ -253,13 +246,13 @@ export default async function PlotDetailPage({
                   Awaiting first reading
                 </Badge>
               )}
-              {plot.device && latestReading && !isDeviceOnline && (
+              {plot.device && latestReading && !deviceOnline && (
                 <Badge variant="secondary" className="bg-amber-100 text-amber-700">
                   Device offline · Last seen{" "}
                   {plot.device.lastSeenAt ? timeAgo(plot.device.lastSeenAt) : "unknown"}
                 </Badge>
               )}
-              {plot.device && latestReading && isDeviceOnline && (
+              {plot.device && latestReading && deviceOnline && (
                 <Badge variant="secondary" className="bg-green-100 text-green-700">
                   Live
                 </Badge>

@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildAlertSuggestion, type AlertSuggestion } from "@/lib/alerts/suggestions";
 import { sendAlertNotifications } from "@/lib/alerts/processor";
+import { OFFLINE_THRESHOLD_MS } from "@/lib/utils/device-status";
 
-// No reading within this window → device considered offline
-const OFFLINE_THRESHOLD_MINUTES = 30;
 // Offline for longer than this bumps the alert from WARNING to CRITICAL
 const CRITICAL_OFFLINE_MINUTES = 120;
 
@@ -73,7 +72,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ===== #6 Device offline detection =====
-  const cutoff = new Date(now.getTime() - OFFLINE_THRESHOLD_MINUTES * 60 * 1000);
+  const cutoff = new Date(now.getTime() - OFFLINE_THRESHOLD_MS);
   const staleDevices = await prisma.device.findMany({
     where: {
       status: "ONLINE",

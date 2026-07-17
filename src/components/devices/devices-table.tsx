@@ -49,6 +49,7 @@ import {
   regenerateApiKey,
 } from "@/actions/devices";
 import type { DeviceStatus } from "@prisma/client";
+import { isDeviceOnline } from "@/lib/utils/device-status";
 
 type DeviceRow = {
   id: string;
@@ -114,6 +115,13 @@ export function DevicesTable({
     setNewKey(result.apiKey!);
   }
 
+  // MAINTENANCE/RETIRED are intentional admin flags, not derived from
+  // timestamp — only ONLINE/OFFLINE get computed live from lastSeenAt.
+  function computedStatus(d: DeviceRow): DeviceStatus {
+    if (d.status === "MAINTENANCE" || d.status === "RETIRED") return d.status;
+    return isDeviceOnline(d.lastSeenAt) ? "ONLINE" : "OFFLINE";
+  }
+
   function formatLastSeen(date: Date | null): string {
     if (!date) return "Never";
     return new Date(date).toLocaleString("en-US", {
@@ -168,8 +176,8 @@ export function DevicesTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <StatusBadge variant={statusVariant[d.status]}>
-                    {d.status}
+                  <StatusBadge variant={statusVariant[computedStatus(d)]}>
+                    {computedStatus(d)}
                   </StatusBadge>
                 </TableCell>
                 <TableCell className="text-sm text-gray-600">
