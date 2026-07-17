@@ -45,6 +45,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [isCompleted, setIsCompleted] = useState(false);
   const [pendingSkip, setPendingSkip] = useState(false);
   const currentDriverRef = useRef<ReturnType<typeof createTourDriver> | null>(null);
+  const savedTourState = useRef<{ steps: TourStep[]; index: number } | null>(null);
 
   // Server truth → localStorage, so a tour already completed (e.g. on another
   // device, or before this browser's localStorage existed) doesn't fire again
@@ -55,6 +56,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       markTourCompleted(userId);
     }
   }, [userId, serverCompletedAt]);
+
+  useEffect(() => {
+    if (pendingSkip) {
+      document.body.classList.add("hauto-tour-dialog-open");
+    }
+    return () => {
+      document.body.classList.remove("hauto-tour-dialog-open");
+    };
+  }, [pendingSkip]);
 
   const startTour = useCallback(
     (steps: TourStep[]) => {
@@ -79,7 +89,16 @@ export function TourProvider({ children }: { children: ReactNode }) {
           }
           return;
         }
-        // Mid-tour close → show skip confirmation
+
+        // Mid-tour close → destroy driver.js immediately (no DOM elements left
+        // to fight with the dialog) and save state to resume later.
+        if (currentDriverRef.current) {
+          const activeIndex = currentDriverRef.current.getActiveIndex() ?? 0;
+          savedTourState.current = { steps, index: activeIndex };
+          currentDriverRef.current.destroy();
+          currentDriverRef.current = null;
+        }
+
         setPendingSkip(true);
       };
 
@@ -110,15 +129,59 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const handleSkipConfirm = () => {
     setPendingSkip(false);
-    if (currentDriverRef.current) {
-      currentDriverRef.current.destroy();
-      currentDriverRef.current = null;
+    savedTourState.current = null;
+    // No need to destroy — was already destroyed in onCloseClick
+    // Just mark completed
+    if (userId) {
+      markTourCompleted(userId);
+      void markTourCompletedAction();
+      setIsCompleted(true);
     }
   };
 
   const handleSkipCancel = () => {
     setPendingSkip(false);
-    // Tour continues where it left off — driver.js keeps the current step highlighted
+
+    // Recreate driver.js from saved state and resume from same step
+    if (savedTourState.current) {
+      const { steps: savedSteps, index } = savedTourState.current;
+      savedTourState.current = null;
+
+      // Recreate driver
+      const onComplete = async () => {
+        if (userId) {
+          markTourCompleted(userId);
+          await markTourCompletedAction();
+          setIsCompleted(true);
+        }
+        currentDriverRef.current = null;
+      };
+
+      const onCloseClick = (isLastStep: boolean) => {
+        if (isLastStep) {
+          if (currentDriverRef.current) {
+            currentDriverRef.current.destroy();
+            currentDriverRef.current = null;
+          }
+          return;
+        }
+        if (currentDriverRef.current) {
+          const activeIndex = currentDriverRef.current.getActiveIndex() ?? 0;
+          savedTourState.current = { steps: savedSteps, index: activeIndex };
+          currentDriverRef.current.destroy();
+          currentDriverRef.current = null;
+        }
+        setPendingSkip(true);
+      };
+
+      const tourDriver = createTourDriver(
+        savedSteps,
+        () => void onComplete(),
+        onCloseClick
+      );
+      currentDriverRef.current = tourDriver;
+      tourDriver.drive(index); // resume from saved step
+    }
   };
 
   return (

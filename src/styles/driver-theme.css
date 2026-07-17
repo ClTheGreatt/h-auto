@@ -153,3 +153,25 @@
 .driver-overlay {
   transition: opacity 0.25s ease;
 }
+
+/* ============================================================
+   Skip confirmation dialog interaction protection
+   When our skip dialog is open, disable driver.js's overlay
+   from intercepting pointer events, so dialog buttons work.
+   ============================================================ */
+body.hauto-tour-dialog-open .driver-overlay,
+body.hauto-tour-dialog-open .driver-highlighted-element-stage,
+body.hauto-tour-dialog-open #driver-dummy-element {
+  pointer-events: none !important;
+}
+
+/* Also keep driver.js popover interactive but non-blocking */
+body.hauto-tour-dialog-open .driver-popover {
+  pointer-events: none !important;
+}
+
+/* Additional safety: target SVG path inside driver.js overlay directly */
+body.hauto-tour-dialog-open svg.driver-overlay,
+body.hauto-tour-dialog-open svg.driver-overlay path {
+  pointer-events: none !important;
+}
