@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTour, hasTourForRole } from "@/lib/tour";
-import { createStudentTour } from "@/lib/tour/tours/student";
+import { useTour, hasTourForRole, getTourForRole } from "@/lib/tour";
 
 export function RestartTourButton() {
   const router = useRouter();
@@ -16,7 +15,11 @@ export function RestartTourButton() {
   if (!role || !hasTourForRole(role)) return null;
 
   const handleRestart = () => {
-    const steps = createStudentTour(router);
+    const steps = getTourForRole(role, router);
+    if (!steps) {
+      console.warn("[tour] No tour steps returned for role", role);
+      return;
+    }
     resetAndRestart(steps);
   };
 
