@@ -38,7 +38,7 @@ export default async function DevicesPage() {
         <div className="text-sm text-blue-900">
           <strong>Testing without hardware?</strong> Use the &quot;Simulate
           reading&quot; option from the menu on each device to generate fake
-          sensor data. Useful for development and demos before your physical
+          sensor data. Useful for development and demo before your physical
           ESP32 arrives.
         </div>
       </div>
