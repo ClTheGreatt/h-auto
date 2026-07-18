@@ -12,7 +12,13 @@ export function createTourDriver(
     showProgress: true,
     showButtons: ["next", "previous", "close"],
     allowClose: true,
-    overlayClickBehavior: "close", // EXPLICIT: overlay click triggers close flow
+    // Clicking overlay does nothing. User must click X to exit.
+    overlayClickBehavior: () => {
+      // no-op, prevents accidental tour exit
+    },
+    // Prevent clicks on highlighted elements from firing during tour.
+    // Users advance via Next button, not by clicking the target itself.
+    disableActiveInteraction: true,
     smoothScroll: true,
     overlayOpacity: 0.6,
     popoverClass: "hauto-tour-popover",

@@ -4,7 +4,7 @@ import type { TourStep } from "../types";
 import { waitForSelector } from "../navigation";
 
 // Navigates to `path`, then waits for `targetSelector` to appear on the new
-// page before advancing the tour — falls back to advancing anyway if the
+// page before advancing the tour. Falls back to advancing anyway if the
 // element never shows up (e.g. slow render), so the tour never gets stuck.
 function navigateAndAdvance(
   router: AppRouterInstance,
@@ -23,9 +23,9 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
   return [
     {
       popover: {
-        title: "Welcome sa H-Auto, Faculty! 🌱",
+        title: "Welcome to H-Auto, Faculty 🌱",
         description:
-          "Bilang Faculty, ikaw yung nag-o-oversee ng mga Student Farmers at mga plots nila. Ipapakita ko sa'yo yung mga tools mo — pag-manage ng assignments, pag-monitor ng plots, pag-respond sa alerts, at pag-generate ng reports. Around 2-3 minutes lang. Pwede mo naman i-skip anytime.",
+          "As a faculty member, you oversee student farmers and their assigned plots. Let me show you your available tools including assignment management, plot monitoring, alert response, and reporting functions. This tour takes about 2 to 3 minutes. You can skip anytime and restart from the Help page.",
         showButtons: ["next", "close"],
         popoverClass: "hauto-tour-popover hauto-tour-popover-modal",
         onNextClick: navigateAndAdvance(
@@ -40,7 +40,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Navigation sidebar",
         description:
-          "MANAGE section — Plots (lahat ng plots na oversee mo), Assignments (i-assign yung mga students). OPERATIONS — Monitoring (growth logs feed) at Alerts (may Resolve action ka rito). INSIGHTS — Analytics at Reports (may Student Activity report exclusive sa Faculty at Admin).",
+          "In the MANAGE section, Plots shows all plots under your supervision and Assignments lets you manage student assignments. In OPERATIONS, Monitoring shows the growth logs feed and Alerts allows you to resolve issues. In INSIGHTS, Analytics and Reports include a Student Activity report available exclusively to Faculty and Admin roles.",
         side: "right",
         align: "start",
       },
@@ -50,7 +50,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Plots I Oversee",
         description:
-          "Bilang ng plots na naka-assign sa'yo bilang faculty adviser. As Faculty, nakikita mo lahat ng plots na oversee mo — hindi lang yung isa. Click mo para makita yung full list.",
+          "This tile shows the number of plots assigned to you as faculty adviser. As a faculty member, you see all plots you oversee, not just individual ones. Click the tile to view the complete list.",
         side: "bottom",
       },
     },
@@ -59,16 +59,16 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Open Alerts",
         description:
-          "Lahat ng alerts sa mga plots na oversee mo. Bilang Faculty, may capability ka na i-resolve mismo yung alert after mo mag-respond — feature na wala sa Student view.",
+          "This tile shows all open alerts on plots under your supervision. As a faculty member, you have the capability to resolve alerts after taking action. This resolve function is not available to Student users.",
         side: "bottom",
       },
     },
     {
       element: '[data-tour="dashboard.my-plots-grid"]',
       popover: {
-        title: "Yung mga plots mo",
+        title: "Your assigned plots",
         description:
-          "Cards ng plots na oversee mo, kasama yung latest sensor readings. Tap any card para makita yung details at para i-manage yung mga students na naka-assign dito.",
+          "These cards show the plots you oversee with their latest sensor readings. Click any card to view details and manage the students assigned to each plot.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -82,7 +82,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Plots I Oversee",
         description:
-          "Mas detalyadong view ng lahat ng plots mo. May search at filters (crop, status). Click any plot row para pumunta sa Plot Detail page — dun mo makikita ang 'Monitoring Assignments' card, kung saan mo ma-a-assign or ma-uunassign yung mga students per plot. Ito yung pangunahing tool mo bilang faculty adviser.",
+          "This page provides a detailed view of all your plots. Click any plot row to open its Plot Detail page. There you will find the Monitoring Assignments card where you can assign or unassign students per plot. This is your primary tool as a faculty adviser.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -96,7 +96,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Assignments",
         description:
-          "Overview ng lahat ng student assignments na ginawa mo. Read-only list — kung gusto mong mag-assign ng bagong student sa isang plot, dumaan ka sa Plot Detail page (may Assign Student card doon).",
+          "This page provides an overview of all student assignments you have created. It is a read only list. To assign a new student to a plot, navigate to the Plot Detail page and use the Assign Student card there.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -110,7 +110,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Monitoring feed",
         description:
-          "Feed ng lahat ng growth logs na na-record ng mga students mo — photos, plant height, leaf count, sensor snapshot per log. Useful para ma-review kung consistent yung pag-log at para makita yung mga observations.",
+          "This is the activity feed of all growth logs recorded by your students. Each entry includes photos, plant height, leaf count, and sensor snapshots. This is useful for reviewing log consistency and observations made in the field.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -124,7 +124,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Alerts",
         description:
-          "Lahat ng alerts sa plots mo. May 'Resolve' button ka per alert row — after mo mag-respond sa issue (nag-diligan, nag-add ng shade, atbp.), tap Resolve para ma-close yung alert. May 'Suggested action' guidance din per alert.",
+          "This page lists all alerts on your assigned plots. Each row includes a Resolve button. After you address an issue such as watering, adding shade, or adjusting conditions, click Resolve to close the alert. Each alert also includes Suggested action guidance.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -138,7 +138,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Analytics",
         description:
-          "System-wide trends across lahat ng plots mo. Pili ka ng time range at plot filter, tapos makikita mo yung charts — sensor trends, alerts over time, observations bar chart (click bars para ma-drill-down).",
+          "This page shows system wide trends across all your plots. Select a time range and plot filter to view charts including sensor trends, alerts over time, and observation counts. The Observations bar chart supports drill down for detailed inspection.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -152,7 +152,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Student Activity Report",
         description:
-          "Faculty-exclusive report — nakikita mo dito kung sino sa mga students mo yung consistent mag-log at kung sino yung less active. Export as PDF or Excel. Handy para sa evaluations at feedback.",
+          "This is a Faculty exclusive report. It shows which of your students are consistently logging observations and which are less active. Export the report as PDF or Excel. This is useful for student evaluations and providing feedback.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -164,9 +164,9 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="profile.settings-card"]',
       popover: {
-        title: "Profile & Settings",
+        title: "Profile and Settings",
         description:
-          "Manage yung account info mo, palitan ang password, at pumili ng theme. May Details section din — makikita mo ang role, employee ID, department, at position mo.",
+          "This page is where you edit your account information, change your password, and select an app theme. The Details section shows your role, employee ID, department, and position.",
         side: "left",
         onNextClick: navigateAndAdvance(
           router,
@@ -180,7 +180,7 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Mobile app",
         description:
-          "May mobile companion app din pala ang H-Auto. Sa field talaga mo ito gagamitin — mag-log ng observation habang katabi mo yung plot, may auto-captured GPS at direktang camera capture. Same account mo lang gamit. I-click ito para makita yung download instructions.",
+          "H-Auto includes a mobile companion app. It is designed for field use, allowing you to log observations, review student activity, and respond to alerts on the go. It uses the same account credentials. Click this link to see download instructions.",
         side: "right",
         align: "start",
         onNextClick: navigateAndAdvance(
@@ -193,9 +193,9 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="help.restart-tour-button"]',
       popover: {
-        title: "Tapos na! 🌿",
+        title: "Tour complete 🌿",
         description:
-          "Salamat sa pagsama sa tour. Kung gusto mong ulit-ulitin, pumindot lang ng 'Start tour' button dito sa Help page. May mga detailed guides at FAQ din dito para sa mas malalim na tanong. Enjoy pag-oversee ng mga plots! 🌱",
+          "Thank you for taking the tour. If you want to review any section again, click the Start tour button on this Help page anytime. This page also contains detailed guides and frequently asked questions for deeper reference. Enjoy overseeing your plots.",
         side: "bottom",
         align: "end",
         showButtons: ["previous", "close"],

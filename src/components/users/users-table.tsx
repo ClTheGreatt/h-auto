@@ -21,10 +21,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DeleteUserDialog } from "./delete-user-dialog";
+import { StudentFarmerSection } from "./student-farmer-section";
 import { cn } from "@/lib/utils";
 import type { UserRole, UserStatus } from "@prisma/client";
+import type { CourseGroup } from "@/lib/users/group-students";
 
-type UserRow = {
+export type UserRow = {
   id: string;
   firstName: string;
   lastName: string;
@@ -32,6 +34,9 @@ type UserRow = {
   role: UserRole;
   status: UserStatus;
   idNumber: string | null;
+  course: string | null;
+  yearLevel: string | null;
+  section: string | null;
 };
 
 const ROLE_ORDER: UserRole[] = [
@@ -71,6 +76,8 @@ const ROLE_META: Record<
   },
 };
 
+export const STUDENT_FARMER_META = ROLE_META.STUDENT_FARMER;
+
 const statusVariant: Record<UserStatus, StatusVariant> = {
   ACTIVE: "success",
   INACTIVE: "neutral",
@@ -90,13 +97,23 @@ function groupByRole(users: UserRow[]): Record<UserRole, UserRow[]> {
   return grouped;
 }
 
-export function UsersTable({ users }: { users: UserRow[] }) {
-  if (users.length === 0) {
+export function UsersTable({
+  users,
+  showStudentSection,
+  courseGroups,
+  hasFilters,
+}: {
+  users: UserRow[];
+  showStudentSection: boolean;
+  courseGroups: CourseGroup[];
+  hasFilters: boolean;
+}) {
+  if (users.length === 0 && !showStudentSection) {
     return (
       <EmptyState
         icon={UsersIcon}
         title="No users found"
-       description="Try adjusting your search or filters, or add a new user."
+        description="Try adjusting your search or filters, or add a new user."
         action={{
           label: "Add user",
           href: "/dashboard/users/new",
@@ -106,19 +123,23 @@ export function UsersTable({ users }: { users: UserRow[] }) {
   }
 
   const grouped = groupByRole(users);
-  const visibleRoles = ROLE_ORDER.filter((role) => grouped[role].length > 0);
+  const otherRoles = ROLE_ORDER.filter(
+    (role) => role !== "STUDENT_FARMER" && grouped[role].length > 0
+  );
 
   return (
     <div className="space-y-4">
-      {visibleRoles.map((role) => (
+      {otherRoles.map((role) => (
         <RoleSection key={role} role={role} users={grouped[role]} />
       ))}
+      {showStudentSection && (
+        <StudentFarmerSection courseGroups={courseGroups} hasFilters={hasFilters} />
+      )}
     </div>
   );
 }
 
 function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
-  const router = useRouter();
   const meta = ROLE_META[role];
 
   return (
@@ -138,88 +159,114 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
         </div>
       </div>
 
-      {/* Mini-table for this role */}
-      <div>
-        <Table className="min-w-[760px] table-fixed">
-          <colgroup>
-            <col className="w-[32%]" />
-            <col className="w-[36%]" />
-            <col className="w-[14%]" />
-            <col className="w-[14%]" />
-            <col className="w-12" />
-          </colgroup>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="px-4 text-xs">Name</TableHead>
-              <TableHead className="px-4 text-xs">Email</TableHead>
-              <TableHead className="px-4 text-xs">Status</TableHead>
-              <TableHead className="px-4 text-xs">ID number</TableHead>
-              <TableHead className="px-3"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((user) => (
-              <TableRow
-                key={user.id}
-                onClick={() => router.push(`/dashboard/users/${user.id}`)}
-                className="cursor-pointer hover:bg-muted/50"
-              >
-                <TableCell className="px-4 py-3 font-medium">
-                  {user.firstName} {user.lastName}
-                </TableCell>
-                <TableCell className="truncate px-4 py-3 text-gray-600">
-                  {user.email}
-                </TableCell>
-                <TableCell className="px-4 py-3">
-                  <StatusBadge variant={statusVariant[user.status]}>
-                    {user.status}
-                  </StatusBadge>
-                </TableCell>
-                <TableCell className="px-4 py-3 text-gray-600">
-                  {user.idNumber ?? "—"}
-                </TableCell>
-                <TableCell className="px-3 py-2 text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/users/${user.id}/edit`}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit
-                        </Link>
-                      </DropdownMenuItem>
-                      <DeleteUserDialog
-                        userId={user.id}
-                        userName={`${user.firstName} ${user.lastName}`}
-                        trigger={
-                          <DropdownMenuItem
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        }
-                      />
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <UserRowsTable users={users} />
     </section>
+  );
+}
+
+// Shared column widths, so any table built from these pieces (RoleSection's
+// own table, or the Student Farmers single continuous table) lines up
+// identically regardless of how many rows/labels are interleaved above it.
+export function UserTableColgroup() {
+  return (
+    <colgroup>
+      <col className="w-[32%]" />
+      <col className="w-[36%]" />
+      <col className="w-[14%]" />
+      <col className="w-[14%]" />
+      <col className="w-12" />
+    </colgroup>
+  );
+}
+
+export function UserTableHeaderRow() {
+  return (
+    <TableRow>
+      <TableHead className="px-4 text-xs">Name</TableHead>
+      <TableHead className="px-4 text-xs">Email</TableHead>
+      <TableHead className="px-4 text-xs">Status</TableHead>
+      <TableHead className="px-4 text-xs">ID number</TableHead>
+      <TableHead className="px-3"></TableHead>
+    </TableRow>
+  );
+}
+
+export function UserTableRow({ user }: { user: UserRow }) {
+  const router = useRouter();
+
+  return (
+    <TableRow
+      onClick={() => router.push(`/dashboard/users/${user.id}`)}
+      className="cursor-pointer hover:bg-muted/50"
+    >
+      <TableCell className="px-4 py-3 font-medium">
+        {user.firstName} {user.lastName}
+      </TableCell>
+      <TableCell className="truncate px-4 py-3 text-gray-600">
+        {user.email}
+      </TableCell>
+      <TableCell className="px-4 py-3">
+        <StatusBadge variant={statusVariant[user.status]}>
+          {user.status}
+        </StatusBadge>
+      </TableCell>
+      <TableCell className="px-4 py-3 text-gray-600">
+        {user.idNumber ?? "—"}
+      </TableCell>
+      <TableCell className="px-3 py-2 text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/users/${user.id}/edit`}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+            <DeleteUserDialog
+              userId={user.id}
+              userName={`${user.firstName} ${user.lastName}`}
+              trigger={
+                <DropdownMenuItem
+                  onSelect={(e) => e.preventDefault()}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              }
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// Standalone table with its own header, used for role sections that have no
+// sub-grouping (Super Admin, Admin, Faculty).
+export function UserRowsTable({ users }: { users: UserRow[] }) {
+  return (
+    <div>
+      <Table className="min-w-[760px] table-fixed">
+        <UserTableColgroup />
+        <TableHeader>
+          <UserTableHeaderRow />
+        </TableHeader>
+        <TableBody>
+          {users.map((user) => (
+            <UserTableRow key={user.id} user={user} />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

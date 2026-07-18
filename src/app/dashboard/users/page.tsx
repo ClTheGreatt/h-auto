@@ -8,6 +8,15 @@ import { UsersTable } from "@/components/users/users-table";
 import { SearchBar } from "@/components/ui/search-bar";
 import { RoleFilter } from "@/components/users/role-filter";
 import { StatusFilter } from "@/components/users/status-filter";
+import { CourseFilter } from "@/components/users/course-filter";
+import { YearFilter } from "@/components/users/year-filter";
+import { SectionFilter } from "@/components/users/section-filter";
+import {
+  groupStudents,
+  uniqueCourses,
+  uniqueYearLevels,
+  uniqueSections,
+} from "@/lib/users/group-students";
 
 const VALID_ROLES: UserRole[] = [
   "SUPER_ADMIN",
@@ -25,6 +34,9 @@ export default async function UsersPage({
     search?: string;
     role?: string;
     status?: string;
+    course?: string;
+    year?: string;
+    section?: string;
   }>;
 }) {
   await requireAdmin();
@@ -40,10 +52,41 @@ export default async function UsersPage({
       ? (sp.status as UserStatus)
       : undefined;
 
+  // Course/Year/Section only mean anything for Student Farmers, so they only
+  // take effect when the Role filter is "All roles" or Student Farmer.
+  const studentFiltersActive = !role || role === "STUDENT_FARMER";
+
+  // Baseline (unfiltered) roster of every student's course/year/section, used
+  // both to populate the filter dropdown options and to compute the "X of Y"
+  // totals shown on group headers while a filter narrows the main query.
+  const studentFieldRows = await prisma.user.findMany({
+    where: { role: "STUDENT_FARMER" },
+    select: { course: true, yearLevel: true, section: true },
+  });
+  const courseOptions = uniqueCourses(studentFieldRows);
+  const yearOptions = uniqueYearLevels(studentFieldRows);
+  const sectionOptions = uniqueSections(studentFieldRows);
+
+  const course =
+    studentFiltersActive && sp.course && courseOptions.includes(sp.course)
+      ? sp.course
+      : undefined;
+  const yearLevel =
+    studentFiltersActive && sp.year && yearOptions.includes(sp.year)
+      ? sp.year
+      : undefined;
+  const section =
+    studentFiltersActive && sp.section && sectionOptions.includes(sp.section)
+      ? sp.section
+      : undefined;
+
   // Build Prisma filter
   const where: Prisma.UserWhereInput = {
     ...(role && { role }),
     ...(status && { status }),
+    ...(course && { course }),
+    ...(yearLevel && { yearLevel }),
+    ...(section && { section }),
     ...(search && {
       OR: [
         { firstName: { contains: search, mode: "insensitive" } },
@@ -66,11 +109,20 @@ export default async function UsersPage({
       role: true,
       status: true,
       idNumber: true,
+      course: true,
+      yearLevel: true,
+      section: true,
     },
   });
 
   const totalUsers = users.length;
-  const hasFilters = Boolean(search || role || status);
+  const hasFilters = Boolean(
+    search || role || status || course || yearLevel || section
+  );
+
+  const studentRows = users.filter((u) => u.role === "STUDENT_FARMER");
+  const courseGroups = groupStudents(studentRows, studentFieldRows);
+  const showStudentSection = studentFiltersActive;
 
   return (
     <div className="w-full space-y-5">
@@ -113,6 +165,21 @@ export default async function UsersPage({
             <div className="flex flex-wrap gap-2">
               <RoleFilter current={role} />
               <StatusFilter current={status} />
+              <CourseFilter
+                current={course}
+                options={courseOptions}
+                disabled={!studentFiltersActive}
+              />
+              <YearFilter
+                current={yearLevel}
+                options={yearOptions}
+                disabled={!studentFiltersActive}
+              />
+              <SectionFilter
+                current={section}
+                options={sectionOptions}
+                disabled={!studentFiltersActive}
+              />
             </div>
           </div>
 
@@ -138,7 +205,12 @@ export default async function UsersPage({
 
       {/* Grouped table */}
       <div data-tour="users.list">
-        <UsersTable users={users} />
+        <UsersTable
+          users={users}
+          showStudentSection={showStudentSection}
+          courseGroups={courseGroups}
+          hasFilters={hasFilters}
+        />
       </div>
     </div>
   );

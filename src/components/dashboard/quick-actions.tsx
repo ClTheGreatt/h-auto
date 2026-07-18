@@ -5,7 +5,6 @@ import {
   Camera,
   Activity,
   FileText,
-  BellRing,
   Plus,
   Cpu,
   UserPlus,
@@ -29,17 +28,10 @@ type ActionItem = {
 
 type Props = {
   role: UserRole;
-  openAlertCount: number;
-  criticalAlertCount: number;
   studentFirstPlot?: { id: string; name: string } | null;
 };
 
-export function QuickActions({
-  role,
-  openAlertCount,
-  criticalAlertCount,
-  studentFirstPlot,
-}: Props) {
+export function QuickActions({ role, studentFirstPlot }: Props) {
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
   const isFaculty = role === "FACULTY";
   const isStudent = role === "STUDENT_FARMER";
@@ -59,10 +51,10 @@ export function QuickActions({
 
   if (isFaculty) {
     actions.push({
-      href: "/dashboard/assignments",
+      href: "/dashboard/plots",
       icon: ClipboardList,
-      label: "Assignments",
-      description: "Manage student plots",
+      label: "Assign students",
+      description: "Pick a plot to assign",
       primary: true,
     });
   }
@@ -90,20 +82,6 @@ export function QuickActions({
     icon: Camera,
     label: "Monitor plots",
     description: "Observation timeline",
-  });
-
-  // Alerts — always visible, badge appears only when there are open alerts
-  actions.push({
-    href: "/dashboard/alerts",
-    icon: BellRing,
-    label: "Alerts",
-    description: openAlertCount > 0 ? `${openAlertCount} open` : "All resolved",
-    badge:
-      criticalAlertCount > 0
-        ? { count: criticalAlertCount, tone: "red" }
-        : openAlertCount > 0
-        ? { count: openAlertCount, tone: "amber" }
-        : undefined,
   });
 
   actions.push({

@@ -4,7 +4,7 @@ import type { TourStep } from "../types";
 import { waitForSelector } from "../navigation";
 
 // Navigates to `path`, then waits for `targetSelector` to appear on the new
-// page before advancing the tour — falls back to advancing anyway if the
+// page before advancing the tour. Falls back to advancing anyway if the
 // element never shows up (e.g. slow render), so the tour never gets stuck.
 function navigateAndAdvance(
   router: AppRouterInstance,
@@ -23,9 +23,9 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
   return [
     {
       popover: {
-        title: "Welcome sa H-Auto, Admin! 🌱",
+        title: "Welcome to H-Auto, Admin 🌱",
         description:
-          "Bilang Admin, may full system access ka — user management, device registration, crop configuration, at lahat ng features ng system. Ipapakita ko sa'yo yung mga admin-exclusive tools. Around 3-4 minutes lang. Pwede mo naman i-skip anytime.",
+          "As an administrator, you have full system access including user management, device registration, crop configuration, and all system features. Let me show you the admin exclusive tools. This tour takes about 3 to 4 minutes. You can skip anytime and restart from the Help page.",
         showButtons: ["next", "close"],
         popoverClass: "hauto-tour-popover hauto-tour-popover-modal",
         onNextClick: navigateAndAdvance(
@@ -40,7 +40,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Navigation sidebar",
         description:
-          "Admin at Super Admin ka, so nakikita mo lahat ng nav items: MANAGE (Users, Crops, Plots, Devices, Assignments), OPERATIONS (Monitoring, Alerts), INSIGHTS (Analytics, Reports). Users at Devices ay admin-exclusive, so hindi mo makikita yang ilang items pag Faculty or Student ka.",
+          "As an Admin or Super Admin, you have access to all navigation items. MANAGE includes Users, Crops, Plots, Devices, and Assignments. OPERATIONS includes Monitoring and Alerts. INSIGHTS includes Analytics and Reports. Users and Devices are admin exclusive, so Faculty and Student users do not see these items.",
         side: "right",
         align: "start",
       },
@@ -50,7 +50,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Total Plots",
         description:
-          "Buong system plot count. As Admin, nakikita mo lahat ng plots regardless of assignment. Click para makita yung full list.",
+          "This tile shows the total plot count across the entire system. As an Admin, you see all plots regardless of assignment. Click the tile to view the complete list.",
         side: "bottom",
       },
     },
@@ -59,7 +59,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Open Alerts",
         description:
-          "System-wide alerts count. Ikaw ang may pinakamataas na view — nakikita mo alerts para sa lahat ng plots at users.",
+          "This tile shows the system wide alert count. As an Admin, you have the highest visibility. You can see alerts for all plots and users in the system.",
         side: "bottom",
       },
     },
@@ -68,7 +68,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "System Activity Overview",
         description:
-          "Overview ng recent activity across the system. Ito yung dashboard ng buong operation mo — lahat ng plots, lahat ng students, real-time.",
+          "This section provides an overview of recent activity across the system. This is your operational dashboard covering all plots, all students, in real time.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -82,7 +82,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "User Management",
         description:
-          "Lahat ng users sa system, grouped by role. Click a row para makita ang detail (role, activity, ID). Yung 'Add user' button pang-manual add ng isa-isa, may 'Import' button din para sa CSV/Excel bulk-create ng maraming users at once.",
+          "This page lists all users in the system, grouped by role. Click any row to view user details including role, activity, and ID information. The Add user button lets you add users individually, while the Import CSV button allows bulk creation from a CSV or Excel file.",
         side: "top",
       },
     },
@@ -91,7 +91,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Adding a single user",
         description:
-          "Click mo yung 'Add User' button para mag-add ng isa-isa. Fill mo yung form: email, name, at role. Depende sa role, may specific fields — Course/Year/Section para sa Student, Department/Position para sa Faculty. Yung system automatically nag-generate ng temporary password, ini-send via email — hindi ka mag-set manually.",
+          "Click the Add user button to add users one at a time. Fill in the form with email, name, and role. Depending on the role, specific fields will appear. Course, Year, and Section for Students, or Department and Position for Faculty. Set an initial password for the user (required). This will be sent to their email as a temporary login credential, which they can change after signing in.",
         side: "bottom",
       },
     },
@@ -100,7 +100,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Bulk import users",
         description:
-          "Kung marami ang ia-add mo (buong section, buong batch), i-click yung 'Import' button. Nag-a-accept ng CSV o Excel file. May downloadable template kasama para malaman mo yung exact format. Handy sa beginning of semester pag i-o-onboard ka ng maraming students at once.",
+          "For adding multiple users at once such as an entire section or batch, click the Import CSV button. It accepts CSV or Excel files. A downloadable template is provided so you know the exact format required. This is useful at the beginning of a semester when onboarding many students simultaneously.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -114,7 +114,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Crop Configuration",
         description:
-          "Lahat ng crops na naka-configure sa system — with default growth stages, days-to-harvest, at threshold ranges. Admin-exclusive management. Yung threshold ranges dito ay ginagamit ng system para ma-trigger yung alerts.",
+          "This page lists all crops configured in the system with their default growth stages, days to harvest, and threshold ranges. This is admin exclusive management. The threshold ranges configured here drive automatic alerts when sensor readings fall outside optimal conditions.",
         side: "top",
       },
     },
@@ -123,7 +123,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Adding a crop",
         description:
-          "Add a new crop with its own growth stages, days-to-harvest, at ideal sensor threshold ranges (moisture, temperature, humidity, NPK). May preset library kaming 9 Philippine vegetables — puwede mong i-quick start galing doon para hindi manual lahat yung threshold entry.",
+          "Click this button to add a new crop with its own growth stages, days to harvest, and ideal sensor threshold ranges covering moisture, temperature, humidity, and NPK levels. A preset library of 9 Philippine vegetables is available, so you do not need to enter every threshold manually.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -137,7 +137,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "All Plots",
         description:
-          "Lahat ng plots sa system. May 'Add plot' button ka (Admin+ only), at pwede mo i-edit or delete ang existing plots via yung per-row '⋯' menu. Click any plot to open its details.",
+          "This page shows all plots in the system. As an Admin or Super Admin, you can create new plots using the Add plot button. You can also edit or delete existing plots through the per row actions menu. Click any plot to view its details.",
         side: "bottom",
       },
     },
@@ -146,7 +146,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Creating a plot",
         description:
-          "I-click ito para mag-add ng plot. Fill in: plot name, location, yung crop na tatanim, at expected planting date. Once created, pupunta ka sa Plot Detail page para ma-assign yung students sa plot na yun.",
+          "Click this button to add a new plot. Fill in the plot name, location, the crop to be planted, and the expected planting date. Once created, you will be taken to the Plot Detail page where you can assign students to the plot.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -160,7 +160,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Device Management",
         description:
-          "Registered ESP32 devices na nag-a-ingest ng sensor data. May 'Register device' button para magdagdag ng bago (nag-ge-generate ng API key na ico-configure mo sa firmware). Per-row '⋯' menu ay may Simulate Reading (test data injection), Regenerate API key (kung na-compromise), at Edit / Delete.",
+          "This page lists all registered ESP32 devices that ingest sensor data. Click the Register device button to add a new device, which generates an API key to be configured in the firmware. The per row actions menu includes Simulate Reading for test data injection, Regenerate API key in case a key is compromised, and Edit or Delete options.",
         side: "top",
       },
     },
@@ -169,7 +169,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Registering an ESP32 device",
         description:
-          "Yung 'Register Device' button ang gagamitin mo pag may bagong physical sensor unit na i-install. Nag-generate ito ng one-time API key na ico-configure mo sa firmware ng ESP32. Importante: yung API key hindi na uulit lumabas after mo i-close yung dialog — kailangan mo agad i-copy at i-save.",
+          "Click the Register device button when installing a new physical sensor unit. The system generates a one time API key that you will configure in the ESP32 firmware. Important: the API key will not be shown again after you close the dialog, so copy and save it immediately.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -183,7 +183,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "All Assignments",
         description:
-          "Lahat ng student-plot assignments sa system. As Admin, nakikita mo lahat, hindi lang yung ginawa mo. Yung actual assign / unassign action ay ginagawa sa Plot Detail page.",
+          "This page shows all student to plot assignments in the system. As an Admin, you see all assignments, not just those you created. The actual assign and unassign actions are performed on the Plot Detail page.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -197,7 +197,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Monitoring feed",
         description:
-          "System-wide growth log feed — lahat ng logs sa lahat ng plots. Nakita mo dito kung sino nag-log, kung kelan, at kung ano yung sensor readings sa moment na yun.",
+          "This is the system wide growth log feed showing all logs from all plots. Each entry displays who logged the observation, when, and the sensor readings at that moment.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -211,7 +211,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "System Alerts",
         description:
-          "Lahat ng alerts, all plots, all severity levels. Pwede mo i-resolve mismo (Faculty+ / Admin capability). May detailed per-recipient SMS delivery status kada alert kung na-expand mo yung row.",
+          "This page shows all alerts across all plots and severity levels. You can resolve alerts directly, a capability available to Faculty and Admin roles. Expand any row to view detailed per recipient SMS delivery status for each alert.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -225,7 +225,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "System Analytics",
         description:
-          "System-wide trends. As Admin, walang filter na naka-apply — nakikita mo aggregated data across lahat ng plots. Useful for high-level system health monitoring.",
+          "This page shows system wide trends. As an Admin, no filter is applied by default, so you see aggregated data across all plots. This is useful for high level system health monitoring.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -239,7 +239,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "System Activity Report",
         description:
-          "Admin-exclusive report — user actions across the system, logins, changes, deletions. Import compliance / audit trail. Export as PDF or Excel.",
+          "This is an Admin exclusive report showing user actions across the system including logins, changes, and deletions. It provides an audit trail useful for compliance and internal review. Export the report as PDF or Excel.",
         side: "bottom",
       },
     },
@@ -248,7 +248,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Student Activity Report",
         description:
-          "Available din sa Admin — nakikita mo lahat ng students, hindi lang yung sa specific faculty. Kung gusto mong mag-generate ng academic activity report for defense or grading, dito ka pupunta.",
+          "This report is also available to Admins. Unlike Faculty who see only their students, you see all students in the system. This is useful for generating academic activity reports for defense presentations or grading.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -260,9 +260,9 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="profile.settings-card"]',
       popover: {
-        title: "Profile & Settings",
+        title: "Profile and Settings",
         description:
-          "Manage yung account info mo, palitan ang password, at pumili ng theme. As Admin, nakikita mo rin yung 'Administration' section sa mobile app for Manage Users access on the go.",
+          "This page is where you edit your account information, change your password, and select an app theme. As an Admin, you can also access the Administration section in the mobile app for user management while on the go.",
         side: "left",
         onNextClick: navigateAndAdvance(
           router,
@@ -276,7 +276,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Mobile app",
         description:
-          "May mobile companion app din pala ang H-Auto. Sa field talaga mo ito gagamitin — mag-log ng observation habang katabi mo yung plot, may auto-captured GPS at direktang camera capture. Same account mo lang gamit. I-click ito para makita yung download instructions.",
+          "H-Auto includes a mobile companion app. It is designed for field use with the same admin capabilities including user management, monitoring, and alert response. It uses the same account credentials. Click this link to see download instructions.",
         side: "right",
         align: "start",
         onNextClick: navigateAndAdvance(
@@ -289,9 +289,9 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="help.restart-tour-button"]',
       popover: {
-        title: "Tapos na! 🌿",
+        title: "Tour complete 🌿",
         description:
-          "Salamat sa pagsama sa tour. Kung gusto mong ulit-ulitin, pumindot lang ng 'Start tour' button dito sa Help page. Detailed guides at FAQ din dito. Enjoy administering H-Auto! 🌱",
+          "Thank you for taking the tour. If you want to review any section again, click the Start tour button on this Help page anytime. This page also contains detailed guides and frequently asked questions for deeper reference. Enjoy administering H-Auto.",
         side: "bottom",
         align: "end",
         showButtons: ["previous", "close"],

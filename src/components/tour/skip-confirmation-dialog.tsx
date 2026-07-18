@@ -85,13 +85,13 @@ export function SkipConfirmationDialog({ open, onConfirm, onCancel }: Props) {
 
         <div style={{ marginBottom: "1rem" }}>
           <h2 className="text-lg font-semibold text-foreground" style={{ margin: 0, marginBottom: "0.5rem" }}>
-            I-skip yung tour?
+            Skip tour?
           </h2>
           <p className="text-sm text-muted-foreground" style={{ margin: 0, lineHeight: 1.6 }}>
-            Kung i-skip mo ngayon, hindi na siya lalabas ulit sa susunod mong login.
-            Pero pwede mo naman itong i-restart anytime galing sa{" "}
-            <span className="font-medium text-foreground">Help page</span> — click mo lang
-            yung &quot;Start tour&quot; button doon.
+            If you skip now, the tour will not appear again on your next login. You
+            can restart it anytime from the{" "}
+            <span className="font-medium text-foreground">Help page</span> by
+            clicking the Start tour button.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export function SkipConfirmationDialog({ open, onConfirm, onCancel }: Props) {
               cursor: "pointer",
             }}
           >
-            Ituloy yung tour
+            Continue tour
           </button>
           <button
             type="button"
@@ -123,7 +123,7 @@ export function SkipConfirmationDialog({ open, onConfirm, onCancel }: Props) {
               cursor: "pointer",
             }}
           >
-            Skip na
+            Skip
           </button>
         </div>
       </div>

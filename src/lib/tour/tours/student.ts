@@ -4,7 +4,7 @@ import type { TourStep } from "../types";
 import { waitForSelector } from "../navigation";
 
 // Navigates to `path`, then waits for `targetSelector` to appear on the new
-// page before advancing the tour — falls back to advancing anyway if the
+// page before advancing the tour. Falls back to advancing anyway if the
 // element never shows up (e.g. slow render), so the tour never gets stuck.
 function navigateAndAdvance(
   router: AppRouterInstance,
@@ -23,9 +23,9 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
   return [
     {
       popover: {
-        title: "Welcome sa H-Auto! 🌱",
+        title: "Welcome to H-Auto 🌱",
         description:
-          "Ito ang Smart Gardening Monitoring System para sa Vegetables. Ipapakita ko sa'yo yung mga main features — dashboard, plots monitoring, alerts, at analytics. Around 2 minutes lang, at pwede mo naman i-skip anytime. Pumindot ng 'Next' para magsimula.",
+          "This is the Smart Gardening Monitoring System for Vegetables. I will show you the main features including your dashboard, plot monitoring, alerts, and analytics. This tour takes about 2 minutes. You can skip anytime and restart from the Help page. Click Next to begin.",
         showButtons: ["next", "close"],
         popoverClass: "hauto-tour-popover hauto-tour-popover-modal",
         onNextClick: navigateAndAdvance(
@@ -40,7 +40,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Navigation sidebar",
         description:
-          "Dito lahat ng pages ng system, naka-group by purpose. MANAGE (Plots, Assignments) para sa day-to-day work. OPERATIONS (Monitoring, Alerts) para sa live activity. INSIGHTS (Analytics, Reports) para sa trends at reports. Nasa baba yung Help at About.",
+          "This is your main navigation. Pages are grouped by purpose. MANAGE contains Plots and Assignments for day to day work. OPERATIONS includes Monitoring and Alerts for live activity. INSIGHTS provides Analytics and Reports for trends and reporting. Help and About are at the bottom.",
         side: "right",
         align: "start",
       },
@@ -50,7 +50,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "My Plots",
         description:
-          "Bilang ng plots na assigned sa'yo for monitoring. Real-time counter — mag-a-update automatically kapag may bagong assignment or na-complete. Pwede mo i-click yung buong card para dumiretso sa listahan mo.",
+          "This tile shows the number of plots assigned to you for monitoring. It updates in real time when new assignments are added or completed. Click the tile to view the full list of your plots.",
         side: "bottom",
       },
     },
@@ -59,16 +59,16 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Open Alerts",
         description:
-          "Kung may issue sa'yong plots (mababang soil moisture, mataas na temperature, low light, atbp.), makikita mo dito. Yung red number = critical alerts na kailangan agad ng aksyon. Yellow / orange = warning. Zero = all clear.",
+          "This tile shows open alerts for your plots. Critical issues such as low soil moisture, high temperature, or low light appear here. A red number indicates critical alerts that need immediate action. Yellow or orange indicates warnings. Zero means all conditions are within optimal range.",
         side: "bottom",
       },
     },
     {
       element: '[data-tour="dashboard.my-plots-grid"]',
       popover: {
-        title: "Yung mga plots mo",
+        title: "Your assigned plots",
         description:
-          "Cards ng plots na assigned sa'yo, kasama yung latest sensor readings (moisture, temp, humidity, NPK). Tap any card para makita yung details, mag-log ng observation with photo, or i-view yung sensor history.",
+          "These cards show your assigned plots with the latest sensor readings including moisture, temperature, humidity, and NPK levels. Click any card to view details, log an observation with a photo, or check sensor history.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -82,7 +82,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Plots page",
         description:
-          "Same list ng plots mo, mas detalyado. May search box para hanapin by name, location, or crop. May Crop filter (Eggplant, Tomato, atbp.) at Status filter (Preparing, Active, Harvested). Click any plot row para mapunta sa full detail.",
+          "This page shows the same list of your plots in more detail. Use the search box to find plots by name, location, or crop. You can filter by Crop such as Eggplant or Tomato, or by Status such as Preparing, Active, or Harvested. Click any plot row to open its full detail page.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -96,7 +96,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Assignments",
         description:
-          "Dito makikita mo yung mga plots na assigned sa'yo, kasama yung faculty na nag-o-oversee sa bawat isa. Read-only view para sa'yo — pag may bagong plot na na-assign ng faculty, mag-a-appear siya dito. Yung actual assign / unassign action ay ginagawa ng faculty sa plot detail page.",
+          "This page displays your plot assignments including the faculty member overseeing each plot. It is a read only view. When new plots are assigned to you by a faculty member, they will appear here automatically.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -108,9 +108,9 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="monitoring.feed"]',
       popover: {
-        title: "Monitoring",
+        title: "Monitoring feed",
         description:
-          "Feed ng lahat ng growth logs na na-record sa mga plots mo — photos, plant height, leaf count, sensor snapshot, at observations. May filter by date, plot, at author. Useful para ma-track yung progress over time at makita yung past observations mo.",
+          "This is the activity feed for all growth logs recorded on your plots. Each entry includes photos, plant height, leaf count, sensor readings, and observations. You can filter by date, plot, or author. This is useful for tracking progress over time and reviewing past observations.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -124,7 +124,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Alerts page",
         description:
-          "Lahat ng alerts na linked sa plots mo. May Open at Resolved tabs. Filter by severity (info / warning / critical), by type (moisture, temperature, humidity, etc.), or by specific plot. Bawat alert ay may 'Suggested action' section — step-by-step guide kung ano gagawin.",
+          "This page lists all alerts related to your plots. Use the tabs to switch between Open and Resolved alerts. You can filter by severity such as info, warning, or critical, by alert type, or by specific plot. Each alert includes a Suggested action section with step by step guidance.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -138,7 +138,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Analytics",
         description:
-          "Trends over time. Pili ka ng time range — 24 hours, 7 days, 30 days, all-time, or specific month. Sa baba makikita mo yung charts: sensor trends (soil moisture, temperature, humidity), light intensity, NPK levels, at observations count per day.",
+          "This page shows trends over time. Select a time range such as 24 hours, 7 days, 30 days, all time, or a specific month. Below the range picker you will find charts for sensor trends including soil moisture, temperature, humidity, light intensity, NPK levels, and daily observation counts.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,
@@ -152,7 +152,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Reports",
         description:
-          "I-export mo yung data as PDF or Excel — Sensor Readings, Plot Performance, Growth Logs, at Alerts. Pili ka lang ng report type at plot filter, tapos i-download. Handy para sa progress reports, defense documentation, or personal backup ng iyong data.",
+          "This page lets you export data as PDF or Excel files. Available report types include Sensor Readings, Plot Performance, Growth Logs, and Alerts. Select a report type and plot filter, then click download. This is useful for progress reports, defense documentation, or personal data backup.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
@@ -164,9 +164,9 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="profile.settings-card"]',
       popover: {
-        title: "Profile & Settings",
+        title: "Profile and Settings",
         description:
-          "Dito mo ini-edit yung account info mo (pangalan, phone number), pinapalitan yung password, at pinipili yung app theme (light / dark / auto). May Details section din — nakita mo dito yung role, ID number, department, at iba pang info na naka-record sa account mo.",
+          "This page is where you edit your account information such as name and phone number, change your password, and select an app theme. The Details section shows your role, ID number, department, and other account information on record.",
         side: "left",
         onNextClick: navigateAndAdvance(
           router,
@@ -180,7 +180,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Mobile app",
         description:
-          "May mobile companion app din pala ang H-Auto. Sa field talaga mo ito gagamitin — mag-log ng observation habang katabi mo yung plot, may auto-captured GPS at direktang camera capture. Same account mo lang gamit. I-click ito para makita yung download instructions.",
+          "H-Auto includes a mobile companion app. It is designed for field use, allowing you to log observations next to the plot with automatic GPS capture and direct camera photo taking. It uses the same account credentials. Click this link to see download instructions.",
         side: "right",
         align: "start",
         onNextClick: navigateAndAdvance(
@@ -193,9 +193,9 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
     {
       element: '[data-tour="help.restart-tour-button"]',
       popover: {
-        title: "Tapos na! 🌿",
+        title: "Tour complete 🌿",
         description:
-          "Salamat sa pagsama sa tour. Kung gusto mong ulit-ulitin ito anytime, pumindot lang ng 'Start tour' button dito sa Help page. May mga detailed guides at FAQ din sa page na ito para sa mas malalim na tanong. Enjoy H-Auto!",
+          "Thank you for taking the tour. If you want to review any section again, click the Start tour button on this Help page anytime. This page also contains detailed guides and frequently asked questions for deeper reference. Enjoy using H-Auto.",
         side: "bottom",
         align: "end",
         showButtons: ["previous", "close"],
