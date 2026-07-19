@@ -46,6 +46,7 @@ import {
   type UpdateUserInput,
 } from "@/lib/validations/user";
 import { createUser, updateUser } from "@/actions/users";
+import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
 
 type FormValues = z.infer<typeof updateUserSchema>;
 
@@ -120,6 +121,14 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   });
 
   const isCreate = mode === "create";
+
+  const isDeactivatedWithPrefixedEmail =
+    mode === "edit" &&
+    !!defaultValues?.email &&
+    isInactivePrefixed(defaultValues.email);
+  const restoredEmailPreview = isDeactivatedWithPrefixedEmail
+    ? stripInactivePrefix(defaultValues!.email!)
+    : "";
   const watchedRole = useWatch({ control: form.control, name: "role" });
   const watchedFirstName = useWatch({
     control: form.control,
@@ -326,6 +335,13 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                     <FormDescription className="text-xs">
                       Must be a BPSU email address (@bpsu.edu.ph)
                     </FormDescription>
+                    {isDeactivatedWithPrefixedEmail && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        This user was deactivated. To reactivate, change
+                        Status to Active — the email will be automatically
+                        restored to {restoredEmailPreview}.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -427,9 +443,12 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                     <SelectContent>
                       <SelectItem value="ACTIVE">Active</SelectItem>
                       <SelectItem value="INACTIVE">Inactive</SelectItem>
-                      <SelectItem value="SUSPENDED">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Deactivated users lose access but their data is preserved.
+                    Set to Active to restore access.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

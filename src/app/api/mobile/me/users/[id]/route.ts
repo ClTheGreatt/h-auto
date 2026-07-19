@@ -6,7 +6,7 @@ function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
 }
 
-const VALID_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"];
+const VALID_STATUSES = ["ACTIVE", "INACTIVE"];
 
 // GET /api/mobile/me/users/[id] — fetch one user's full detail (admin only)
 export async function GET(

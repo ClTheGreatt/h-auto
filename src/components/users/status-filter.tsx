@@ -35,7 +35,6 @@ export function StatusFilter({ current }: { current?: string }) {
         <SelectItem value="all">All status</SelectItem>
         <SelectItem value="ACTIVE">Active</SelectItem>
         <SelectItem value="INACTIVE">Inactive</SelectItem>
-        <SelectItem value="SUSPENDED">Suspended</SelectItem>
       </SelectContent>
     </Select>
   );

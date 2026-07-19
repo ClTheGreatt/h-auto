@@ -86,11 +86,13 @@ export async function POST(req: NextRequest) {
 
     // Check account status
     if (user.status !== "ACTIVE") {
-      const message =
-        user.status === "SUSPENDED"
-          ? "Your account has been suspended. Please contact an administrator."
-          : "Your account is inactive. Please contact an administrator.";
-      return NextResponse.json({ error: message }, { status: 403 });
+      return NextResponse.json(
+        {
+          error:
+            "Your account is inactive. Please contact an administrator.",
+        },
+        { status: 403 }
+      );
     }
 
     // Update lastLoginAt best-effort; don't fail login if this fails.

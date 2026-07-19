@@ -81,7 +81,6 @@ export const STUDENT_FARMER_META = ROLE_META.STUDENT_FARMER;
 const statusVariant: Record<UserStatus, StatusVariant> = {
   ACTIVE: "success",
   INACTIVE: "neutral",
-  SUSPENDED: "danger",
 };
 
 function groupByRole(users: UserRow[]): Record<UserRole, UserRow[]> {
@@ -240,7 +239,7 @@ export function UserTableRow({ user }: { user: UserRow }) {
                   className="text-red-600 focus:text-red-600"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                  Deactivate
                 </DropdownMenuItem>
               }
             />

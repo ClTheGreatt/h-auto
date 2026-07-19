@@ -21,7 +21,7 @@ const VALID_ROLES: UserRole[] = [
   "FACULTY",
   "STUDENT_FARMER",
 ];
-const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE", "SUSPENDED"];
+const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE"];
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (same
 // rule as the web createUser action). Other roles (ADMIN/SUPER_ADMIN)

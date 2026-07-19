@@ -14,7 +14,7 @@ const baseUserSchema = z.object({
   yearLevel: z.string().optional().or(z.literal("")),
   section: z.string().optional().or(z.literal("")),
   position: z.string().optional().or(z.literal("")),
-  status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
+  status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
 // Lenient — used for ADMIN/SUPER_ADMIN creation (out of scope for the

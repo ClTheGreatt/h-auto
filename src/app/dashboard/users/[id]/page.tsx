@@ -38,7 +38,6 @@ const ROLE_BADGE_CLASS: Record<UserRole, string> = {
 const statusVariant: Record<UserStatus, StatusVariant> = {
   ACTIVE: "success",
   INACTIVE: "neutral",
-  SUSPENDED: "danger",
 };
 
 export default async function UserDetailPage({
@@ -131,7 +130,7 @@ export default async function UserDetailPage({
                       className="text-red-600 focus:text-red-600"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
+                      Deactivate
                     </DropdownMenuItem>
                   }
                 />

@@ -25,7 +25,7 @@ const VALID_ROLES: UserRole[] = [
   "STUDENT_FARMER",
 ];
 
-const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE", "SUSPENDED"];
+const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE"];
 
 export default async function UsersPage({
   searchParams,

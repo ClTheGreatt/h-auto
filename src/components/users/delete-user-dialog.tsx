@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { deleteUser } from "@/actions/users";
+import { deactivateUser } from "@/actions/users";
 
 export function DeleteUserDialog({
   userId,
@@ -27,12 +27,12 @@ export function DeleteUserDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    const result = await deleteUser(userId);
-    setDeleting(false);
+  async function handleDeactivate() {
+    setDeactivating(true);
+    const result = await deactivateUser(userId);
+    setDeactivating(false);
 
     if (result?.error) {
       toast.error(result.error);
@@ -45,7 +45,7 @@ export function DeleteUserDialog({
         description: result.message,
       });
     } else {
-      toast.success("User deleted");
+      toast.success("User deactivated");
     }
 
     setOpen(false);
@@ -57,24 +57,25 @@ export function DeleteUserDialog({
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+          <AlertDialogTitle>Deactivate user?</AlertDialogTitle>
           <AlertDialogDescription>
-            <strong>{userName}</strong> will be removed. If they have associated
-            records (assignments, growth logs, alerts), they will be deactivated
-            instead — preserving audit history.
+            This will deactivate <strong>{userName}</strong>&apos;s account.
+            They will lose access immediately, but their historical data
+            (plots, growth logs, alerts, assignments) is preserved. You can
+            reactivate them later by editing their profile.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              handleDelete();
+              handleDeactivate();
             }}
-            disabled={deleting}
+            disabled={deactivating}
             className="bg-red-600 hover:bg-red-700"
           >
-            {deleting ? "Processing..." : "Delete"}
+            {deactivating ? "Processing..." : "Deactivate"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

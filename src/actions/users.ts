@@ -15,6 +15,7 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations/user";
+import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (adviser
 // request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema.
@@ -132,6 +133,14 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     };
   }
 
+  const existingUser = await prisma.user.findUnique({
+    where: { id },
+    select: { status: true, email: true },
+  });
+  if (!existingUser) {
+    return { error: "User not found" };
+  }
+
   const { password, ...rest } = parsed.data;
 
   const updateData: Record<string, unknown> = {
@@ -146,9 +155,41 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     position: rest.position || null,
   };
 
+  // Reactivation: INACTIVE -> ACTIVE. Restore the original email (stripping
+  // whatever inactive_<timestamp>_ / inactive::<timestamp>:: prefix is
+  // present) so the account is usable again. Only intervenes when the
+  // stored email is actually prefixed — an INACTIVE user whose email was
+  // never touched (e.g. deactivated by hand outside deactivateUser)
+  // reactivates normally with no extra check.
+  const isReactivating =
+    existingUser.status === "INACTIVE" && rest.status === "ACTIVE";
+
+  if (isReactivating && isInactivePrefixed(existingUser.email)) {
+    // stripInactivePrefix() is a no-op on an email the admin already typed
+    // something clean into, so this is safe to apply unconditionally.
+    const finalEmail = stripInactivePrefix(rest.email);
+
+    const conflict = await prisma.user.findFirst({
+      where: {
+        email: { equals: finalEmail, mode: "insensitive" },
+        id: { not: id },
+        status: "ACTIVE",
+      },
+    });
+
+    if (conflict) {
+      return {
+        error: `Cannot reactivate: another active user (${conflict.firstName} ${conflict.lastName}) is using ${finalEmail}. Please provide a new email.`,
+      };
+    }
+
+    updateData.email = finalEmail;
+  }
+
   // Bump tokenVersion whenever this update could otherwise leave a stale
-  // session/token with access it shouldn't have: a password reset, or the
-  // account being suspended/deactivated.
+  // session/token with access it shouldn't have: a password reset, the
+  // account being deactivated, or being reactivated (safety — invalidate
+  // any stale token left over from before deactivation).
   let bumpTokenVersion = false;
 
   if (password && password.length > 0) {
@@ -156,7 +197,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     bumpTokenVersion = true;
   }
 
-  if (rest.status === "SUSPENDED" || rest.status === "INACTIVE") {
+  if (rest.status === "INACTIVE" || isReactivating) {
     bumpTokenVersion = true;
   }
 
@@ -177,7 +218,20 @@ export async function updateUser(id: string, input: UpdateUserInput) {
   return { success: true };
 }
 
-export async function deleteUser(id: string) {
+/**
+ * Soft-deactivates a user account. Sets status to INACTIVE, renames the
+ * email to free it up for future registrations, and increments tokenVersion
+ * to invalidate any active session.
+ *
+ * Historical data (plots, growth logs, alerts, assignments) is preserved.
+ * To reactivate: admin edits the user's profile and manually restores the
+ * email (remove the inactive_<timestamp>_ prefix) plus sets status back to ACTIVE.
+ *
+ * (Renamed from deleteUser — a real prisma.user.delete() is still attempted
+ * first and succeeds when the user has no related records; the above only
+ * describes the far more common fallback path.)
+ */
+export async function deactivateUser(id: string) {
   const session = await requireAdmin();
   if (session.user.id === id) {
     return { error: "You cannot delete your own account" };
@@ -196,9 +250,26 @@ export async function deleteUser(id: string) {
       (error.code === "P2003" || error.code === "P2014")
     ) {
       try {
+        const target = await prisma.user.findUnique({
+          where: { id },
+          select: { email: true },
+        });
+        if (!target) {
+          return { error: "User not found" };
+        }
+
+        // Prefix the email so it's freed up for a future registration —
+        // otherwise the unique constraint on email blocks re-signup under
+        // the same address. Also bump tokenVersion to invalidate any
+        // session/token this account currently holds.
+        const inactiveEmail = `inactive_${Date.now()}_${target.email}`;
         await prisma.user.update({
           where: { id },
-          data: { status: "INACTIVE" },
+          data: {
+            status: "INACTIVE",
+            email: inactiveEmail,
+            tokenVersion: { increment: 1 },
+          },
         });
         revalidatePath("/dashboard/users");
         return {
@@ -212,10 +283,10 @@ export async function deleteUser(id: string) {
       }
     }
 
-    console.error("deleteUser error:", error);
+    console.error("deactivateUser error:", error);
     return {
       error:
-        "Failed to delete user. Please contact your administrator if this persists.",
+        "Failed to deactivate user. Please contact your administrator if this persists.",
     };
   }
 }
