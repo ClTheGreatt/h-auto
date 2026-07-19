@@ -77,6 +77,7 @@ export async function commitImport(
         phoneNumber: row.phoneNumber || null,
         idNumber: row.idNumber || null,
         passwordHash,
+        mustChangePassword: true,
       };
 
       let createdUser;

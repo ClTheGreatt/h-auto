@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
+import { MustChangePasswordBanner } from "@/components/dashboard/must-change-password-banner";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { TourProvider } from "@/lib/tour";
 import { TourAutoStart } from "@/components/tour/tour-auto-start";
@@ -40,6 +41,7 @@ select: {
     <SessionProvider session={session}>
       <TourProvider>
         <TourAutoStart />
+        <MustChangePasswordBanner />
         <div className="flex min-h-screen bg-stone-50 dark:bg-gray-950">
           {/* Desktop sidebar - hidden on mobile */}
           <div className="hidden lg:block sticky top-0 h-screen">

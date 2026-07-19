@@ -82,6 +82,7 @@ const passwordHash = await bcrypt.hash(parsed.data.password, 10);
         section: rest.section || null,
         position: rest.position || null,
         passwordHash,
+        mustChangePassword: true,
       },
     });
   } catch (error) {
@@ -194,6 +195,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 
   if (password && password.length > 0) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
+    updateData.mustChangePassword = true;
     bumpTokenVersion = true;
   }
 

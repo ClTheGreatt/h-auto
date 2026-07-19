@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
         phoneNumber: row.phoneNumber || null,
         idNumber: row.idNumber || null,
         passwordHash,
+        mustChangePassword: true,
       };
 
       let createdUser;

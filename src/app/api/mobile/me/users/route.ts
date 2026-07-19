@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
           section: rest.section || null,
           position: rest.position || null,
           passwordHash,
+          mustChangePassword: true,
         },
         select: {
           id: true,

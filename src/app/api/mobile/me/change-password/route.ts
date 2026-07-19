@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { passwordStrengthSchema } from "@/lib/validations/password";
 
 export async function POST(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -18,9 +19,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (newPassword.length < 8) {
+    const strength = passwordStrengthSchema.safeParse(newPassword);
+    if (!strength.success) {
       return NextResponse.json(
-        { error: "New password must be at least 8 characters" },
+        { error: strength.error.issues[0]?.message ?? "Password is too weak" },
         { status: 400 }
       );
     }
@@ -44,7 +46,11 @@ export async function POST(req: NextRequest) {
     const newHash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash: newHash,
+        tokenVersion: { increment: 1 },
+        mustChangePassword: false,
+      },
     });
 
     return NextResponse.json({ success: true });

@@ -139,6 +139,10 @@ model User {
   // Existing JWTs/sessions carry the tokenVersion at issue time; a mismatch
   // against the current DB value invalidates that session immediately.
   tokenVersion Int        @default(0)
+  // True for newly created accounts (temp password must be rotated before
+  // the dashboard is reachable). Existing accounts were backfilled to false
+  // by the migration that added this column.
+  mustChangePassword Boolean @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

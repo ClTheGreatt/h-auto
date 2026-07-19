@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +30,16 @@ import {
 import { changePassword } from "@/actions/profile";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 
-// changePassword bumps tokenVersion, which would otherwise invalidate this
-// same session on its next request (auth.ts's jwt callback rejects a stale
-// tokenVersion). Calling useSession().update() after a successful change
-// refreshes the token with the new tokenVersion so the user stays signed in.
-export function PasswordChangeForm() {
+// Reuses the same changePassword server action as the profile page's
+// PasswordChangeForm. changePassword always bumps tokenVersion, which would
+// otherwise invalidate the *current* session too (auth.ts's jwt callback
+// rejects a stale tokenVersion on the very next request) — so after a
+// successful change we call useSession().update(), which round-trips
+// through the jwt callback's `trigger === "update"` branch and adopts the
+// fresh tokenVersion/mustChangePassword as the token's new baseline,
+// keeping this session valid instead of forcing a re-login.
+export function FirstLoginPasswordForm() {
+  const router = useRouter();
   const { update } = useSession();
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,30 +56,29 @@ export function PasswordChangeForm() {
   async function onSubmit(values: ChangePasswordInput) {
     setSubmitting(true);
     const result = await changePassword(values);
-    setSubmitting(false);
 
     if (mapServerErrorsToForm(form, result ?? {})) {
+      setSubmitting(false);
       toast.error(result?.error ?? "Please fix the errors below");
       return;
     }
 
     if (result?.error) {
+      setSubmitting(false);
       toast.error(result.error);
       return;
     }
 
-    toast.success("Password changed successfully");
+    toast.success("Password changed");
     await update();
-    form.reset();
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Lock className="w-4 h-4 text-gray-500" />
-          Change password
-        </CardTitle>
+        <CardTitle className="text-base">Change your password</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -87,7 +91,7 @@ export function PasswordChangeForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Current password <RequiredMark />
+                    Current (temporary) password <RequiredMark />
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -118,8 +122,7 @@ export function PasswordChangeForm() {
                   </FormControl>
                   <FormDescription className="text-xs">
                     Minimum 8 characters, with at least 1 uppercase letter, 1
-                    lowercase letter, 1 number, and 1 symbol. Use something
-                    different from your temporary password.
+                    lowercase letter, 1 number, and 1 symbol.
                   </FormDescription>
                   <PasswordStrengthIndicator password={field.value ?? ""} />
                   <FormMessage />
@@ -147,7 +150,7 @@ export function PasswordChangeForm() {
               )}
             />
 
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting} className="w-full">
               {submitting ? "Changing..." : "Change password"}
             </Button>
           </form>

@@ -97,7 +97,11 @@ export async function changePassword(input: ChangePasswordInput) {
     const newPasswordHash = await bcrypt.hash(parsed.data.newPassword, 10);
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash: newPasswordHash,
+        tokenVersion: { increment: 1 },
+        mustChangePassword: false,
+      },
     });
   } catch (error) {
     console.error("changePassword error:", error);

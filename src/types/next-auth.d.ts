@@ -7,6 +7,7 @@ declare module "next-auth" {
       id: string;
       role: UserRole;
       tourCompletedAt: string | null;
+      mustChangePassword: boolean;
     } & DefaultSession["user"];
   }
 
@@ -14,6 +15,7 @@ declare module "next-auth" {
     role: UserRole;
     tourCompletedAt: string | null;
     tokenVersion: number;
+    mustChangePassword: boolean;
   }
 }
 
@@ -23,5 +25,6 @@ declare module "next-auth/jwt" {
     role: UserRole;
     tourCompletedAt: string | null;
     tokenVersion: number;
+    mustChangePassword: boolean;
   }
 }

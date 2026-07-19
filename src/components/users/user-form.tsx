@@ -47,6 +47,7 @@ import {
 } from "@/lib/validations/user";
 import { createUser, updateUser } from "@/actions/users";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
+import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 
 type FormValues = z.infer<typeof updateUserSchema>;
 
@@ -472,12 +473,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                     <Input type="password" {...field} />
                   </FormControl>
                   <FormDescription className="text-xs">
-                    {isCreate &&
-                    (watchedRole === "STUDENT_FARMER" ||
-                      watchedRole === "FACULTY")
-                      ? "Minimum 8 characters, with at least 1 letter and 1 number"
-                      : "Minimum 6 characters"}
+                    Minimum 8 characters, with at least 1 uppercase letter, 1
+                    lowercase letter, 1 number, and 1 symbol
                   </FormDescription>
+                  <PasswordStrengthIndicator password={field.value ?? ""} />
                   <FormMessage />
                 </FormItem>
               )}

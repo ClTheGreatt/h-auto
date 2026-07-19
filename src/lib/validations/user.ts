@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { bpsuEmail } from "./email";
+import { passwordStrengthSchema } from "./password";
 
 const baseUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -17,27 +18,19 @@ const baseUserSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
-// Lenient — used for ADMIN/SUPER_ADMIN creation (out of scope for the
-// strict-validation rules below) and as the base for updates.
+// Used for ADMIN/SUPER_ADMIN creation and as the base for updates. Password
+// strength is unified across every creation path via passwordStrengthSchema.
 export const createUserSchema = baseUserSchema.extend({
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: passwordStrengthSchema,
 });
 
-// Update stays lenient for every role — an adviser request so existing
-// incomplete users can still be edited/completed incrementally.
+// Update stays lenient on every other field for every role — an adviser
+// request so existing incomplete users can still be edited/completed
+// incrementally. Password itself still uses the same strength rule
+// whenever a new one is actually being set (blank = keep current).
 export const updateUserSchema = baseUserSchema.extend({
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters")
-    .optional()
-    .or(z.literal("")),
+  password: passwordStrengthSchema.optional().or(z.literal("")),
 });
-
-export const strongPassword = z
-  .string()
-  .min(8, "Password must be at least 8 characters")
-  .regex(/[A-Za-z]/, "Password must contain at least one letter")
-  .regex(/[0-9]/, "Password must contain at least one number");
 
 export const phPhone = z
   .string()
@@ -54,7 +47,7 @@ export const createStudentSchema = baseUserSchema.extend({
   section: z.string().trim().min(1, "Section is required"),
   yearLevel: z.enum(YEAR_LEVELS, { error: "Year level is required" }),
   phoneNumber: phPhone,
-  password: strongPassword,
+  password: passwordStrengthSchema,
 });
 
 // STRICT — Faculty creation. Same rationale as createStudentSchema.
@@ -63,7 +56,7 @@ export const createFacultySchema = baseUserSchema.extend({
   idNumber: z.string().trim().min(1, "Employee ID is required"),
   department: z.string().trim().min(1, "Department is required"),
   position: z.string().trim().min(1, "Position is required"),
-  password: strongPassword,
+  password: passwordStrengthSchema,
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

@@ -17,7 +17,13 @@ const DUMMY_BCRYPT_HASH =
 const getUserForSessionCheck = cache(async (userId: string) => {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { status: true, role: true, tokenVersion: true, tourCompletedAt: true },
+    select: {
+      status: true,
+      role: true,
+      tokenVersion: true,
+      tourCompletedAt: true,
+      mustChangePassword: true,
+    },
   });
 });
 
@@ -60,6 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
           tokenVersion: user.tokenVersion,
+          mustChangePassword: user.mustChangePassword,
           tourCompletedAt: user.tourCompletedAt
             ? user.tourCompletedAt.toISOString()
             : null,
@@ -68,15 +75,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         // Initial sign-in — populate from the just-verified user.
         token.id = user.id;
         token.role = user.role as UserRole;
         token.tokenVersion = user.tokenVersion;
+        token.mustChangePassword = user.mustChangePassword;
         token.tourCompletedAt = user.tourCompletedAt
           ? new Date(user.tourCompletedAt).toISOString()
           : null;
+        return token;
+      }
+
+      // Client explicitly called useSession().update() (e.g. right after
+      // this same device changed its own password). tokenVersion was just
+      // bumped in the DB, so the normal re-validation branch below would
+      // see a mismatch and log this session out. Adopt the fresh DB values
+      // as the token's new baseline instead of comparing against the old
+      // (intentionally superseded) tokenVersion.
+      if (trigger === "update") {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: {
+            status: true,
+            role: true,
+            tokenVersion: true,
+            tourCompletedAt: true,
+            mustChangePassword: true,
+          },
+        });
+        if (fresh && fresh.status === "ACTIVE") {
+          token.role = fresh.role;
+          token.tokenVersion = fresh.tokenVersion;
+          token.mustChangePassword = fresh.mustChangePassword;
+          token.tourCompletedAt = fresh.tourCompletedAt
+            ? fresh.tourCompletedAt.toISOString()
+            : null;
+        }
         return token;
       }
 
@@ -93,6 +129,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       token.role = fresh.role;
+      token.mustChangePassword = fresh.mustChangePassword;
       token.tourCompletedAt = fresh.tourCompletedAt
         ? fresh.tourCompletedAt.toISOString()
         : null;
@@ -102,6 +139,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
+        session.user.mustChangePassword = (token.mustChangePassword as boolean) ?? false;
         session.user.tourCompletedAt = (token.tourCompletedAt as string | null) ?? null;
       }
       return session;

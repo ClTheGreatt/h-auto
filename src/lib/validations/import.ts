@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { bpsuEmail } from "./email";
+import { passwordStrengthSchema } from "./password";
 
 const baseRow = {
   firstName: z.string().trim().min(1, "First name is required"),
@@ -8,7 +9,7 @@ const baseRow = {
   email: bpsuEmail,
   phoneNumber: z.string().trim().optional().default(""),
   idNumber: z.string().trim().optional().default(""),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: passwordStrengthSchema,
 };
 
 export const facultyImportRowSchema = z.object({
