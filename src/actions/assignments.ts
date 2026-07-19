@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireFaculty } from "@/lib/auth-helpers";
+import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 
 export async function assignStudent(
   plotId: string,
@@ -10,6 +11,13 @@ export async function assignStudent(
   notes?: string
 ) {
   const session = await requireFaculty();
+
+  // FACULTY is scoped to plots they actively advise; ADMIN/SUPER_ADMIN keep
+  // unrestricted access.
+  if (session.user.role === "FACULTY") {
+    const hasAccess = await canFacultyAccessPlot(session.user.id, plotId);
+    if (!hasAccess) return { error: "You don't have access to this plot" };
+  }
 
   const student = await prisma.user.findUnique({ where: { id: studentId } });
   if (!student || student.role !== "STUDENT_FARMER") {
@@ -39,12 +47,17 @@ export async function assignStudent(
 }
 
 export async function removeAssignment(assignmentId: string) {
-  await requireFaculty();
+  const session = await requireFaculty();
 
   const assignment = await prisma.plotAssignment.findUnique({
     where: { id: assignmentId },
   });
   if (!assignment) return { error: "Assignment not found" };
+
+  if (session.user.role === "FACULTY") {
+    const hasAccess = await canFacultyAccessPlot(session.user.id, assignment.plotId);
+    if (!hasAccess) return { error: "You don't have access to this plot" };
+  }
 
   await prisma.plotAssignment.update({
     where: { id: assignmentId },

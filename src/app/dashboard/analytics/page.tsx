@@ -242,14 +242,18 @@ export default async function AnalyticsPage({
   const bucketMs = pickBucketMs(month, since);
 
   // Role-aware base filter
-  const plotFilter =
-    role === "STUDENT_FARMER"
+  // Archived plots are excluded from analytics; historical data for a plot
+  // remains in the DB but stops surfacing once it's archived.
+  const plotFilter = {
+    status: { not: "ARCHIVED" as const },
+    ...(role === "STUDENT_FARMER"
       ? {
           assignments: {
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
-      : {};
+      : {}),
+  };
 
   const combinedPlotFilter = selectedPlotId
     ? { ...plotFilter, id: selectedPlotId }

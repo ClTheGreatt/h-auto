@@ -54,11 +54,13 @@ export default async function PlotsPage({
         }
       : {};
 
-  // Combined where clause
+  // Combined where clause. Archived plots are hidden unless a specific
+  // status filter is explicitly requested (VALID_STATUSES doesn't include
+  // ARCHIVED, so `status` here is never that value).
   const where: Prisma.PlotWhereInput = {
     ...roleFilter,
+    status: status ?? { not: "ARCHIVED" },
     ...(cropId && { cropId }),
-    ...(status && { status }),
     ...(search && {
       OR: [
         { name: { contains: search, mode: "insensitive" } },

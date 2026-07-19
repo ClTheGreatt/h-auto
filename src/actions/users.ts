@@ -146,8 +146,22 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     position: rest.position || null,
   };
 
+  // Bump tokenVersion whenever this update could otherwise leave a stale
+  // session/token with access it shouldn't have: a password reset, or the
+  // account being suspended/deactivated.
+  let bumpTokenVersion = false;
+
   if (password && password.length > 0) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
+    bumpTokenVersion = true;
+  }
+
+  if (rest.status === "SUSPENDED" || rest.status === "INACTIVE") {
+    bumpTokenVersion = true;
+  }
+
+  if (bumpTokenVersion) {
+    updateData.tokenVersion = { increment: 1 };
   }
 
   try {

@@ -15,13 +15,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let plotFilter = {};
+    let plotFilter: Record<string, unknown> = { status: { not: "ARCHIVED" } };
     if (user.role === "STUDENT_FARMER") {
       plotFilter = {
+        ...plotFilter,
         assignments: { some: { studentId: user.id, status: "ACTIVE" } },
       };
     } else if (user.role === "FACULTY") {
       plotFilter = {
+        ...plotFilter,
         assignments: { some: { facultyId: user.id, status: "ACTIVE" } },
       };
     }

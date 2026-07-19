@@ -15,9 +15,11 @@ function formatElapsed(ms: number): string {
 }
 
 export async function GET(req: NextRequest) {
-  // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" when CRON_SECRET is set
+  // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" on scheduled invocations.
+  // Fail closed: without CRON_SECRET configured, there is no way to verify the
+  // caller, so the request must be rejected rather than allowed through.
   const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

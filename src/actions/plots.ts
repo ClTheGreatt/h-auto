@@ -59,17 +59,20 @@ export async function updatePlot(id: string, input: PlotFormValues) {
   return { success: true };
 }
 
-export async function deletePlot(id: string) {
+// Soft delete: archives the plot instead of a hard `delete`, so historical
+// sensor readings, growth logs (with photos), and alerts are preserved
+// rather than cascade-deleted.
+export async function archivePlot(id: string) {
   await requireAdmin();
 
   const assignmentCount = await prisma.plotAssignment.count({
     where: { plotId: id, status: "ACTIVE" },
   });
   if (assignmentCount > 0) {
-    return { error: `Cannot delete: ${assignmentCount} active assignment(s) exist. End them first.` };
+    return { error: `Cannot archive: ${assignmentCount} active assignment(s) exist. End them first.` };
   }
 
-  await prisma.plot.delete({ where: { id } });
+  await prisma.plot.update({ where: { id }, data: { status: "ARCHIVED" } });
   revalidatePath("/dashboard/plots");
   return { success: true };
 }

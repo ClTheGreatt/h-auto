@@ -3,11 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
+import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { growthLogSchema, type GrowthLogFormValues } from "@/lib/validations/growth";
 
 async function canAccessPlot(plotId: string, userId: string, role: string) {
-  if (role === "SUPER_ADMIN" || role === "ADMIN" || role === "FACULTY") {
+  if (role === "SUPER_ADMIN" || role === "ADMIN") {
     return true;
+  }
+  if (role === "FACULTY") {
+    return canFacultyAccessPlot(userId, plotId);
   }
   const assignment = await prisma.plotAssignment.findFirst({
     where: { plotId, studentId: userId, status: "ACTIVE" },

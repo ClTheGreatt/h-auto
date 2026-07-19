@@ -90,6 +90,9 @@ export async function GET(
     if (!plot) {
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
     }
+    if (plot.status === "ARCHIVED" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+    }
 
     // Fetch latest sensor reading (if any)
     const latestReading = await prisma.sensorReading.findFirst({

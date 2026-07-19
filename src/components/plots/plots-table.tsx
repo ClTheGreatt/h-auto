@@ -41,6 +41,7 @@ const statusLabels: Record<PlotStatus, string> = {
   READY_FOR_HARVEST: "Ready for harvest",
   HARVESTED: "Harvested",
   FALLOW: "Fallow",
+  ARCHIVED: "Archived",
 };
 
 const statusVariant: Record<PlotStatus, StatusVariant> = {
@@ -50,6 +51,7 @@ const statusVariant: Record<PlotStatus, StatusVariant> = {
   READY_FOR_HARVEST: "warning",
   HARVESTED: "success",
   FALLOW: "neutral",
+  ARCHIVED: "neutral",
 };
 
 export function PlotsTable({
@@ -159,7 +161,7 @@ export function PlotsTable({
                             className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
+                            Archive
                           </DropdownMenuItem>
                         }
                       />

@@ -9,14 +9,18 @@ export default async function ReportsPage() {
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
   const isFacultyOrAdmin = isAdmin || role === "FACULTY";
 
-  const plotFilter =
-    role === "STUDENT_FARMER"
+  // Archived plots are excluded from reports; historical data for a plot
+  // remains in the DB but stops surfacing once it's archived.
+  const plotFilter = {
+    status: { not: "ARCHIVED" as const },
+    ...(role === "STUDENT_FARMER"
       ? {
           assignments: {
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
-      : {};
+      : {}),
+  };
 
   const plots = await prisma.plot.findMany({
     where: plotFilter,

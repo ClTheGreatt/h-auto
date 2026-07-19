@@ -90,12 +90,14 @@ export async function changePassword(input: ChangePasswordInput) {
     };
   }
 
-  // Hash and save new password
+  // Hash and save new password. Bumping tokenVersion invalidates any
+  // existing session/token for this account (including this one, on its
+  // next request) — the auth.ts jwt callback rejects a stale tokenVersion.
   try {
     const newPasswordHash = await bcrypt.hash(parsed.data.newPassword, 10);
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { passwordHash: newPasswordHash },
+      data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } },
     });
   } catch (error) {
     console.error("changePassword error:", error);

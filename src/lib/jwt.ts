@@ -14,6 +14,7 @@ export type MobileTokenPayload = {
   sub: string; // user id
   email: string;
   role: string;
+  tokenVersion: number;
 };
 
 export function signMobileToken(

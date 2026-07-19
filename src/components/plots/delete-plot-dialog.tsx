@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { deletePlot } from "@/actions/plots";
+import { archivePlot } from "@/actions/plots";
 
 export function DeletePlotDialog({
   plotId,
@@ -27,19 +27,19 @@ export function DeletePlotDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    const result = await deletePlot(plotId);
-    setDeleting(false);
+  async function handleArchive() {
+    setArchiving(true);
+    const result = await archivePlot(plotId);
+    setArchiving(false);
 
     if (result?.error) {
       toast.error(result.error);
       return;
     }
 
-    toast.success("Plot deleted");
+    toast.success("Plot archived");
     setOpen(false);
     router.refresh();
   }
@@ -49,23 +49,24 @@ export function DeletePlotDialog({
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete this plot?</AlertDialogTitle>
+          <AlertDialogTitle>Archive this plot?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete <strong>{plotName}</strong> and all its
-            sensor readings, growth logs, and alerts. This cannot be undone.
+            This will archive <strong>{plotName}</strong> and preserve all
+            historical data. It will no longer appear in active lists but can
+            be restored by an administrator.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              handleDelete();
+              handleArchive();
             }}
-            disabled={deleting}
+            disabled={archiving}
             className="bg-red-600 hover:bg-red-700"
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {archiving ? "Archiving..." : "Archive"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -37,6 +37,7 @@ enum PlotStatus {
   READY_FOR_HARVEST
   HARVESTED
   FALLOW
+  ARCHIVED
 }
 
 enum AssignmentStatus {
@@ -135,6 +136,10 @@ model User {
   status       UserStatus @default(ACTIVE)
   lastLoginAt  DateTime?
   tourCompletedAt DateTime?
+  // Bumped on password change or status change to SUSPENDED/INACTIVE.
+  // Existing JWTs/sessions carry the tokenVersion at issue time; a mismatch
+  // against the current DB value invalidates that session immediately.
+  tokenVersion Int        @default(0)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

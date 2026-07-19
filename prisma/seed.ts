@@ -1,78 +1,99 @@
 import { PrismaClient, UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
+
+// 16 chars, alphanumeric-only (base64 minus the +/= padding characters that
+// would otherwise make the password awkward to select/copy from a terminal).
+function generateStrongPassword(): string {
+  return randomBytes(12).toString("base64").replace(/[+/=]/g, "").slice(0, 16);
+}
 
 // =================================================================
 // ADMIN USER
 // =================================================================
 async function seedAdmin() {
-  const passwordHash = await bcrypt.hash("admin123", 10);
+  const email = "admin@h-auto.local";
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log(`✓ Admin already exists (${email}) — password unchanged`);
+    return;
+  }
 
-  await prisma.user.upsert({
-    where: { email: "admin@h-auto.local" },
-    update: {},
-    create: {
-      email: "admin@h-auto.local",
+  const password = generateStrongPassword();
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.user.create({
+    data: {
+      email,
       passwordHash,
       firstName: "System",
       lastName: "Administrator",
       role: UserRole.SUPER_ADMIN,
     },
   });
-  console.log("✓ Admin user ready (admin@h-auto.local / admin123)");
+  console.log(`✓ Admin created: ${email} / ${password}`);
+  console.log("  ⚠️  SAVE THIS PASSWORD NOW — it will NOT be shown again");
 }
 
 // =================================================================
 // FACULTY + STUDENT TEST USERS
 // =================================================================
-async function seedTestUsers() {
-  const facultyPw = await bcrypt.hash("faculty123", 10);
-  const studentPw = await bcrypt.hash("student123", 10);
+type TestUserInput = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  role: UserRole;
+  department?: string;
+  course?: string;
+};
 
-  await prisma.user.upsert({
-    where: { email: "maria@h-auto.local" },
-    update: {},
-    create: {
+async function seedTestUsers() {
+  const testUsers: TestUserInput[] = [
+    {
       email: "maria@h-auto.local",
-      passwordHash: facultyPw,
       firstName: "Maria",
       lastName: "Reyes",
       phoneNumber: "09171234567",
       role: UserRole.FACULTY,
       department: "Agriculture",
     },
-  });
-
-  await prisma.user.upsert({
-    where: { email: "pedro@h-auto.local" },
-    update: {},
-    create: {
+    {
       email: "pedro@h-auto.local",
-      passwordHash: studentPw,
       firstName: "Pedro",
       lastName: "Santos",
       phoneNumber: "09181234567",
       role: UserRole.STUDENT_FARMER,
       course: "BSIT",
     },
-  });
-
-  await prisma.user.upsert({
-    where: { email: "juan@h-auto.local" },
-    update: {},
-    create: {
+    {
       email: "juan@h-auto.local",
-      passwordHash: studentPw,
       firstName: "Juan",
       lastName: "Cruz",
       phoneNumber: "09191234567",
       role: UserRole.STUDENT_FARMER,
       course: "BSIT",
     },
-  });
+  ];
 
-  console.log("✓ Test users: maria (faculty) + pedro/juan (students), pw faculty123/student123");
+  for (const testUser of testUsers) {
+    const existing = await prisma.user.findUnique({ where: { email: testUser.email } });
+    if (existing) {
+      console.log(`✓ ${testUser.email} already exists — password unchanged`);
+      continue;
+    }
+
+    const password = generateStrongPassword();
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await prisma.user.create({
+      data: { ...testUser, passwordHash },
+    });
+    console.log(`✓ ${testUser.role} created: ${testUser.email} / ${password}`);
+    console.log("  ⚠️  SAVE THIS PASSWORD NOW — it will NOT be shown again");
+  }
 }
 
 // =================================================================

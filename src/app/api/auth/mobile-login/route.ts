@@ -9,6 +9,11 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// Fixed dummy hash to equalize response time when the user doesn't exist.
+// Prevents timing-based user enumeration (bcrypt.compare always runs).
+const DUMMY_BCRYPT_HASH =
+  "$2b$10$abcdefghijklmnopqrstuv.abcdefghijklmnopqrstuvwxyz012345";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
@@ -31,9 +36,19 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parsed.data;
 
+    // Trim only — email casing as entered by an admin (or at signup) is
+    // preserved in the DB, so the lookup must be case-insensitive rather
+    // than forcing lowercase on the input.
+    const emailInput = email.trim();
+
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: emailInput,
+          mode: "insensitive",
+        },
+      },
       select: {
         id: true,
         email: true,
@@ -51,19 +66,18 @@ export async function POST(req: NextRequest) {
         position: true,
         profileImage: true,
         passwordHash: true,
+        tokenVersion: true,
       },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
+    // Always run bcrypt.compare, even when the user doesn't exist, so the
+    // response time doesn't reveal whether the email is registered.
+    const valid = await bcrypt.compare(
+      password,
+      user?.passwordHash ?? DUMMY_BCRYPT_HASH
+    );
 
-    // Verify password
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
+    if (!user || !valid) {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
@@ -95,13 +109,15 @@ export async function POST(req: NextRequest) {
         sub: user.id,
         email: user.email,
         role: user.role,
+        tokenVersion: user.tokenVersion,
       },
       "30d"
     );
 
-    // Strip passwordHash before returning
-    const { passwordHash: _, ...userSafe } = user;
+    // Strip passwordHash and tokenVersion before returning
+    const { passwordHash: _, tokenVersion: __, ...userSafe } = user;
     void _;
+    void __;
 
     return NextResponse.json({
       user: userSafe,

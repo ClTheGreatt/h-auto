@@ -22,11 +22,11 @@ export async function GET(req: NextRequest) {
     const monthParam = sp.get("month");
     const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null;
 
-    let plotFilter = {};
+    let plotFilter: Record<string, unknown> = { status: { not: "ARCHIVED" } };
     if (user.role === "STUDENT_FARMER") {
-      plotFilter = { assignments: { some: { studentId: user.id, status: "ACTIVE" } } };
+      plotFilter = { ...plotFilter, assignments: { some: { studentId: user.id, status: "ACTIVE" } } };
     } else if (user.role === "FACULTY") {
-      plotFilter = { assignments: { some: { facultyId: user.id, status: "ACTIVE" } } };
+      plotFilter = { ...plotFilter, assignments: { some: { facultyId: user.id, status: "ACTIVE" } } };
     }
 
     const accessiblePlots = await prisma.plot.findMany({

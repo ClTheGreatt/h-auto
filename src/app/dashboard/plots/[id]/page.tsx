@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { timeAgo } from "@/lib/format-date";
 import { isDeviceOnline } from "@/lib/utils/device-status";
+import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { LatestReadings } from "@/components/devices/latest-readings";
 import { LiveRefresh } from "@/components/plots/live-refresh";
@@ -29,6 +30,7 @@ const statusLabels: Record<PlotStatus, string> = {
   READY_FOR_HARVEST: "Ready for harvest",
   HARVESTED: "Harvested",
   FALLOW: "Fallow",
+  ARCHIVED: "Archived",
 };
 
 const statusColors: Record<PlotStatus, string> = {
@@ -38,6 +40,7 @@ const statusColors: Record<PlotStatus, string> = {
   READY_FOR_HARVEST: "bg-amber-100 text-amber-700",
   HARVESTED: "bg-purple-100 text-purple-700",
   FALLOW: "bg-stone-100 text-stone-700",
+  ARCHIVED: "bg-gray-200 text-gray-600",
 };
 
 export default async function PlotDetailPage({
@@ -83,12 +86,20 @@ export default async function PlotDetailPage({
   });
 
   if (!plot) notFound();
+  if (plot.status === "ARCHIVED" && role !== "SUPER_ADMIN" && role !== "ADMIN") {
+    redirect("/dashboard/plots");
+  }
 
   if (role === "STUDENT_FARMER") {
     const isAssigned = plot.assignments.some(
       (a) => a.student.id === session.user.id
     );
     if (!isAssigned) redirect("/dashboard/plots");
+  }
+
+  if (role === "FACULTY") {
+    const hasAccess = await canFacultyAccessPlot(session.user.id, plot.id);
+    if (!hasAccess) redirect("/dashboard/plots");
   }
 
   const isAssignedStudent = plot.assignments.some(

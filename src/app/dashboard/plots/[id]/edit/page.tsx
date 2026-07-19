@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { PlotForm } from "@/components/plots/plot-form";
@@ -31,6 +31,10 @@ export default async function EditPlotPage({
   ]);
 
   if (!plot) notFound();
+  // Archived plots aren't edited in place — restore/un-archive first
+  // (restore UI deferred; for now this just prevents editing a plot that's
+  // supposed to be a frozen historical record).
+  if (plot.status === "ARCHIVED") redirect("/dashboard/plots");
 
   return (
     <div className="space-y-6 max-w-4xl">

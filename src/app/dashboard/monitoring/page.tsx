@@ -33,15 +33,18 @@ export default async function MonitoringPage({
     dateWindow = { gte: start, lt: end };
   }
 
-  // Role-aware base filter
-  const plotFilter =
-    role === "STUDENT_FARMER"
+  // Role-aware base filter. Archived plots (and their logs) are excluded
+  // from this active-activity view.
+  const plotFilter = {
+    status: { not: "ARCHIVED" as const },
+    ...(role === "STUDENT_FARMER"
       ? {
           assignments: {
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
-      : {};
+      : {}),
+  };
 
   // Build log filter
   const logFilter = {

@@ -9,11 +9,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Role-based plot access
-    let whereClause = {};
+    // Role-based plot access. Archived plots are always excluded.
+    let whereClause: Record<string, unknown> = { status: { not: "ARCHIVED" } };
 
     if (user.role === "STUDENT_FARMER") {
       whereClause = {
+        ...whereClause,
         assignments: {
           some: {
             studentId: user.id,
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
       };
     } else if (user.role === "FACULTY") {
       whereClause = {
+        ...whereClause,
         assignments: {
           some: {
             facultyId: user.id,
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
         },
       };
     }
-    // ADMIN and SUPER_ADMIN: see all plots (empty where = no filter)
+    // ADMIN and SUPER_ADMIN: see all non-archived plots (no extra filter)
 
     const plots = await prisma.plot.findMany({
       where: whereClause,
