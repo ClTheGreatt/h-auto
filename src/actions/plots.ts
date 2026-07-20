@@ -103,3 +103,52 @@ export async function restorePlot(id: string) {
   revalidatePath(`/dashboard/plots/${id}`);
   return { success: true };
 }
+
+export async function harvestPlot(id: string) {
+  await requireAdmin();
+
+  const plot = await prisma.plot.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!plot) return { error: "Plot not found" };
+  if (plot.status === "HARVESTED") {
+    return { error: "Plot is already harvested." };
+  }
+  if (plot.status === "ARCHIVED") {
+    return { error: "Cannot harvest an archived plot." };
+  }
+
+  await prisma.plot.update({
+    where: { id },
+    data: { status: "HARVESTED", harvestedAt: new Date() },
+  });
+
+  revalidatePath("/dashboard/plots");
+  revalidatePath("/dashboard/plots/archived");
+  revalidatePath(`/dashboard/plots/${id}`);
+  return { success: true };
+}
+
+export async function unharvestPlot(id: string) {
+  await requireAdmin();
+
+  const plot = await prisma.plot.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!plot) return { error: "Plot not found" };
+  if (plot.status !== "HARVESTED") {
+    return { error: "Plot is not harvested." };
+  }
+
+  await prisma.plot.update({
+    where: { id },
+    data: { status: "GROWING", harvestedAt: null },
+  });
+
+  revalidatePath("/dashboard/plots");
+  revalidatePath("/dashboard/plots/archived");
+  revalidatePath(`/dashboard/plots/${id}`);
+  return { success: true };
+}
