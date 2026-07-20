@@ -19,6 +19,12 @@ export default async function NewPlotPage() {
     },
   });
 
+  const faculty = await prisma.user.findMany({
+    where: { role: "FACULTY", status: "ACTIVE" },
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  });
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -43,6 +49,7 @@ export default async function NewPlotPage() {
           daysToHarvest: c.daysToHarvest,
           stages: c.stages,
         }))}
+        faculty={faculty}
       />
     </div>
   );

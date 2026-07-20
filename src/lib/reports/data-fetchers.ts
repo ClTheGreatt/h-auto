@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { UserRole } from "@prisma/client";
 import { getDateFromRange, type TimeRange } from "@/lib/analytics/time-range";
 
 export type ReportFilters = {
@@ -6,13 +7,29 @@ export type ReportFilters = {
   plotId?: string;
 };
 
-export async function fetchSensorReadingsData(filters: ReportFilters) {
+export type ScopedReportFilters = ReportFilters & {
+  role: UserRole;
+  userId: string;
+};
+
+// Plot-level scope for "all plots" (no specific plotId requested):
+// ADMIN/SUPER_ADMIN see everything, FACULTY only their advised plots,
+// STUDENT_FARMER only plots they're actively assigned to.
+function plotScopeWhere(role: UserRole, userId: string) {
+  if (role === "SUPER_ADMIN" || role === "ADMIN") return {};
+  if (role === "FACULTY") return { facultyId: userId };
+  return { assignments: { some: { studentId: userId, status: "ACTIVE" as const } } };
+}
+
+export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
   const readings = await prisma.sensorReading.findMany({
     where: {
       ...(since ? { recordedAt: { gte: since } } : {}),
-      ...(filters.plotId ? { plotId: filters.plotId } : {}),
+      ...(filters.plotId
+        ? { plotId: filters.plotId }
+        : { plot: plotScopeWhere(filters.role, filters.userId) }),
     },
     orderBy: { recordedAt: "desc" },
     take: 5000,
@@ -37,10 +54,11 @@ export async function fetchSensorReadingsData(filters: ReportFilters) {
   }));
 }
 
-export async function fetchPlotPerformanceData(filters: ReportFilters) {
+export async function fetchPlotPerformanceData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
   const plots = await prisma.plot.findMany({
+    where: plotScopeWhere(filters.role, filters.userId),
     orderBy: { name: "asc" },
     include: {
       crop: { select: { name: true, variety: true } },
@@ -96,13 +114,15 @@ export async function fetchPlotPerformanceData(filters: ReportFilters) {
   return result;
 }
 
-export async function fetchGrowthLogData(filters: ReportFilters) {
+export async function fetchGrowthLogData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
   const logs = await prisma.growthLog.findMany({
     where: {
       ...(since ? { createdAt: { gte: since } } : {}),
-      ...(filters.plotId ? { plotId: filters.plotId } : {}),
+      ...(filters.plotId
+        ? { plotId: filters.plotId }
+        : { plot: plotScopeWhere(filters.role, filters.userId) }),
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -126,13 +146,15 @@ export async function fetchGrowthLogData(filters: ReportFilters) {
   }));
 }
 
-export async function fetchAlertsData(filters: ReportFilters) {
+export async function fetchAlertsData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
   const alerts = await prisma.alert.findMany({
     where: {
       ...(since ? { createdAt: { gte: since } } : {}),
-      ...(filters.plotId ? { plotId: filters.plotId } : {}),
+      ...(filters.plotId
+        ? { plotId: filters.plotId }
+        : { plot: plotScopeWhere(filters.role, filters.userId) }),
     },
     orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
     include: {
@@ -283,11 +305,23 @@ export async function fetchActivityData(filters: ReportFilters) {
   return events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 }
 
-export async function fetchStudentActivityData(filters: ReportFilters) {
+export async function fetchStudentActivityData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
   const students = await prisma.user.findMany({
-    where: { role: "STUDENT_FARMER" },
+    where: {
+      role: "STUDENT_FARMER",
+      ...(filters.role === "SUPER_ADMIN" || filters.role === "ADMIN"
+        ? {}
+        : {
+            studentAssignments: {
+              some: {
+                status: "ACTIVE",
+                plot: plotScopeWhere(filters.role, filters.userId),
+              },
+            },
+          }),
+    },
     orderBy: { firstName: "asc" },
     select: {
       id: true,

@@ -3,29 +3,28 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
-import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
+import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import { growthLogSchema, type GrowthLogFormValues } from "@/lib/validations/growth";
-
-async function canAccessPlot(plotId: string, userId: string, role: string) {
-  if (role === "SUPER_ADMIN" || role === "ADMIN") {
-    return true;
-  }
-  if (role === "FACULTY") {
-    return canFacultyAccessPlot(userId, plotId);
-  }
-  const assignment = await prisma.plotAssignment.findFirst({
-    where: { plotId, studentId: userId, status: "ACTIVE" },
-  });
-  return !!assignment;
-}
 
 export async function createGrowthLog(plotId: string, input: GrowthLogFormValues) {
   const session = await requireAuth();
   const userId = session.user.id;
   const role = session.user.role;
 
-  const allowed = await canAccessPlot(plotId, userId, role);
+  const allowed = await assertCanAccessPlot(role, userId, plotId);
   if (!allowed) return { error: "You don't have access to this plot" };
+
+  const plot = await prisma.plot.findUnique({
+    where: { id: plotId },
+    select: { status: true },
+  });
+  if (!plot) return { error: "Plot not found" };
+  if (plot.status === "HARVESTED") {
+    return { error: "This plot is harvested. Unmark it to add growth logs." };
+  }
+  if (plot.status === "ARCHIVED") {
+    return { error: "This plot is archived. Restore it to add growth logs." };
+  }
 
   const parsed = growthLogSchema.safeParse(input);
   if (!parsed.success) return { error: "Invalid input" };

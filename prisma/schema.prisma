@@ -153,6 +153,7 @@ model User {
 
   facultyAssignments  PlotAssignment[]    @relation("FacultyAssignments")
   studentAssignments  PlotAssignment[]    @relation("StudentAssignments")
+  advisedPlots        Plot[]              @relation("PlotAdviser")
   growthLogs          GrowthLog[]
   reports             Report[]
   importBatches       ImportBatch[]
@@ -229,6 +230,7 @@ model Plot {
   sizeSqm         Float?
   cropId          String?
   currentStageId  String?
+  facultyId       String?
   plantingDate    DateTime?
   expectedHarvest DateTime?
   status          PlotStatus @default(PREPARING)
@@ -239,6 +241,7 @@ model Plot {
 
   crop          Crop?            @relation(fields: [cropId], references: [id])
   currentStage  CropStage?       @relation("CurrentStage", fields: [currentStageId], references: [id])
+  adviser       User?            @relation("PlotAdviser", fields: [facultyId], references: [id])
   device        Device?
   assignments   PlotAssignment[]
   sensorReadings SensorReading[]
@@ -247,6 +250,7 @@ model Plot {
 
   @@index([cropId])
   @@index([status])
+  @@index([facultyId])
 }
 
 model PlotAssignment {

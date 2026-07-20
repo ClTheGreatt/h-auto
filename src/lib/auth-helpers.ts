@@ -21,3 +21,17 @@ export async function requireAdmin() {
 export async function requireFaculty() {
   return requireRole(["SUPER_ADMIN", "ADMIN", "FACULTY"]);
 }
+
+const ADMIN_TIER: UserRole[] = ["ADMIN", "SUPER_ADMIN"];
+
+// Can `actorRole` create/assign `targetRole`?
+// Assigning an admin-tier role requires the actor to be SUPER_ADMIN.
+export function canAssignRole(actorRole: UserRole, targetRole: UserRole): boolean {
+  return !ADMIN_TIER.includes(targetRole) || actorRole === "SUPER_ADMIN";
+}
+
+// Can `actorRole` manage (edit/deactivate) a user whose current role is `targetCurrentRole`?
+// Managing an admin-tier account requires the actor to be SUPER_ADMIN.
+export function canManageUser(actorRole: UserRole, targetCurrentRole: UserRole): boolean {
+  return !ADMIN_TIER.includes(targetCurrentRole) || actorRole === "SUPER_ADMIN";
+}

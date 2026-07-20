@@ -17,6 +17,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
   }
 
+  const plot = await prisma.plot.findUnique({
+    where: { id: device.plotId },
+    select: { status: true },
+  });
+  if (!plot) {
+    return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+  }
+  if (plot.status === "HARVESTED" || plot.status === "ARCHIVED") {
+    return NextResponse.json(
+      { error: "Plot is not active (harvested or archived); reading rejected." },
+      { status: 409 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();

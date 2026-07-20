@@ -5,6 +5,7 @@ export const plotSchema = z.object({
   location: z.string().optional().or(z.literal("")),
   sizeSqm: z.number().nonnegative().nullable().optional(),
   cropId: z.string().nullable().optional(),
+  facultyId: z.string().nullable().optional(),
   currentStageId: z.string().nullable().optional(),
   plantingDate: z.string().optional().or(z.literal("")),
   expectedHarvest: z.string().optional().or(z.literal("")),

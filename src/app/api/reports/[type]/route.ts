@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { parseRange, TIME_RANGES } from "@/lib/analytics/time-range";
 import { prisma } from "@/lib/prisma";
+import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import {
   fetchSensorReadingsData,
   fetchPlotPerformanceData,
@@ -78,6 +79,16 @@ export async function GET(
   const range = parseRange(searchParams.get("range") ?? undefined);
   const plotId = searchParams.get("plotId") ?? undefined;
 
+  if (
+    plotId &&
+    !(await assertCanAccessPlot(session.user.role, session.user.id, plotId))
+  ) {
+    return NextResponse.json(
+      { error: "You don't have access to this plot." },
+      { status: 403 }
+    );
+  }
+
   const rangeLabel =
     TIME_RANGES.find((r) => r.value === range)?.label ?? "7 days";
 
@@ -98,7 +109,12 @@ export async function GET(
 
     switch (type) {
       case "sensor-readings": {
-        const data = await fetchSensorReadingsData({ range, plotId });
+        const data = await fetchSensorReadingsData({
+          range,
+          plotId,
+          role: session.user.role,
+          userId: session.user.id,
+        });
         if (format === "excel") {
           buffer = await generateSensorReadingsExcel(data, rangeLabel, plotName);
           mimeType = EXCEL_MIME;
@@ -111,7 +127,11 @@ export async function GET(
         break;
       }
       case "plot-performance": {
-        const data = await fetchPlotPerformanceData({ range });
+        const data = await fetchPlotPerformanceData({
+          range,
+          role: session.user.role,
+          userId: session.user.id,
+        });
         if (format === "excel") {
           buffer = await generatePlotPerformanceExcel(data, rangeLabel);
           mimeType = EXCEL_MIME;
@@ -124,7 +144,12 @@ export async function GET(
         break;
       }
       case "growth-log": {
-        const data = await fetchGrowthLogData({ range, plotId });
+        const data = await fetchGrowthLogData({
+          range,
+          plotId,
+          role: session.user.role,
+          userId: session.user.id,
+        });
         if (format === "excel") {
           buffer = await generateGrowthLogExcel(data, rangeLabel, plotName);
           mimeType = EXCEL_MIME;
@@ -137,7 +162,12 @@ export async function GET(
         break;
       }
       case "alerts": {
-        const data = await fetchAlertsData({ range, plotId });
+        const data = await fetchAlertsData({
+          range,
+          plotId,
+          role: session.user.role,
+          userId: session.user.id,
+        });
         if (format === "excel") {
           buffer = await generateAlertsExcel(data, rangeLabel, plotName);
           mimeType = EXCEL_MIME;
@@ -163,7 +193,11 @@ export async function GET(
         break;
       }
       case "student-activity": {
-        const data = await fetchStudentActivityData({ range });
+        const data = await fetchStudentActivityData({
+          range,
+          role: session.user.role,
+          userId: session.user.id,
+        });
         if (format === "excel") {
           buffer = await generateStudentActivityExcel(data, rangeLabel);
           mimeType = EXCEL_MIME;

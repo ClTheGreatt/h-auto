@@ -69,6 +69,8 @@ export default async function DashboardPage() {
           some: { studentId: userId, status: "ACTIVE" as const },
         },
       }
+    : isFaculty
+    ? { facultyId: userId }
     : {};
 
   const [

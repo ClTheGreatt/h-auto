@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdmin, canAssignRole, canManageUser } from "@/lib/auth-helpers";
 import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
 import {
@@ -52,7 +52,7 @@ function handlePrismaError(error: unknown): { error: string } | null {
 }
 
 export async function createUser(input: CreateUserInput) {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const schema = pickCreateSchema(input?.role);
   const parsed = schema.safeParse(input);
@@ -61,6 +61,10 @@ export async function createUser(input: CreateUserInput) {
       error: "Invalid input",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
+  }
+
+  if (!canAssignRole(session.user.role, parsed.data.role)) {
+    return { error: "Only a Super Admin can create Admin or Super Admin accounts." };
   }
 
 const passwordHash = await bcrypt.hash(parsed.data.password, 10);
@@ -124,7 +128,7 @@ const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 }
 
 export async function updateUser(id: string, input: UpdateUserInput) {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const parsed = updateUserSchema.safeParse(input);
   if (!parsed.success) {
@@ -136,13 +140,21 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 
   const existingUser = await prisma.user.findUnique({
     where: { id },
-    select: { status: true, email: true },
+    select: { status: true, email: true, role: true },
   });
   if (!existingUser) {
     return { error: "User not found" };
   }
 
+  if (!canManageUser(session.user.role, existingUser.role)) {
+    return { error: "Only a Super Admin can manage Admin or Super Admin accounts." };
+  }
+
   const { password, ...rest } = parsed.data;
+
+  if (rest.role !== existingUser.role && !canAssignRole(session.user.role, rest.role)) {
+    return { error: "Only a Super Admin can assign Admin or Super Admin roles." };
+  }
 
   const updateData: Record<string, unknown> = {
     ...rest,

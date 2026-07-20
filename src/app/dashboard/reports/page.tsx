@@ -19,6 +19,8 @@ export default async function ReportsPage() {
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
+      : role === "FACULTY"
+      ? { facultyId: session.user.id }
       : {}),
   };
 

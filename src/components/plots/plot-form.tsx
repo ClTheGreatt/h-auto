@@ -35,16 +35,20 @@ type CropOption = {
   stages: Array<{ id: string; name: string; orderIndex: number }>;
 };
 
+type FacultyOption = { id: string; firstName: string; lastName: string };
+
 type PlotFormProps = {
   mode: "create" | "edit";
   plotId?: string;
   crops: CropOption[];
+  faculty: FacultyOption[];
   defaultValues?: Partial<PlotFormValues>;
 };
 
 const NO_CROP = "__none__";
+const NO_FACULTY = "__no_faculty__";
 
-export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) {
+export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,6 +59,7 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
       location: defaultValues?.location ?? "",
       sizeSqm: defaultValues?.sizeSqm ?? null,
       cropId: defaultValues?.cropId ?? null,
+      facultyId: defaultValues?.facultyId ?? null,
       currentStageId: defaultValues?.currentStageId ?? null,
       plantingDate: defaultValues?.plantingDate ?? "",
       expectedHarvest: defaultValues?.expectedHarvest ?? "",
@@ -244,6 +249,40 @@ export function PlotForm({ mode, plotId, crops, defaultValues }: PlotFormProps) 
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="facultyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Faculty adviser</FormLabel>
+                  <Select
+                    onValueChange={(v) =>
+                      field.onChange(v === NO_FACULTY ? null : v)
+                    }
+                    value={field.value ?? NO_FACULTY}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a faculty adviser" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_FACULTY}>None (no adviser)</SelectItem>
+                      {faculty.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.firstName} {f.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="text-xs">
+                    The faculty member responsible for advising this plot.
+                    Students can only be assigned once an adviser is set.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -74,6 +74,8 @@ export default async function AlertsPage({
             },
           },
         }
+      : role === "FACULTY"
+      ? { plot: { facultyId: session.user.id } }
       : {};
 
   // Build filter
@@ -99,6 +101,8 @@ export default async function AlertsPage({
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
+      : role === "FACULTY"
+      ? { facultyId: session.user.id }
       : {};
 
   // Counts for tabs (Open/Resolved) — use role filter only, not other filters

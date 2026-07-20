@@ -52,6 +52,8 @@ export default async function PlotsPage({
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
+      : role === "FACULTY"
+      ? { facultyId: session.user.id }
       : {};
 
   // Combined where clause. Archived plots are hidden unless a specific

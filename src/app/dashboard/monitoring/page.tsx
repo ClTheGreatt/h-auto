@@ -43,6 +43,8 @@ export default async function MonitoringPage({
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
+      : role === "FACULTY"
+      ? { facultyId: session.user.id }
       : {}),
   };
 

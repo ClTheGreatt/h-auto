@@ -252,6 +252,8 @@ export default async function AnalyticsPage({
             some: { studentId: session.user.id, status: "ACTIVE" as const },
           },
         }
+      : role === "FACULTY"
+      ? { facultyId: session.user.id }
       : {}),
   };
 
@@ -422,6 +424,8 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
           <p className="text-sm text-gray-500 mt-1">
             {selectedPlot
               ? `Detailed insights for ${selectedPlot.name}.`
+              : role === "FACULTY"
+              ? "Insights across your advised plots."
               : "System-wide insights and trends across all plots."}
           </p>
         </div>

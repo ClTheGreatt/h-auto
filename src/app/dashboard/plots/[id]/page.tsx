@@ -9,6 +9,7 @@ import {
   Ruler,
   Plus,
   AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ import { isDeviceOnline } from "@/lib/utils/device-status";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { RestorePlotDialog } from "@/components/plots/restore-plot-dialog";
+import { HarvestPlotDialog } from "@/components/plots/harvest-plot-dialog";
+import { UnharvestPlotDialog } from "@/components/plots/unharvest-plot-dialog";
 import { LatestReadings } from "@/components/devices/latest-readings";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { GrowthTimeline } from "@/components/growth/growth-timeline";
@@ -95,6 +98,7 @@ export default async function PlotDetailPage({
   // Admins can view an archived plot (historical data stays inspectable),
   // but every mutating action on it is disabled — restore it first.
   const isArchived = plot.status === "ARCHIVED";
+  const isHarvested = plot.status === "HARVESTED";
 
   if (role === "STUDENT_FARMER") {
     const isAssigned = plot.assignments.some(
@@ -184,6 +188,29 @@ export default async function PlotDetailPage({
           </div>
         )}
 
+        {isHarvested && !isArchived && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 mb-4 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+            <div className="flex items-start gap-2 text-sm">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                This plot is harvested. Sensor ingest and new growth logs
+                are paused. Unmark to resume.
+              </span>
+            </div>
+            {isAdmin && (
+              <UnharvestPlotDialog
+                plotId={plot.id}
+                plotName={plot.name}
+                trigger={
+                  <Button size="sm" className="shrink-0">
+                    Unmark
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -209,6 +236,15 @@ export default async function PlotDetailPage({
               <Button variant="outline" asChild>
                 <Link href={`/dashboard/plots/${plot.id}/edit`}>Edit plot</Link>
               </Button>
+            )}
+            {canEditPlot && !isArchived && !isHarvested && (
+              <HarvestPlotDialog
+                plotId={plot.id}
+                plotName={plot.name}
+                trigger={
+                  <Button variant="outline">Mark as harvested</Button>
+                }
+              />
             )}
           </div>
       </div>

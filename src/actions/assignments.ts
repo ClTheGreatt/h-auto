@@ -12,11 +12,23 @@ export async function assignStudent(
 ) {
   const session = await requireFaculty();
 
-  // FACULTY is scoped to plots they actively advise; ADMIN/SUPER_ADMIN keep
-  // unrestricted access.
-  if (session.user.role === "FACULTY") {
-    const hasAccess = await canFacultyAccessPlot(session.user.id, plotId);
-    if (!hasAccess) return { error: "You don't have access to this plot" };
+  const plot = await prisma.plot.findUnique({
+    where: { id: plotId },
+    select: { facultyId: true },
+  });
+  if (!plot) return { error: "Plot not found" };
+
+  // No adviser set yet: a PlotAssignment requires a non-null facultyId, and
+  // there's no adviser to record it as. Block every caller (including
+  // admins) until an adviser is assigned to the plot first.
+  if (!plot.facultyId) {
+    return { error: "Set a plot adviser before assigning students." };
+  }
+
+  // Faculty may only assign students on plots they actually advise;
+  // ADMIN/SUPER_ADMIN keep unrestricted access.
+  if (session.user.role === "FACULTY" && plot.facultyId !== session.user.id) {
+    return { error: "You are not the adviser of this plot." };
   }
 
   const student = await prisma.user.findUnique({ where: { id: studentId } });
@@ -35,7 +47,7 @@ export async function assignStudent(
     data: {
       plotId,
       studentId,
-      facultyId: session.user.id,
+      facultyId: plot.facultyId,
       notes: notes || null,
       status: "ACTIVE",
     },
