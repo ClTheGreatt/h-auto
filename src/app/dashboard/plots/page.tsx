@@ -21,6 +21,14 @@ const VALID_STATUSES: PlotStatus[] = [
   "FALLOW",
 ];
 
+const ACTIVE_STATUSES = [
+  "PREPARING",
+  "PLANTED",
+  "GROWING",
+  "READY_FOR_HARVEST",
+] as const;
+const COMPLETED_STATUSES = ["HARVESTED", "FALLOW"] as const;
+
 export default async function PlotsPage({
   searchParams,
 }: {
@@ -28,6 +36,7 @@ export default async function PlotsPage({
     search?: string;
     cropId?: string;
     status?: string;
+    view?: string;
     page?: string;
   }>;
 }) {
@@ -42,6 +51,7 @@ export default async function PlotsPage({
     sp.status && VALID_STATUSES.includes(sp.status as PlotStatus)
       ? (sp.status as PlotStatus)
       : undefined;
+  const view = sp.view === "completed" ? "completed" : "active";
   const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
 
   // Role-based base filter
@@ -56,12 +66,18 @@ export default async function PlotsPage({
       ? { facultyId: session.user.id }
       : {};
 
-  // Combined where clause. Archived plots are hidden unless a specific
-  // status filter is explicitly requested (VALID_STATUSES doesn't include
-  // ARCHIVED, so `status` here is never that value).
+  // Status scope: an explicit ?status= pick wins outright (unchanged
+  // dropdown behavior); otherwise fall back to the current tab's status
+  // bucket. Both buckets exclude ARCHIVED by construction, so archived
+  // plots never leak into either tab.
+  const statusWhere: Prisma.PlotWhereInput = status
+    ? { status }
+    : { status: { in: view === "completed" ? [...COMPLETED_STATUSES] : [...ACTIVE_STATUSES] } };
+
+  // Combined where clause.
   const where: Prisma.PlotWhereInput = {
     ...roleFilter,
-    status: status ?? { not: "ARCHIVED" },
+    ...statusWhere,
     ...(cropId && { cropId }),
     ...(search && {
       OR: [
@@ -99,6 +115,17 @@ export default async function PlotsPage({
   const totalPages = Math.max(1, Math.ceil(totalPlots / PAGE_SIZE));
   const hasFilters = Boolean(search || cropId || status);
 
+  // Build URL preserving filters when switching tabs (page resets to 1)
+  function tabUrl(targetView: "active" | "completed"): string {
+    const p = new URLSearchParams();
+    if (targetView === "completed") p.set("view", "completed");
+    if (search) p.set("search", search);
+    if (cropId) p.set("cropId", cropId);
+    if (status) p.set("status", status);
+    const qs = p.toString();
+    return `/dashboard/plots${qs ? "?" + qs : ""}`;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -127,6 +154,32 @@ export default async function PlotsPage({
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Active/Completed tabs */}
+      <div className="flex items-center gap-2">
+        <Link
+          href={tabUrl("active")}
+          className={
+            "px-3 py-1.5 rounded-md text-sm transition " +
+            (view === "active"
+              ? "bg-green-100 text-green-700 font-medium"
+              : "text-gray-600 hover:bg-gray-100")
+          }
+        >
+          Active
+        </Link>
+        <Link
+          href={tabUrl("completed")}
+          className={
+            "px-3 py-1.5 rounded-md text-sm transition " +
+            (view === "completed"
+              ? "bg-green-100 text-green-700 font-medium"
+              : "text-gray-600 hover:bg-gray-100")
+          }
+        >
+          Completed
+        </Link>
       </div>
 
       {/* Filters */}
