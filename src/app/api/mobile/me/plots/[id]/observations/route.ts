@@ -41,13 +41,25 @@ export async function POST(
       : null;
     const leafCount = leafCountRaw ? parseInt(leafCountRaw, 10) : null;
 
-    // Get plot's current stage (for stageId)
+    // Get plot's current stage (for stageId) + status (for the harvest guard)
     const plot = await prisma.plot.findUnique({
       where: { id: plotId },
-      select: { currentStageId: true },
+      select: { currentStageId: true, status: true },
     });
     if (!plot) {
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+    }
+    if (plot.status === "HARVESTED") {
+      return NextResponse.json(
+        { error: "This plot is harvested. Unmark it to add growth logs." },
+        { status: 409 }
+      );
+    }
+    if (plot.status === "ARCHIVED") {
+      return NextResponse.json(
+        { error: "This plot is archived. Restore it to add growth logs." },
+        { status: 409 }
+      );
     }
 
     // Upload image if provided

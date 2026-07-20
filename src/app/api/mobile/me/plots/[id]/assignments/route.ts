@@ -100,8 +100,10 @@ export async function GET(
 }
 
 // POST /api/mobile/me/plots/[id]/assignments — assign a student to a plot.
-// Mirrors src/actions/assignments.ts's assignStudent exactly: Faculty,
-// Admin, or Super Admin only, no plot-ownership check (matching web).
+// Mirrors src/actions/assignments.ts's assignStudent exactly: the plot
+// must already have an adviser (facultyId), a Faculty caller must BE that
+// adviser (Admin/Super Admin may assign on any plot), and the created
+// assignment's facultyId is the plot's real adviser, not the caller.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -132,10 +134,22 @@ export async function POST(
 
     const plot = await prisma.plot.findUnique({
       where: { id: plotId },
-      select: { id: true },
+      select: { id: true, facultyId: true },
     });
     if (!plot) {
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+    }
+    if (!plot.facultyId) {
+      return NextResponse.json(
+        { error: "Set a plot adviser before assigning students." },
+        { status: 409 }
+      );
+    }
+    if (user.role === "FACULTY" && plot.facultyId !== user.id) {
+      return NextResponse.json(
+        { error: "You are not the adviser of this plot." },
+        { status: 403 }
+      );
     }
 
     const student = await prisma.user.findUnique({
@@ -165,7 +179,7 @@ export async function POST(
       data: {
         plotId,
         studentId,
-        facultyId: user.id,
+        facultyId: plot.facultyId,
         notes: notes?.trim() || null,
         status: "ACTIVE",
       },

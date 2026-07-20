@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 
 function isFacultyOrAdmin(role: string) {
   return role === "FACULTY" || role === "ADMIN" || role === "SUPER_ADMIN";
@@ -25,6 +26,14 @@ export async function DELETE(
   const { id: plotId, assignmentId } = await params;
 
   try {
+    if (user.role === "FACULTY") {
+      const hasAccess = await canFacultyAccessPlot(user.id, plotId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+    // ADMIN/SUPER_ADMIN: no extra check
+
     const assignment = await prisma.plotAssignment.findUnique({
       where: { id: assignmentId },
     });

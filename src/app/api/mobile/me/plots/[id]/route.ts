@@ -35,6 +35,14 @@ export async function GET(
         plantingDate: true,
         expectedHarvest: true,
         sizeSqm: true,
+        facultyId: true,
+        adviser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         crop: {
           select: {
             id: true,
@@ -89,6 +97,15 @@ export async function GET(
       },
     });
 
+    // Faculty may only manage assignments on the plot they advise; Admin/
+    // Super Admin manage any plot; Students never manage assignments.
+    const canManageAssignments =
+      user.role === "ADMIN" || user.role === "SUPER_ADMIN"
+        ? true
+        : user.role === "FACULTY"
+          ? plot.facultyId === user.id
+          : false;
+
     // Fetch recent observations
 const observations = await prisma.growthLog.findMany({
   where: { plotId: id },
@@ -138,6 +155,8 @@ const observations = await prisma.growthLog.findMany({
         expectedHarvest: plot.expectedHarvest?.toISOString() ?? null,
         crop: plot.crop,
         currentStage: plot.currentStage,
+        adviser: plot.adviser,
+        canManageAssignments,
         device: plot.device
           ? {
               ...plot.device,
