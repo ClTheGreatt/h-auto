@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
         where: { studentId: user.id, status: "ACTIVE" },
       });
     } else if (user.role === "FACULTY") {
-      plotsAssigned = await prisma.plotAssignment.count({
-        where: { facultyId: user.id, status: "ACTIVE" },
+      plotsAssigned = await prisma.plot.count({
+        where: { facultyId: user.id },
       });
     } else {
       plotsAssigned = await prisma.plot.count();

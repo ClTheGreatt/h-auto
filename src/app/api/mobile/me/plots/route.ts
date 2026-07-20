@@ -25,12 +25,7 @@ export async function GET(req: NextRequest) {
     } else if (user.role === "FACULTY") {
       whereClause = {
         ...whereClause,
-        assignments: {
-          some: {
-            facultyId: user.id,
-            status: "ACTIVE",
-          },
-        },
+        facultyId: user.id,
       };
     }
     // ADMIN and SUPER_ADMIN: see all non-archived plots (no extra filter)

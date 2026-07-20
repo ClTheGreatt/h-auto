@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 
 const assignBodySchema = z.object({
   studentId: z.string().min(1, "studentId is required"),
@@ -13,9 +14,10 @@ function isFacultyOrAdmin(role: string) {
 }
 
 // GET /api/mobile/me/plots/[id]/assignments — list active assignments for
-// a plot. Faculty/Admin/Super Admin see it unconditionally; a Student
-// Farmer can see it only if they're themselves actively assigned to the
-// same plot (so they can see their fellow students on it).
+// a plot. Admin/Super Admin see it unconditionally; Faculty only if they're
+// the plot's adviser; a Student Farmer can see it only if they're
+// themselves actively assigned to the same plot (so they can see their
+// fellow students on it).
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,7 +38,12 @@ export async function GET(
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
     }
 
-    if (!isFacultyOrAdmin(user.role)) {
+    if (user.role === "FACULTY") {
+      const hasAccess = await canFacultyAccessPlot(user.id, plotId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else if (!isFacultyOrAdmin(user.role)) {
       const ownAssignment = await prisma.plotAssignment.findFirst({
         where: { plotId, studentId: user.id, status: "ACTIVE" },
       });
@@ -44,6 +51,7 @@ export async function GET(
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
+    // ADMIN/SUPER_ADMIN: no extra check
 
     const assignments = await prisma.plotAssignment.findMany({
       where: { plotId, status: "ACTIVE" },

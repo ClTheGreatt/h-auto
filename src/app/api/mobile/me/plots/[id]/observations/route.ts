@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { uploadToCloudinary } from "@/lib/cloudinary-server";
+import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 
 export async function POST(
   req: NextRequest,
@@ -16,28 +17,13 @@ export async function POST(
 
   try {
     // Access check
-    if (user.role === "STUDENT_FARMER") {
-      const access = await prisma.plotAssignment.findFirst({
-        where: { plotId, studentId: user.id, status: "ACTIVE" },
-      });
-      if (!access) {
-        return NextResponse.json(
-          { error: "You don't have access to this plot" },
-          { status: 403 }
-        );
-      }
-    } else if (user.role === "FACULTY") {
-      const access = await prisma.plotAssignment.findFirst({
-        where: { plotId, facultyId: user.id, status: "ACTIVE" },
-      });
-      if (!access) {
-        return NextResponse.json(
-          { error: "You don't have access to this plot" },
-          { status: 403 }
-        );
-      }
+    const access = await assertCanAccessPlot(user.role, user.id, plotId);
+    if (!access) {
+      return NextResponse.json(
+        { error: "You don't have access to this plot" },
+        { status: 403 }
+      );
     }
-    // ADMIN/SUPER_ADMIN: pass through
 
     // Parse multipart form
     const formData = await req.formData();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 
 export async function GET(
   req: NextRequest,
@@ -15,36 +16,13 @@ export async function GET(
 
   try {
     // Role-based access check
-    if (user.role === "STUDENT_FARMER") {
-      const hasAccess = await prisma.plotAssignment.findFirst({
-        where: {
-          plotId: id,
-          studentId: user.id,
-          status: "ACTIVE",
-        },
-      });
-      if (!hasAccess) {
-        return NextResponse.json(
-          { error: "You don't have access to this plot" },
-          { status: 403 }
-        );
-      }
-    } else if (user.role === "FACULTY") {
-      const hasAccess = await prisma.plotAssignment.findFirst({
-        where: {
-          plotId: id,
-          facultyId: user.id,
-          status: "ACTIVE",
-        },
-      });
-      if (!hasAccess) {
-        return NextResponse.json(
-          { error: "You don't have access to this plot" },
-          { status: 403 }
-        );
-      }
+    const hasAccess = await assertCanAccessPlot(user.role, user.id, id);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "You don't have access to this plot" },
+        { status: 403 }
+      );
     }
-    // ADMIN / SUPER_ADMIN: no extra check
 
     // Fetch plot with relations
     const plot = await prisma.plot.findUnique({

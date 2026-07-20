@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     if (user.role === "STUDENT_FARMER") {
       plotFilter = { ...plotFilter, assignments: { some: { studentId: user.id, status: "ACTIVE" } } };
     } else if (user.role === "FACULTY") {
-      plotFilter = { ...plotFilter, assignments: { some: { facultyId: user.id, status: "ACTIVE" } } };
+      plotFilter = { ...plotFilter, facultyId: user.id };
     }
 
     const accessiblePlots = await prisma.plot.findMany({

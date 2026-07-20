@@ -4,6 +4,8 @@ export function plotScopeFilter(role: string, userId: string, plotId?: string) {
   const base =
     role === "STUDENT_FARMER"
       ? { assignments: { some: { studentId: userId, status: "ACTIVE" as const } } }
+      : role === "FACULTY"
+      ? { facultyId: userId }
       : {};
   return plotId ? { ...base, id: plotId } : base;
 }

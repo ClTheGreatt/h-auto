@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     } else if (user.role === "FACULTY") {
       plotFilter = {
         ...plotFilter,
-        assignments: { some: { facultyId: user.id, status: "ACTIVE" } },
+        facultyId: user.id,
       };
     }
 

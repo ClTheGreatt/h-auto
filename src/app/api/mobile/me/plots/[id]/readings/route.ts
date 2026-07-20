@@ -26,7 +26,7 @@ export async function GET(
     user.role === "STUDENT_FARMER"
       ? { assignments: { some: { studentId: user.id, status: "ACTIVE" as const } } }
       : user.role === "FACULTY"
-        ? { assignments: { some: { facultyId: user.id, status: "ACTIVE" as const } } }
+        ? { facultyId: user.id }
         : {};
 
   const plot = await prisma.plot.findFirst({
