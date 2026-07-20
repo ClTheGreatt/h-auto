@@ -7,7 +7,9 @@ import { PlotForm } from "@/components/plots/plot-form";
 export default async function NewPlotPage() {
   await requireAdmin();
 
+  // A brand-new plot should never be assignable to an archived crop.
   const crops = await prisma.crop.findMany({
+    where: { status: "ACTIVE" },
     orderBy: { name: "asc" },
     include: {
       stages: {

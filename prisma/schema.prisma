@@ -29,6 +29,11 @@ enum UserStatus {
   INACTIVE
 }
 
+enum CropStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 enum PlotStatus {
   PREPARING
   PLANTED
@@ -170,11 +175,15 @@ model Crop {
   imageUrl       String?
   daysToHarvest  Int
   cultivationGuide String?   @db.Text
+  status         CropStatus  @default(ACTIVE)
+  archivedAt     DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   stages CropStage[]
   plots  Plot[]
+
+  @@index([status])
 }
 
 model CropStage {
@@ -223,6 +232,7 @@ model Plot {
   plantingDate    DateTime?
   expectedHarvest DateTime?
   status          PlotStatus @default(PREPARING)
+  archivedAt      DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 

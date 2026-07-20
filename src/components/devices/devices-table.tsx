@@ -57,7 +57,7 @@ type DeviceRow = {
   status: DeviceStatus;
   lastSeenAt: Date | null;
   firmwareVersion: string | null;
-  plot: { name: string; location: string | null };
+  plot: { id: string; name: string; location: string | null };
   _count: { readings: number };
 };
 
@@ -166,7 +166,7 @@ export function DevicesTable({
                 </TableCell>
                 <TableCell>
                   <Link
-                    href={`/dashboard/plots/${d.plot.name}`}
+                    href={`/dashboard/plots/${d.plot.id}`}
                     className="text-sm hover:underline"
                   >
                     {d.plot.name}

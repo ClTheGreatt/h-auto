@@ -72,7 +72,34 @@ export async function archivePlot(id: string) {
     return { error: `Cannot archive: ${assignmentCount} active assignment(s) exist. End them first.` };
   }
 
-  await prisma.plot.update({ where: { id }, data: { status: "ARCHIVED" } });
+  await prisma.plot.update({
+    where: { id },
+    data: { status: "ARCHIVED", archivedAt: new Date() },
+  });
   revalidatePath("/dashboard/plots");
+  revalidatePath("/dashboard/plots/archived");
+  return { success: true };
+}
+
+// Admin/Super Admin only (requireAdmin) — Faculty cannot restore. Restores
+// to PREPARING as a safe re-entry state; the admin can transition it to
+// whatever status actually applies via the edit form afterward.
+export async function restorePlot(id: string) {
+  await requireAdmin();
+
+  const plot = await prisma.plot.findUnique({ where: { id } });
+  if (!plot) return { error: "Plot not found" };
+  if (plot.status !== "ARCHIVED") {
+    return { error: "Plot is not archived" };
+  }
+
+  await prisma.plot.update({
+    where: { id },
+    data: { status: "PREPARING", archivedAt: null },
+  });
+
+  revalidatePath("/dashboard/plots");
+  revalidatePath("/dashboard/plots/archived");
+  revalidatePath(`/dashboard/plots/${id}`);
   return { success: true };
 }

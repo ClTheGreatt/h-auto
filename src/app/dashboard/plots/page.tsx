@@ -110,12 +110,20 @@ export default async function PlotsPage({
           </p>
         </div>
         {canManage && (
-          <Button data-tour="plots.add-button" asChild>
-            <Link href="/dashboard/plots/new">
-              <Plus className="w-4 h-4 mr-2" />
-              Add plot
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/plots/archived"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              View archived plots
             </Link>
-          </Button>
+            <Button data-tour="plots.add-button" asChild>
+              <Link href="/dashboard/plots/new">
+                <Plus className="w-4 h-4 mr-2" />
+                Add plot
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

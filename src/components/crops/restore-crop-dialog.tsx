@@ -14,9 +14,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { archiveCrop } from "@/actions/crops";
+import { restoreCrop } from "@/actions/crops";
 
-export function DeleteCropDialog({
+export function RestoreCropDialog({
   cropId,
   cropName,
   trigger,
@@ -27,19 +27,19 @@ export function DeleteCropDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
-  async function handleArchive() {
-    setArchiving(true);
-    const result = await archiveCrop(cropId);
-    setArchiving(false);
+  async function handleRestore() {
+    setRestoring(true);
+    const result = await restoreCrop(cropId);
+    setRestoring(false);
 
     if (result?.error) {
       toast.error(result.error);
       return;
     }
 
-    toast.success("Crop archived");
+    toast.success("Crop restored");
     setOpen(false);
     router.refresh();
   }
@@ -49,25 +49,22 @@ export function DeleteCropDialog({
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Archive this crop?</AlertDialogTitle>
+          <AlertDialogTitle>Restore this crop?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will archive <strong>{cropName}</strong>. It will no longer
-            appear in the active crops list, but any plots currently using it
-            keep the reference. Historical crop data is preserved. You can
-            restore it later from the archived crops page.
+            <strong>{cropName}</strong> will reappear in the active crops
+            list. All historical data and plot references are preserved.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              handleArchive();
+              handleRestore();
             }}
-            disabled={archiving}
-            className="bg-red-600 hover:bg-red-700"
+            disabled={restoring}
           >
-            {archiving ? "Archiving..." : "Archive"}
+            {restoring ? "Restoring..." : "Restore"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

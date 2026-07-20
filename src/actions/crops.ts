@@ -80,17 +80,45 @@ export async function updateCrop(id: string, input: CropFormValues) {
   return { success: true };
 }
 
-export async function deleteCrop(id: string) {
+// Soft delete: archives the crop instead of a hard `delete`, so historical
+// crop data (and any plot that already references it) is preserved rather
+// than blocked or cascade-deleted. Plots keep their existing crop reference
+// even after it's archived — only new assignments are prevented (enforced
+// by the crop pickers on the plot create/edit forms, not here).
+export async function archiveCrop(id: string) {
   await requireAdmin();
 
-  const plotCount = await prisma.plot.count({ where: { cropId: id } });
-  if (plotCount > 0) {
-    return {
-      error: `Cannot delete: ${plotCount} plot(s) are using this crop. Reassign them first.`,
-    };
+  const crop = await prisma.crop.findUnique({ where: { id } });
+  if (!crop) return { error: "Crop not found" };
+  if (crop.status === "ARCHIVED") {
+    return { error: "Crop is already archived" };
   }
 
-  await prisma.crop.delete({ where: { id } });
+  await prisma.crop.update({
+    where: { id },
+    data: { status: "ARCHIVED", archivedAt: new Date() },
+  });
+
   revalidatePath("/dashboard/crops");
+  revalidatePath("/dashboard/crops/archived");
+  return { success: true };
+}
+
+export async function restoreCrop(id: string) {
+  await requireAdmin();
+
+  const crop = await prisma.crop.findUnique({ where: { id } });
+  if (!crop) return { error: "Crop not found" };
+  if (crop.status !== "ARCHIVED") {
+    return { error: "Crop is not archived" };
+  }
+
+  await prisma.crop.update({
+    where: { id },
+    data: { status: "ACTIVE", archivedAt: null },
+  });
+
+  revalidatePath("/dashboard/crops");
+  revalidatePath("/dashboard/crops/archived");
   return { success: true };
 }

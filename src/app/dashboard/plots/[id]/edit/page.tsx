@@ -17,24 +17,29 @@ export default async function EditPlotPage({
   await requireAdmin();
   const { id } = await params;
 
-  const [plot, crops] = await Promise.all([
-    prisma.plot.findUnique({ where: { id } }),
-    prisma.crop.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        stages: {
-          orderBy: { orderIndex: "asc" },
-          select: { id: true, name: true, orderIndex: true },
-        },
-      },
-    }),
-  ]);
+  const plot = await prisma.plot.findUnique({ where: { id } });
 
   if (!plot) notFound();
   // Archived plots aren't edited in place — restore/un-archive first
   // (restore UI deferred; for now this just prevents editing a plot that's
   // supposed to be a frozen historical record).
   if (plot.status === "ARCHIVED") redirect("/dashboard/plots");
+
+  // Only offer active crops for (re)assignment, except the plot's current
+  // crop even if it's since been archived — otherwise the dropdown would
+  // silently drop the existing selection.
+  const crops = await prisma.crop.findMany({
+    where: plot.cropId
+      ? { OR: [{ status: "ACTIVE" }, { id: plot.cropId }] }
+      : { status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    include: {
+      stages: {
+        orderBy: { orderIndex: "asc" },
+        select: { id: true, name: true, orderIndex: true },
+      },
+    },
+  });
 
   return (
     <div className="space-y-6 max-w-4xl">

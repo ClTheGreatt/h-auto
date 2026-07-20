@@ -26,15 +26,17 @@ export default async function CropsPage({
   const sort = params.sort ?? "name-asc";
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  // 🔍 Search: crop name or variety (case-insensitive)
-  const where: Prisma.CropWhereInput = q
-    ? {
-        OR: [
-          { name: { contains: q, mode: "insensitive" } },
-          { variety: { contains: q, mode: "insensitive" } },
-        ],
-      }
-    : {};
+  // 🔍 Search: crop name or variety (case-insensitive). Archived crops are
+  // hidden from the active list — see /dashboard/crops/archived.
+  const where: Prisma.CropWhereInput = {
+    status: "ACTIVE",
+    ...(q && {
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { variety: { contains: q, mode: "insensitive" } },
+      ],
+    }),
+  };
 
   // 🎛️ Sort
   let orderBy: Prisma.CropOrderByWithRelationInput;
@@ -85,12 +87,20 @@ export default async function CropsPage({
             Manage crop profiles and ideal thresholds for each growth stage.
           </p>
         </div>
-        <Button data-tour="crops.add-button" asChild>
-          <Link href="/dashboard/crops/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Add crop
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/crops/archived"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            View archived crops
           </Link>
-        </Button>
+          <Button data-tour="crops.add-button" asChild>
+            <Link href="/dashboard/crops/new">
+              <Plus className="w-4 h-4 mr-2" />
+              Add crop
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div data-tour="crops.list">

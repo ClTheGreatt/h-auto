@@ -11,7 +11,7 @@ export default async function DevicesPage() {
   const devices = await prisma.device.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      plot: { select: { name: true, location: true } },
+      plot: { select: { id: true, name: true, location: true } },
       _count: { select: { readings: true } },
     },
   });

@@ -8,6 +8,7 @@ import {
   Calendar,
   Ruler,
   Plus,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { timeAgo } from "@/lib/format-date";
 import { isDeviceOnline } from "@/lib/utils/device-status";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
+import { RestorePlotDialog } from "@/components/plots/restore-plot-dialog";
 import { LatestReadings } from "@/components/devices/latest-readings";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { GrowthTimeline } from "@/components/growth/growth-timeline";
@@ -90,6 +92,10 @@ export default async function PlotDetailPage({
     redirect("/dashboard/plots");
   }
 
+  // Admins can view an archived plot (historical data stays inspectable),
+  // but every mutating action on it is disabled — restore it first.
+  const isArchived = plot.status === "ARCHIVED";
+
   if (role === "STUDENT_FARMER") {
     const isAssigned = plot.assignments.some(
       (a) => a.student.id === session.user.id
@@ -105,9 +111,10 @@ export default async function PlotDetailPage({
   const isAssignedStudent = plot.assignments.some(
     (a) => a.student.id === session.user.id
   );
-  const canLogGrowth = canManageAssignments || isAssignedStudent;
+  const canLogGrowth = (canManageAssignments || isAssignedStudent) && !isArchived;
+  const canManageAssignmentsNow = canManageAssignments && !isArchived;
 
-  const availableStudents = canManageAssignments
+  const availableStudents = canManageAssignmentsNow
     ? await prisma.user.findMany({
         where: { role: "STUDENT_FARMER", status: "ACTIVE" },
         select: {
@@ -154,6 +161,29 @@ export default async function PlotDetailPage({
           Back to plots
         </Link>
 
+        {isArchived && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 mb-4 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+            <div className="flex items-start gap-2 text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                This plot is archived. Historical data is view-only. Restore
+                to make changes.
+              </span>
+            </div>
+            {isAdmin && (
+              <RestorePlotDialog
+                plotId={plot.id}
+                plotName={plot.name}
+                trigger={
+                  <Button size="sm" className="shrink-0">
+                    Restore
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -175,7 +205,7 @@ export default async function PlotDetailPage({
             <Button variant="outline" asChild>
               <Link href={`/dashboard/plots/${plot.id}/analytics`}>Analytics</Link>
             </Button>
-            {canEditPlot && (
+            {canEditPlot && !isArchived && (
               <Button variant="outline" asChild>
                 <Link href={`/dashboard/plots/${plot.id}/edit`}>Edit plot</Link>
               </Button>
@@ -276,7 +306,7 @@ export default async function PlotDetailPage({
             <div className="text-sm text-gray-500">
               No device linked to this plot yet. Link one from the Devices tab
               to start receiving readings.{" "}
-              {canEditPlot && (
+              {canEditPlot && !isArchived && (
                 <Link
                   href="/dashboard/devices/new"
                   className="text-green-600 hover:underline font-medium"
@@ -316,7 +346,7 @@ export default async function PlotDetailPage({
             plotId={plot.id}
             assignments={plot.assignments}
             availableStudents={availableStudents}
-            canManage={canManageAssignments}
+            canManage={canManageAssignmentsNow}
           />
         </CardContent>
       </Card>
