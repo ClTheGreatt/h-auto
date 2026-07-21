@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
-import ExcelJS from "exceljs";
 import { toast } from "sonner";
 import {
   Upload,
@@ -26,18 +25,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import {
-  facultyImportRowSchema,
-  studentImportRowSchema,
-  type ImportRowType,
-} from "@/lib/validations/import";
+import { type ImportRowType } from "@/lib/validations/import";
 import { commitImport } from "@/actions/import";
-
-type ParsedRow = {
-  rowNumber: number;
-  raw: Record<string, string>;
-  errors: string[];
-};
+import { buildParsedRows, type ParsedRow } from "@/lib/imports/parse-rows";
 
 type ImportResult = {
   success: string[];
@@ -46,50 +36,6 @@ type ImportResult = {
 };
 
 type Phase = "idle" | "preview" | "committing" | "done";
-
-// Shared by both the CSV and Excel parse paths: validates raw row objects
-// against the schema for the selected import type and flags duplicate emails.
-function buildParsedRows(
-  data: Record<string, string>[],
-  importType: ImportRowType
-): ParsedRow[] {
-  const schema =
-    importType === "FACULTY" ? facultyImportRowSchema : studentImportRowSchema;
-
-  const emailCounts = new Map<string, number>();
-  data.forEach((row) => {
-    const email = row.email?.trim().toLowerCase();
-    if (email) emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
-  });
-
-  return data.map((raw, idx) => {
-    const trimmed: Record<string, string> = {};
-    for (const [k, v] of Object.entries(raw)) {
-      trimmed[k] = typeof v === "string" ? v.trim() : String(v ?? "");
-    }
-
-    const result = schema.safeParse(trimmed);
-    const errors: string[] = [];
-
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        const field = issue.path.join(".") || "row";
-        errors.push(`${field}: ${issue.message}`);
-      }
-    }
-
-    const email = trimmed.email?.toLowerCase();
-    if (email && (emailCounts.get(email) ?? 0) > 1) {
-      errors.push("Duplicate email within this file");
-    }
-
-    return {
-      rowNumber: idx + 2, // +2 because header is row 1 and rows are 1-indexed
-      raw: trimmed,
-      errors,
-    };
-  });
-}
 
 export function ImportForm() {
   const router = useRouter();
@@ -129,38 +75,23 @@ export function ImportForm() {
 
   async function parseExcelFile(file: File) {
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", importType === "FACULTY" ? "faculty" : "student");
 
-      const sheet = workbook.getWorksheet("Data") ?? workbook.worksheets[0];
-      if (!sheet) {
-        toast.error("Could not find a sheet with data in this Excel file");
+      const response = await fetch("/api/users/import/parse", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to parse Excel file");
         return;
       }
 
-      const headers: string[] = [];
-      sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
-        headers[colNumber - 1] = String(cell.value ?? "").trim();
-      });
-
-      const data: Record<string, string>[] = [];
-      sheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; // header row, already read above
-
-        const record: Record<string, string> = {};
-        let hasValue = false;
-        headers.forEach((header, idx) => {
-          if (!header) return;
-          const value = row.getCell(idx + 1).value;
-          const text = value == null ? "" : String(value);
-          record[header] = text;
-          if (text) hasValue = true;
-        });
-        if (hasValue) data.push(record);
-      });
-
-      setRows(buildParsedRows(data, importType));
+      setRows(data as ParsedRow[]);
       setPhase("preview");
     } catch (err) {
       toast.error(
