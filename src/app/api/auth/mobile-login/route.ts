@@ -3,6 +3,12 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { signMobileToken } from "@/lib/jwt";
+import {
+  checkRateLimit,
+  recordFailedAttempt,
+  resetRateLimit,
+  getClientIp,
+} from "@/lib/rate-limit";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
@@ -35,6 +41,16 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, password } = parsed.data;
+
+    const ip = getClientIp(req.headers);
+    const rateLimitKey = `${ip}:login`;
+
+    if (!checkRateLimit(rateLimitKey).allowed) {
+      return NextResponse.json(
+        { error: "Too many failed attempts. Try again in about 15 minutes." },
+        { status: 429 }
+      );
+    }
 
     // Trim only — email casing as entered by an admin (or at signup) is
     // preserved in the DB, so the lookup must be case-insensitive rather
@@ -78,6 +94,7 @@ export async function POST(req: NextRequest) {
     );
 
     if (!user || !valid) {
+      recordFailedAttempt(rateLimitKey);
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
@@ -86,6 +103,7 @@ export async function POST(req: NextRequest) {
 
     // Check account status
     if (user.status !== "ACTIVE") {
+      recordFailedAttempt(rateLimitKey);
       return NextResponse.json(
         {
           error:
@@ -94,6 +112,8 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    resetRateLimit(rateLimitKey);
 
     // Update lastLoginAt best-effort; don't fail login if this fails.
     void prisma.user

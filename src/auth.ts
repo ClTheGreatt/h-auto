@@ -1,9 +1,21 @@
 import { cache } from "react";
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import type { UserRole } from "@prisma/client";
+import {
+  checkRateLimit,
+  recordFailedAttempt,
+  resetRateLimit,
+  getClientIp,
+} from "@/lib/rate-limit";
+
+// Surfaces as `code=rate_limited` in the login redirect URL, distinct from
+// the generic CredentialsSignin the framework uses for wrong-password/etc.
+class RateLimitError extends CredentialsSignin {
+  code = "rate_limited";
+}
 
 // Fixed dummy hash to equalize response time when the user doesn't exist.
 // Prevents timing-based user enumeration (bcrypt.compare always runs).
@@ -36,8 +48,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        const ip = getClientIp(request.headers);
+        const rateLimitKey = `${ip}:login`;
+
+        if (!checkRateLimit(rateLimitKey).allowed) {
+          throw new RateLimitError();
+        }
 
         // Trim only — email casing as entered by an admin (or at signup)
         // is preserved in the DB, so the login lookup must be
@@ -58,7 +77,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user?.passwordHash ?? DUMMY_BCRYPT_HASH
         );
 
-        if (!user || !valid || user.status !== "ACTIVE") return null;
+        if (!user || !valid || user.status !== "ACTIVE") {
+          recordFailedAttempt(rateLimitKey);
+          return null;
+        }
+
+        resetRateLimit(rateLimitKey);
 
         return {
           id: user.id,

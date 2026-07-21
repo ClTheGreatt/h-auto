@@ -39,7 +39,11 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        toast.error("Invalid email or password");
+        toast.error(
+          result.code === "rate_limited"
+            ? "Too many failed attempts. Please try again in about 15 minutes."
+            : "Invalid email or password"
+        );
         setSubmitting(false);
         return;
       }
