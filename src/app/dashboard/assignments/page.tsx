@@ -4,35 +4,62 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
+import { AssignmentPlotFilter } from "@/components/assignments/assignment-plot-filter";
 
-export default async function AssignmentsPage() {
+export default async function AssignmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plotId?: string }>;
+}) {
   const session = await requireAuth();
   const role = session.user.role;
+  const sp = await searchParams;
+  const plotId = sp.plotId;
 
   const where =
     role === "STUDENT_FARMER"
-      ? { studentId: session.user.id, status: "ACTIVE" as const }
+      ? { studentId: session.user.id, status: "ACTIVE" as const, ...(plotId && { plotId }) }
       : role === "FACULTY"
-      ? { facultyId: session.user.id, status: "ACTIVE" as const }
-      : { status: "ACTIVE" as const };
+      ? { facultyId: session.user.id, status: "ACTIVE" as const, ...(plotId && { plotId }) }
+      : { status: "ACTIVE" as const, ...(plotId && { plotId }) };
 
-  const assignments = await prisma.plotAssignment.findMany({
-    where,
-    orderBy: { assignedAt: "desc" },
-    include: {
-      plot: {
-        include: {
-          crop: { select: { name: true } },
+  // Plot list for filter dropdown, scoped the same way the page's own
+  // role-aware where is (students/faculty only see their own plots).
+  const plotWhere =
+    role === "STUDENT_FARMER"
+      ? {
+          assignments: {
+            some: { studentId: session.user.id, status: "ACTIVE" as const },
+          },
+        }
+      : role === "FACULTY"
+      ? { facultyId: session.user.id }
+      : {};
+
+  const [assignments, plotsForFilter] = await Promise.all([
+    prisma.plotAssignment.findMany({
+      where,
+      orderBy: [{ plot: { name: "asc" } }, { assignedAt: "desc" }],
+      include: {
+        plot: {
+          include: {
+            crop: { select: { name: true } },
+          },
+        },
+        student: {
+          select: { firstName: true, lastName: true, email: true },
+        },
+        faculty: {
+          select: { firstName: true, lastName: true },
         },
       },
-      student: {
-        select: { firstName: true, lastName: true, email: true },
-      },
-      faculty: {
-        select: { firstName: true, lastName: true },
-      },
-    },
-  });
+    }),
+    prisma.plot.findMany({
+      where: plotWhere,
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -45,6 +72,10 @@ export default async function AssignmentsPage() {
             ? "Plots you've assigned to your students."
             : "All active plot assignments in the system."}
         </p>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <AssignmentPlotFilter plots={plotsForFilter} current={plotId} />
       </div>
 
       {assignments.length === 0 ? (

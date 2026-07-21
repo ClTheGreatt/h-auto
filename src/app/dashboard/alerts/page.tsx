@@ -125,7 +125,7 @@ export default async function AlertsPage({
     prisma.alert.count({ where }),
     prisma.alert.findMany({
       where,
-      orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ plot: { name: "asc" } }, { severity: "desc" }, { createdAt: "desc" }],
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
