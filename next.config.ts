@@ -8,14 +8,17 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=()" },
 ];
 
-// Report-only for now — logs violations to the browser console without
-// blocking anything. Production-only so dev's HMR WebSocket / Fast Refresh
-// is never affected. Flip to the enforcing "Content-Security-Policy" key
-// only after a clean QA pass with no console violations.
+// Enforcing, production-only so dev's HMR WebSocket / Fast Refresh is never
+// affected.
+//
+// 'unsafe-eval' is required by Zod v4's JIT schema compiler (Function()
+// feature-probe with a graceful non-eval fallback) and decimal.js's
+// global-object idiom (a recharts dependency). Both are trusted first-party
+// dependencies; no dynamic evaluation of untrusted input occurs.
 const CSP_VALUE = [
   "default-src 'self'",
   "img-src 'self' data: https://res.cloudinary.com https://placehold.co",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "connect-src 'self'",
@@ -38,7 +41,7 @@ const nextConfig: NextConfig = {
     const headers = [...securityHeaders];
     if (process.env.NODE_ENV === "production") {
       headers.push({
-        key: "Content-Security-Policy-Report-Only",
+        key: "Content-Security-Policy",
         value: CSP_VALUE,
       });
     }
