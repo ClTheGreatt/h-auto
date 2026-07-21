@@ -8,6 +8,24 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=()" },
 ];
 
+// Report-only for now — logs violations to the browser console without
+// blocking anything. Production-only so dev's HMR WebSocket / Fast Refresh
+// is never affected. Flip to the enforcing "Content-Security-Policy" key
+// only after a clean QA pass with no console violations.
+const CSP_VALUE = [
+  "default-src 'self'",
+  "img-src 'self' data: https://res.cloudinary.com https://placehold.co",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "frame-src 'none'",
+  "frame-ancestors 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.54", "localhost", "127.0.0.1"],
   images: {
@@ -17,7 +35,14 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    const headers = [...securityHeaders];
+    if (process.env.NODE_ENV === "production") {
+      headers.push({
+        key: "Content-Security-Policy-Report-Only",
+        value: CSP_VALUE,
+      });
+    }
+    return [{ source: "/:path*", headers }];
   },
 };
 
