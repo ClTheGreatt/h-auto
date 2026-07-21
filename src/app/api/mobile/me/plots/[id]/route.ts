@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
+import { isDeviceOnline } from "@/lib/utils/device-status";
 
 export async function GET(
   req: NextRequest,
@@ -97,6 +98,10 @@ export async function GET(
       },
     });
 
+    // Computed live from lastSeenAt (same 30-min threshold as web), rather
+    // than trusting Device.status which is only refreshed once/day by cron.
+    const deviceOnline = isDeviceOnline(plot.device?.lastSeenAt);
+
     // Faculty may only manage assignments on the plot they advise; Admin/
     // Super Admin manage any plot; Students never manage assignments.
     const canManageAssignments =
@@ -163,6 +168,7 @@ const observations = await prisma.growthLog.findMany({
               lastSeenAt: plot.device.lastSeenAt?.toISOString() ?? null,
             }
           : null,
+        deviceOnline,
         latestReading: latestReading
           ? {
               ...latestReading,
