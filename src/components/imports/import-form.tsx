@@ -32,10 +32,6 @@ import {
   type ImportRowType,
 } from "@/lib/validations/import";
 import { commitImport } from "@/actions/import";
-import {
-  generateFacultyTemplate,
-  generateStudentTemplate,
-} from "@/lib/imports/template-generator";
 
 type ParsedRow = {
   rowNumber: number;
@@ -104,19 +100,9 @@ export function ImportForm() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
 
-  async function downloadTemplate() {
-    const blob =
-      importType === "FACULTY"
-        ? await generateFacultyTemplate()
-        : await generateStudentTemplate();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `h-auto-${importType}-template.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  function downloadTemplate() {
+    const type = importType === "FACULTY" ? "faculty" : "student";
+    window.location.href = `/api/users/import/template?type=${type}`;
   }
 
   function parseCsvFile(file: File) {

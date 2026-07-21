@@ -126,11 +126,9 @@ function buildInstructionsSheet(
   return sheet;
 }
 
-async function toBlob(workbook: ExcelJS.Workbook): Promise<Blob> {
+async function toBuffer(workbook: ExcelJS.Workbook): Promise<Buffer> {
   const buffer = await workbook.xlsx.writeBuffer();
-  return new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  return Buffer.from(buffer);
 }
 
 const FACULTY_COLUMNS: ColumnDef[] = [
@@ -197,7 +195,7 @@ const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "password", required: true, description: "Initial password (user can change later)" },
 ];
 
-export async function generateFacultyTemplate(): Promise<Blob> {
+export async function generateFacultyTemplate(): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "H-Auto";
   workbook.created = new Date();
@@ -210,10 +208,10 @@ export async function generateFacultyTemplate(): Promise<Blob> {
     [...COMMON_NOTES, ...CLOSING_NOTES]
   );
 
-  return toBlob(workbook);
+  return toBuffer(workbook);
 }
 
-export async function generateStudentTemplate(): Promise<Blob> {
+export async function generateStudentTemplate(): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "H-Auto";
   workbook.created = new Date();
@@ -229,5 +227,5 @@ export async function generateStudentTemplate(): Promise<Blob> {
     [...COMMON_NOTES, STUDENT_ONLY_NOTE, ...CLOSING_NOTES]
   );
 
-  return toBlob(workbook);
+  return toBuffer(workbook);
 }
