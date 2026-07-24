@@ -178,6 +178,10 @@ model Crop {
   cultivationGuide String?   @db.Text
   status         CropStatus  @default(ACTIVE)
   archivedAt     DateTime?
+  // Promotes this crop into the "Custom" group of the Add-crop Quick start
+  // dropdown, alongside the hard-coded built-in presets. Never set
+  // automatically — an admin opts a crop in explicitly via togglePreset().
+  isPreset       Boolean     @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -185,6 +189,7 @@ model Crop {
   plots  Plot[]
 
   @@index([status])
+  @@index([isPreset])
 }
 
 model CropStage {

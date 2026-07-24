@@ -104,6 +104,28 @@ export async function archiveCrop(id: string) {
   return { success: true };
 }
 
+// Promotes/demotes a crop in the Add-crop Quick start dropdown's "Custom"
+// group. Same role gate as every other crop-management action (requireAdmin
+// already encodes "SUPER_ADMIN or ADMIN only" — no separate role check to
+// hand-roll here, unlike canAssignRole/canManageUser which compare against a
+// *different user's* role; there's no such comparison for a crop flag).
+export async function togglePreset(id: string, value: boolean) {
+  await requireAdmin();
+
+  const crop = await prisma.crop.findUnique({ where: { id } });
+  if (!crop) return { error: "Crop not found" };
+
+  await prisma.crop.update({
+    where: { id },
+    data: { isPreset: value },
+  });
+
+  revalidatePath("/dashboard/crops");
+  revalidatePath(`/dashboard/crops/${id}/edit`);
+  revalidatePath("/dashboard/crops/new");
+  return { success: true };
+}
+
 export async function restoreCrop(id: string) {
   await requireAdmin();
 

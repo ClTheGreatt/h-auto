@@ -56,3 +56,56 @@ export const IMPORT_PHONE_REGEX = /^\+639\d{9}$/;
 export function studentIdPrefixRange(): { min: number; max: number } {
   return { min: 20, max: (new Date().getFullYear() % 100) + 1 };
 }
+
+// Assumes the format regex (STUDENT_ID_REGEX) already passed — this only
+// checks the numeric prefix range, so callers can report a distinct
+// "wrong format" vs "wrong prefix" message.
+export function isValidStudentIdPrefix(idNumber: string): boolean {
+  const prefix = parseInt(idNumber.slice(0, 2), 10);
+  const { min, max } = studentIdPrefixRange();
+  return prefix >= min && prefix <= max;
+}
+
+// Which columns are required, per import type. Single source of truth for:
+// the template's header asterisk/fill, the Instructions sheet's "Required
+// fields" note, and the preview table's header asterisk.
+export const FACULTY_REQUIRED_FIELDS = [
+  "firstName",
+  "lastName",
+  "email",
+  "idNumber",
+  "department",
+  "position",
+  "password",
+] as const;
+
+export const STUDENT_REQUIRED_FIELDS = [
+  "firstName",
+  "lastName",
+  "email",
+  "idNumber",
+  "course",
+  "section",
+  "password",
+] as const;
+
+// Case-insensitive prefix/substring match against a fixed list of valid
+// values, for a friendly "did you mean X?" suggestion on enum mismatches.
+// Falls back to a truncated preview of valid values (with a count) when
+// nothing is close enough to guess.
+export function enumMismatchMessage(
+  value: string,
+  validValues: readonly string[],
+  fieldName: string,
+  unitLabel: string = "valid values"
+): string {
+  const lower = value.trim().toLowerCase();
+  const suggestion = validValues.find(
+    (v) => v.toLowerCase().startsWith(lower) || v.toLowerCase().includes(lower)
+  );
+  if (suggestion) {
+    return `${fieldName} "${value}" is not valid — did you mean "${suggestion}"?`;
+  }
+  const preview = validValues.slice(0, 3).join(", ");
+  return `${fieldName} must be one of: ${preview}, ... (${validValues.length} ${unitLabel})`;
+}

@@ -28,19 +28,25 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
 import { createCrop, updateCrop } from "@/actions/crops";
-import { CROP_PRESETS } from "@/lib/crops/presets";
+import { CROP_PRESETS, type CropPreset } from "@/lib/crops/presets";
 
 type CropFormProps = {
   mode: "create" | "edit";
   cropId?: string;
   defaultValues?: Partial<CropFormValues>;
+  // Admin-promoted crops (Crop.isPreset = true), reshaped to the same
+  // CropPreset shape as the 9 built-ins. Only relevant in create mode.
+  customPresets?: CropPreset[];
 };
 
 const NONE_PRESET = "__none__";
@@ -66,7 +72,12 @@ const emptyStage = {
   maxPotassium: 150,
 };
 
-export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
+export function CropForm({
+  mode,
+  cropId,
+  defaultValues,
+  customPresets = [],
+}: CropFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
@@ -98,7 +109,9 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
       return;
     }
 
-    const preset = CROP_PRESETS.find((p) => p.id === presetId);
+    const preset =
+      CROP_PRESETS.find((p) => p.id === presetId) ??
+      customPresets.find((p) => p.id === presetId);
     if (!preset) return;
 
     // Don't set variety — it varies per seed brand, user's own input.
@@ -157,11 +170,28 @@ export function CropForm({ mode, cropId, defaultValues }: CropFormProps) {
                   <SelectItem value={NONE_PRESET} className="italic text-muted-foreground">
                     — None (manual entry) —
                   </SelectItem>
-                  {CROP_PRESETS.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.displayName}
-                    </SelectItem>
-                  ))}
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Built-in</SelectLabel>
+                    {CROP_PRESETS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  {customPresets.length > 0 && (
+                    <>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel>Custom</SelectLabel>
+                        {customPresets.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </CardContent>

@@ -1,10 +1,22 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { CropForm } from "@/components/crops/crop-form";
+import { toCustomPreset } from "@/lib/crops/custom-presets";
 
 export default async function NewCropPage() {
   await requireAdmin();
+
+  // Archived crops never appear in the Quick start dropdown, promoted or not.
+  const presetCrops = await prisma.crop.findMany({
+    where: { isPreset: true, status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    include: {
+      stages: { orderBy: { orderIndex: "asc" } },
+    },
+  });
+  const customPresets = presetCrops.map(toCustomPreset);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -22,7 +34,7 @@ export default async function NewCropPage() {
         </p>
       </div>
 
-      <CropForm mode="create" />
+      <CropForm mode="create" customPresets={customPresets} />
     </div>
   );
 }

@@ -9,6 +9,8 @@ import {
   SECTION_REGEX,
   IMPORT_PHONE_REGEX,
   studentIdPrefixRange,
+  isValidStudentIdPrefix,
+  enumMismatchMessage,
 } from "@/lib/constants/user-import";
 
 // Import-only phone rule (stricter than the interactive form's phPhone,
@@ -16,14 +18,14 @@ import {
 const importPhone = z
   .string()
   .trim()
-  .regex(IMPORT_PHONE_REGEX, "Phone must be in format +639XXXXXXXXX")
+  .regex(IMPORT_PHONE_REGEX, "phoneNumber must be in format +639XXXXXXXXX, e.g. +639171234567")
   .optional()
   .or(z.literal(""));
 
 const baseRow = {
-  firstName: z.string().trim().min(1, "First name is required"),
+  firstName: z.string().trim().min(1, "firstName is required"),
   middleName: z.string().trim().optional().default(""),
-  lastName: z.string().trim().min(1, "Last name is required"),
+  lastName: z.string().trim().min(1, "lastName is required"),
   email: bpsuEmail,
   phoneNumber: importPhone,
   password: passwordStrengthSchema,
@@ -31,45 +33,81 @@ const baseRow = {
 
 const { min: studentIdMin, max: studentIdMax } = studentIdPrefixRange();
 
-export const facultyImportRowSchema = z.object({
-  ...baseRow,
-  idNumber: z
-    .string()
-    .trim()
-    .min(1, "Employee ID is required")
-    .regex(FACULTY_ID_REGEX, "Employee ID must be in format 123456-1234"),
-  department: z.enum(DEPARTMENTS, {
-    error: "Department must be one of the official department names (see Instructions sheet)",
-  }),
-  position: z.enum(FACULTY_POSITIONS, {
-    error: "Position must be one of the 18 official faculty ranks (see Instructions sheet)",
-  }),
-});
+// Messages below are self-contained (no "see Instructions sheet" pointers) —
+// the user has usually already closed the file by the time they read them.
+// Enum/format checks run in .superRefine() rather than z.enum()/.regex()
+// chains so an empty field reports only "X is required", never a second,
+// redundant format message on top of it.
+export const facultyImportRowSchema = z
+  .object({
+    ...baseRow,
+    idNumber: z.string().trim().min(1, "idNumber is required"),
+    department: z.string().trim().min(1, "department is required"),
+    position: z.string().trim().min(1, "position is required"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.idNumber && !FACULTY_ID_REGEX.test(data.idNumber)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["idNumber"],
+        message: "idNumber must be in format 123456-1234, e.g. 202000-0001",
+      });
+    }
+    if (data.department && !(DEPARTMENTS as readonly string[]).includes(data.department)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["department"],
+        message: enumMismatchMessage(data.department, DEPARTMENTS, "department", "valid departments"),
+      });
+    }
+    if (data.position && !(FACULTY_POSITIONS as readonly string[]).includes(data.position)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["position"],
+        message: enumMismatchMessage(data.position, FACULTY_POSITIONS, "position", "valid ranks"),
+      });
+    }
+  });
 
-export const studentImportRowSchema = z.object({
-  ...baseRow,
-  idNumber: z
-    .string()
-    .trim()
-    .min(1, "Student ID is required")
-    .regex(STUDENT_ID_REGEX, "Student ID must be in format 12-34567")
-    .refine(
-      (val) => {
-        const prefix = parseInt(val.slice(0, 2), 10);
-        return prefix >= studentIdMin && prefix <= studentIdMax;
-      },
-      { message: `Student ID prefix must be between ${studentIdMin} and ${studentIdMax}` }
-    ),
-  course: z.enum(DEPARTMENTS, {
-    error: "Course must be one of the official program names (see Instructions sheet)",
-  }),
-  yearLevel: z.string().trim().optional().default(""),
-  section: z
-    .string()
-    .trim()
-    .min(1, "Section is required")
-    .regex(SECTION_REGEX, "Section must match e.g. BSA-1A, BTVTED-2B, BSABE-3C"),
-});
+export const studentImportRowSchema = z
+  .object({
+    ...baseRow,
+    idNumber: z.string().trim().min(1, "idNumber is required"),
+    course: z.string().trim().min(1, "course is required"),
+    yearLevel: z.string().trim().optional().default(""),
+    section: z.string().trim().min(1, "section is required"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.idNumber) {
+      if (!STUDENT_ID_REGEX.test(data.idNumber)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["idNumber"],
+          message: "idNumber must be in format 12-34567, e.g. 23-04567",
+        });
+      } else if (!isValidStudentIdPrefix(data.idNumber)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["idNumber"],
+          message: `idNumber prefix must be between ${studentIdMin} and ${studentIdMax}`,
+        });
+      }
+    }
+    if (data.course && !(DEPARTMENTS as readonly string[]).includes(data.course)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["course"],
+        message: enumMismatchMessage(data.course, DEPARTMENTS, "course", "valid programs"),
+      });
+    }
+    if (data.section && !SECTION_REGEX.test(data.section)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["section"],
+        message: "section must be in format PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C",
+      });
+    }
+  });
 
 export type FacultyImportRow = z.infer<typeof facultyImportRowSchema>;
 export type StudentImportRow = z.infer<typeof studentImportRowSchema>;

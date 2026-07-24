@@ -71,7 +71,12 @@ export async function POST(req: NextRequest) {
       validationFailed.push({
         email,
         reason: parsed.error.issues
-          .map((i) => `${i.path.join(".") || "row"}: ${i.message}`)
+          .map((i) => {
+            const field = i.path.join(".") || "row";
+            return i.message.toLowerCase().startsWith(field.toLowerCase())
+              ? i.message
+              : `${field}: ${i.message}`;
+          })
           .join("; "),
       });
     }

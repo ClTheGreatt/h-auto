@@ -41,7 +41,15 @@ export function buildParsedRows(
     if (!result.success) {
       for (const issue of result.error.issues) {
         const field = issue.path.join(".") || "row";
-        errors.push(`${field}: ${issue.message}`);
+        // Most import messages already self-name their field (e.g. "idNumber
+        // is required") — only prefix the ones that don't (shared validators
+        // like bpsuEmail/passwordStrengthSchema), to avoid "email: Email is
+        // required"-style duplication.
+        errors.push(
+          issue.message.toLowerCase().startsWith(field.toLowerCase())
+            ? issue.message
+            : `${field}: ${issue.message}`
+        );
       }
     }
 

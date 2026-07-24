@@ -47,6 +47,7 @@ type CropRow = {
   name: string;
   variety: string | null;
   daysToHarvest: number;
+  isPreset: boolean;
   _count: { stages: number; plots: number };
 };
 
@@ -221,12 +222,22 @@ export function CropsTable({
               {crops.map((crop) => (
                 <TableRow key={crop.id}>
                   <TableCell className="font-medium">
-                    <Link
-                      href={`/dashboard/crops/${crop.id}/edit`}
-                      className="hover:underline"
-                    >
-                      {crop.name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/dashboard/crops/${crop.id}/edit`}
+                        className="hover:underline"
+                      >
+                        {crop.name}
+                      </Link>
+                      {crop.isPreset && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-100 text-amber-700"
+                        >
+                          Preset
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-gray-600">
                     {crop.variety ?? "—"}

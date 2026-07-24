@@ -3,10 +3,12 @@ import { YEAR_LEVELS } from "@/lib/validations/user";
 import {
   DEPARTMENTS,
   FACULTY_POSITIONS,
+  FACULTY_REQUIRED_FIELDS,
+  STUDENT_REQUIRED_FIELDS,
   studentIdPrefixRange,
 } from "@/lib/constants/user-import";
 
-type ColumnDef = { header: string; key: string };
+type ColumnDef = { header: string; key: string; required: boolean };
 type ColumnGuideEntry = { name: string; required: boolean; description: string };
 // Inline list: a literal comma-separated formula (fine for short lists —
 // Excel's classic data-validation list formula has a ~255-char limit).
@@ -16,10 +18,16 @@ type DropdownSpec =
   | { columnKey: string; values: readonly string[] }
   | { columnKey: string; sheetRange: string };
 
-const HEADER_FILL: ExcelJS.Fill = {
+const REQUIRED_HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
   pattern: "solid",
   fgColor: { argb: "FFDCFCE7" },
+};
+
+const OPTIONAL_HEADER_FILL: ExcelJS.Fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FFE5E7EB" },
 };
 
 const TABLE_HEADER_FILL: ExcelJS.Fill = {
@@ -68,6 +76,24 @@ function buildListsSheet(workbook: ExcelJS.Workbook) {
   return sheet;
 }
 
+function makeColumns(keys: string[], required: readonly string[]): ColumnDef[] {
+  return keys.map((key) => ({
+    header: key,
+    key,
+    required: (required as readonly string[]).includes(key),
+  }));
+}
+
+// Header stays on row 1 (data from row 2) — deliberately NOT shifted down
+// for a separate legend row. The parse route reads row 1 as headers, and
+// exporting this sheet to CSV (an explicitly supported upload format) would
+// turn an inserted legend row into bogus CSV headers, breaking the whole
+// row-1-header assumption both parse paths rely on. The asterisk/fill on
+// the header cells themselves is the always-visible signal; a cell note on
+// the first header explains the convention for anyone opening the .xlsx.
+const HEADER_ROW = 1;
+const FIRST_DATA_ROW = HEADER_ROW + 1;
+
 function buildDataSheet(
   workbook: ExcelJS.Workbook,
   columns: ColumnDef[],
@@ -75,18 +101,32 @@ function buildDataSheet(
   dropdowns?: DropdownSpec[]
 ) {
   const sheet = workbook.addWorksheet("Data");
-  sheet.columns = columns.map((c) => ({ header: c.header, key: c.key }));
-
-  const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true };
-  headerRow.fill = HEADER_FILL;
-
-  rows.forEach((row) => sheet.addRow(row));
 
   columns.forEach((col, idx) => {
+    const cell = sheet.getCell(HEADER_ROW, idx + 1);
+    cell.value = col.required ? `${col.header} *` : col.header;
+    cell.font = { bold: true };
+    cell.fill = col.required ? REQUIRED_HEADER_FILL : OPTIONAL_HEADER_FILL;
+  });
+
+  // Note (hover) on the first header cell — explains the asterisk/fill
+  // legend without inserting a row that would shift CSV/Excel parsing.
+  sheet.getCell(HEADER_ROW, 1).note =
+    "Required fields are marked with * and shaded green in the header row. " +
+    "Optional fields are unmarked and shaded gray. See the Instructions " +
+    "sheet's \"Required fields\" section for the full list.";
+
+  rows.forEach((row, rIdx) => {
+    row.forEach((value, cIdx) => {
+      sheet.getCell(FIRST_DATA_ROW + rIdx, cIdx + 1).value = value;
+    });
+  });
+
+  columns.forEach((col, idx) => {
+    const headerLen = col.header.length + (col.required ? 2 : 0);
     const longestValue = rows.reduce(
       (max, row) => Math.max(max, String(row[idx] ?? "").length),
-      col.header.length
+      headerLen
     );
     sheet.getColumn(idx + 1).width = Math.max(15, longestValue + 2);
   });
@@ -97,7 +137,7 @@ function buildDataSheet(
       if (colIndex < 1) continue;
       const formula =
         "values" in dropdown ? `"${dropdown.values.join(",")}"` : dropdown.sheetRange;
-      for (let r = 2; r <= 1000; r++) {
+      for (let r = FIRST_DATA_ROW; r <= 1000; r++) {
         sheet.getCell(r, colIndex).dataValidation = {
           type: "list",
           allowBlank: true,
@@ -113,6 +153,7 @@ function buildDataSheet(
 function buildInstructionsSheet(
   workbook: ExcelJS.Workbook,
   title: string,
+  requiredFields: readonly string[],
   columnGuide: ColumnGuideEntry[],
   notes: string[]
 ) {
@@ -124,15 +165,23 @@ function buildInstructionsSheet(
   sheet.getCell(1, 1).font = { bold: true, size: 14 };
 
   sheet.mergeCells(3, 1, 3, 3);
-  sheet.getCell(3, 1).value = "Column Guide";
+  sheet.getCell(3, 1).value = "Required fields";
   sheet.getCell(3, 1).font = { bold: true, size: 12 };
+  sheet.mergeCells(4, 1, 4, 3);
+  sheet.getCell(4, 1).value = requiredFields.join(", ");
+  sheet.getCell(4, 1).font = REQUIRED_FONT;
+  sheet.getCell(4, 1).alignment = { wrapText: true };
 
-  const tableHeaderRow = sheet.getRow(4);
+  sheet.mergeCells(6, 1, 6, 3);
+  sheet.getCell(6, 1).value = "Column Guide";
+  sheet.getCell(6, 1).font = { bold: true, size: 12 };
+
+  const tableHeaderRow = sheet.getRow(7);
   tableHeaderRow.values = ["Column Name", "Required", "Description"];
   tableHeaderRow.font = { bold: true };
   tableHeaderRow.fill = TABLE_HEADER_FILL;
 
-  let row = 5;
+  let row = 8;
   columnGuide.forEach((entry, idx) => {
     const r = sheet.getRow(row);
     r.values = [entry.name, entry.required ? "Required" : "Optional", entry.description];
@@ -165,17 +214,10 @@ async function toBuffer(workbook: ExcelJS.Workbook): Promise<Buffer> {
   return Buffer.from(buffer);
 }
 
-const FACULTY_COLUMNS: ColumnDef[] = [
-  { header: "firstName", key: "firstName" },
-  { header: "middleName", key: "middleName" },
-  { header: "lastName", key: "lastName" },
-  { header: "email", key: "email" },
-  { header: "phoneNumber", key: "phoneNumber" },
-  { header: "idNumber", key: "idNumber" },
-  { header: "department", key: "department" },
-  { header: "position", key: "position" },
-  { header: "password", key: "password" },
-];
+const FACULTY_COLUMNS: ColumnDef[] = makeColumns(
+  ["firstName", "middleName", "lastName", "email", "phoneNumber", "idNumber", "department", "position", "password"],
+  FACULTY_REQUIRED_FIELDS
+);
 
 const FACULTY_EXAMPLE_ROWS: string[][] = [
   ["Maria Elena", "Santos", "Cruz", "maria.santos@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III", "TempPass123!"],
@@ -185,29 +227,21 @@ const FACULTY_EXAMPLE_ROWS: string[][] = [
 ];
 
 const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
-  { name: "firstName", required: true, description: "The person's first (given) name" },
-  { name: "middleName", required: false, description: "Middle name if applicable" },
-  { name: "lastName", required: true, description: "Family name / surname" },
-  { name: "email", required: true, description: "Must be @bpsu.edu.ph" },
-  { name: "phoneNumber", required: false, description: "+639XXXXXXXXX, if provided" },
-  { name: "idNumber", required: true, description: "Format: 123456-1234 (6 digits, dash, 4 digits)" },
-  { name: "department", required: true, description: "Pick from the dropdown — one of 5 official department names" },
-  { name: "position", required: true, description: "Pick from the dropdown — one of 18 official faculty ranks" },
-  { name: "password", required: true, description: "Initial password (user can change later)" },
+  { name: "firstName", required: FACULTY_REQUIRED_FIELDS.includes("firstName"), description: "The person's first (given) name" },
+  { name: "middleName", required: (FACULTY_REQUIRED_FIELDS as readonly string[]).includes("middleName"), description: "Middle name if applicable" },
+  { name: "lastName", required: FACULTY_REQUIRED_FIELDS.includes("lastName"), description: "Family name / surname" },
+  { name: "email", required: FACULTY_REQUIRED_FIELDS.includes("email"), description: "Must be @bpsu.edu.ph" },
+  { name: "phoneNumber", required: (FACULTY_REQUIRED_FIELDS as readonly string[]).includes("phoneNumber"), description: "+639XXXXXXXXX, if provided" },
+  { name: "idNumber", required: FACULTY_REQUIRED_FIELDS.includes("idNumber"), description: "Format: 123456-1234 (6 digits, dash, 4 digits)" },
+  { name: "department", required: FACULTY_REQUIRED_FIELDS.includes("department"), description: "Pick from the dropdown — one of 5 official department names (listed below)" },
+  { name: "position", required: FACULTY_REQUIRED_FIELDS.includes("position"), description: "Pick from the dropdown — one of 18 official faculty ranks (listed below)" },
+  { name: "password", required: FACULTY_REQUIRED_FIELDS.includes("password"), description: "Initial password (user can change later)" },
 ];
 
-const STUDENT_COLUMNS: ColumnDef[] = [
-  { header: "firstName", key: "firstName" },
-  { header: "middleName", key: "middleName" },
-  { header: "lastName", key: "lastName" },
-  { header: "email", key: "email" },
-  { header: "phoneNumber", key: "phoneNumber" },
-  { header: "idNumber", key: "idNumber" },
-  { header: "course", key: "course" },
-  { header: "yearLevel", key: "yearLevel" },
-  { header: "section", key: "section" },
-  { header: "password", key: "password" },
-];
+const STUDENT_COLUMNS: ColumnDef[] = makeColumns(
+  ["firstName", "middleName", "lastName", "email", "phoneNumber", "idNumber", "course", "yearLevel", "section", "password"],
+  STUDENT_REQUIRED_FIELDS
+);
 
 const STUDENT_EXAMPLE_ROWS: string[][] = [
   ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "BS Agriculture - Animal Science", "4th Year", "BSA-4A", "TempPass123!"],
@@ -217,16 +251,16 @@ const STUDENT_EXAMPLE_ROWS: string[][] = [
 ];
 
 const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
-  { name: "firstName", required: true, description: "The person's first (given) name" },
-  { name: "middleName", required: false, description: "Middle name if applicable" },
-  { name: "lastName", required: true, description: "Family name / surname" },
-  { name: "email", required: true, description: "Must be @bpsu.edu.ph" },
-  { name: "phoneNumber", required: false, description: "+639XXXXXXXXX, if provided" },
-  { name: "idNumber", required: true, description: `Format: 12-34567 (2-digit year prefix ${STUDENT_ID_MIN}–${STUDENT_ID_MAX}, dash, 5 digits)` },
-  { name: "course", required: true, description: "Pick from the dropdown — one of 5 official program names" },
-  { name: "yearLevel", required: false, description: "Must be exactly: 1st Year, 2nd Year, 3rd Year, or 4th Year" },
-  { name: "section", required: true, description: "Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C" },
-  { name: "password", required: true, description: "Initial password (user can change later)" },
+  { name: "firstName", required: STUDENT_REQUIRED_FIELDS.includes("firstName"), description: "The person's first (given) name" },
+  { name: "middleName", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("middleName"), description: "Middle name if applicable" },
+  { name: "lastName", required: STUDENT_REQUIRED_FIELDS.includes("lastName"), description: "Family name / surname" },
+  { name: "email", required: STUDENT_REQUIRED_FIELDS.includes("email"), description: "Must be @bpsu.edu.ph" },
+  { name: "phoneNumber", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("phoneNumber"), description: "+639XXXXXXXXX, if provided" },
+  { name: "idNumber", required: STUDENT_REQUIRED_FIELDS.includes("idNumber"), description: `Format: 12-34567 (2-digit year prefix ${STUDENT_ID_MIN}–${STUDENT_ID_MAX}, dash, 5 digits)` },
+  { name: "course", required: STUDENT_REQUIRED_FIELDS.includes("course"), description: "Pick from the dropdown — one of 5 official program names (listed below)" },
+  { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Must be exactly: 1st Year, 2nd Year, 3rd Year, or 4th Year" },
+  { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C" },
+  { name: "password", required: STUDENT_REQUIRED_FIELDS.includes("password"), description: "Initial password (user can change later)" },
 ];
 
 export async function generateFacultyTemplate(): Promise<Buffer> {
@@ -242,6 +276,7 @@ export async function generateFacultyTemplate(): Promise<Buffer> {
   buildInstructionsSheet(
     workbook,
     "H-Auto User Import Template — Faculty",
+    FACULTY_REQUIRED_FIELDS,
     FACULTY_COLUMN_GUIDE,
     [
       ...COMMON_NOTES,
@@ -267,6 +302,7 @@ export async function generateStudentTemplate(): Promise<Buffer> {
   buildInstructionsSheet(
     workbook,
     "H-Auto User Import Template — Student",
+    STUDENT_REQUIRED_FIELDS,
     STUDENT_COLUMN_GUIDE,
     [
       ...COMMON_NOTES,

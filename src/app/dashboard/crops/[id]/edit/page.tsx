@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { CropForm } from "@/components/crops/crop-form";
+import { PresetToggle } from "@/components/crops/preset-toggle";
 
 export default async function EditCropPage({
   params,
@@ -32,10 +33,15 @@ export default async function EditCropPage({
           <ArrowLeft className="w-4 h-4" />
           Back to crops
         </Link>
-        <h1 className="text-2xl font-semibold text-gray-900">Edit {crop.name}</h1>
-        {crop.variety && (
-          <p className="text-sm text-gray-500 mt-1">{crop.variety}</p>
-        )}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Edit {crop.name}</h1>
+            {crop.variety && (
+              <p className="text-sm text-gray-500 mt-1">{crop.variety}</p>
+            )}
+          </div>
+          <PresetToggle cropId={crop.id} initialValue={crop.isPreset} />
+        </div>
       </div>
 
       <CropForm

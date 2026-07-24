@@ -70,6 +70,7 @@ export default async function CropsPage({
         name: true,
         variety: true,
         daysToHarvest: true,
+        isPreset: true,
         _count: { select: { stages: true, plots: true } },
       },
     }),

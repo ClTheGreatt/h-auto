@@ -28,6 +28,10 @@ import { cn } from "@/lib/utils";
 import { type ImportRowType } from "@/lib/validations/import";
 import { commitImport } from "@/actions/import";
 import { buildParsedRows, type ParsedRow } from "@/lib/imports/parse-rows";
+import {
+  FACULTY_REQUIRED_FIELDS,
+  STUDENT_REQUIRED_FIELDS,
+} from "@/lib/constants/user-import";
 
 type ImportResult = {
   success: string[];
@@ -186,6 +190,8 @@ export function ImportForm() {
           "section",
           "password",
         ];
+  const requiredColumns: readonly string[] =
+    importType === "FACULTY" ? FACULTY_REQUIRED_FIELDS : STUDENT_REQUIRED_FIELDS;
 
   // ============= IDLE =============
   if (phase === "idle") {
@@ -305,6 +311,10 @@ export function ImportForm() {
           </CardContent>
         </Card>
 
+        <p className="text-xs text-gray-500">
+          <span className="text-red-500">*</span> Required field
+        </p>
+
         <div className="border rounded-md bg-white overflow-auto">
           <Table>
             <TableHeader>
@@ -314,6 +324,9 @@ export function ImportForm() {
                 {allColumns.map((col) => (
                   <TableHead key={col} className="whitespace-nowrap">
                     {col}
+                    {requiredColumns.includes(col) && (
+                      <span className="text-red-500">*</span>
+                    )}
                   </TableHead>
                 ))}
                 <TableHead>Issues</TableHead>

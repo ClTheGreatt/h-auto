@@ -45,9 +45,29 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations/user";
+import {
+  DEPARTMENTS,
+  FACULTY_POSITIONS,
+  studentIdPrefixRange,
+} from "@/lib/constants/user-import";
 import { createUser, updateUser } from "@/actions/users";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
+
+const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
+
+// If an existing (legacy) value isn't one of the canonical options, show it
+// as an extra leading choice so editing doesn't silently blank out or force
+// a change to a field the admin isn't trying to touch.
+function optionsWithLegacyValue(
+  canonical: readonly string[],
+  currentValue: string | undefined
+): string[] {
+  if (currentValue && !canonical.includes(currentValue)) {
+    return [currentValue, ...canonical];
+  }
+  return [...canonical];
+}
 
 type FormValues = z.infer<typeof updateUserSchema>;
 
@@ -122,6 +142,13 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   });
 
   const isCreate = mode === "create";
+
+  // Legacy DB rows may hold department/position/course values that predate
+  // these canonical lists — surface them as an extra option in edit mode
+  // rather than silently dropping the current value from the Select.
+  const departmentOptions = optionsWithLegacyValue(DEPARTMENTS, defaultValues?.department);
+  const positionOptions = optionsWithLegacyValue(FACULTY_POSITIONS, defaultValues?.position);
+  const courseOptions = optionsWithLegacyValue(DEPARTMENTS, defaultValues?.course);
 
   const isDeactivatedWithPrefixedEmail =
     mode === "edit" &&
@@ -385,14 +412,24 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       <Input
                         placeholder={
                           watchedRole === "FACULTY"
-                            ? "e.g. EMP-001"
+                            ? "e.g. 202000-0001"
                             : watchedRole === "STUDENT_FARMER"
-                            ? "e.g. 20-12345"
+                            ? "e.g. 23-04567"
                             : undefined
                         }
                         {...field}
                       />
                     </FormControl>
+                    {watchedRole === "FACULTY" && (
+                      <FormDescription className="text-xs">
+                        Format: 123456-1234 (6 digits, dash, 4 digits)
+                      </FormDescription>
+                    )}
+                    {watchedRole === "STUDENT_FARMER" && (
+                      <FormDescription className="text-xs">
+                        Format: 12-34567 (year prefix {STUDENT_ID_MIN}–{STUDENT_ID_MAX}, dash, 5 digits)
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -499,12 +536,20 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       Department
                       {isCreate && <RequiredMark />}
                     </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. College of Information and Communications Technology"
-                        {...field}
-                      />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {departmentOptions.map((dep) => (
+                          <SelectItem key={dep} value={dep}>
+                            {dep}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -518,12 +563,20 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       Position
                       {isCreate && <RequiredMark />}
                     </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. Instructor, Associate Professor"
-                        {...field}
-                      />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select position" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {positionOptions.map((pos) => (
+                          <SelectItem key={pos} value={pos}>
+                            {pos}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -547,9 +600,20 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       Course
                       {isCreate && <RequiredMark />}
                     </FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. BS Information Technology" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select course" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {courseOptions.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -591,8 +655,11 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       {isCreate && <RequiredMark />}
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. BSIT-3A" {...field} />
+                      <Input placeholder="e.g. BSA-1A" {...field} />
                     </FormControl>
+                    <FormDescription className="text-xs">
+                      Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
