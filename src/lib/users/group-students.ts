@@ -13,12 +13,18 @@ export type StudentUserRow = {
   course: string | null;
   yearLevel: string | null;
   section: string | null;
+  academicYear: string | null;
+  graduatedAt: Date | null;
 };
 
 // Only the fields needed to compute filter dropdown options and baseline
 // (unfiltered) counts, fetched separately so the "X of Y" counts don't
-// shift as search/status/course/year/section filters narrow the main query.
-export type StudentFieldRow = Pick<StudentUserRow, "course" | "yearLevel" | "section">;
+// shift as search/status/course/year/section/academicYear filters narrow
+// the main query.
+export type StudentFieldRow = Pick<
+  StudentUserRow,
+  "course" | "yearLevel" | "section" | "academicYear"
+>;
 
 export type SectionGroup = {
   key: string;
@@ -104,6 +110,10 @@ export function uniqueYearLevels(rows: StudentFieldRow[]): string[] {
 export function uniqueSections(rows: StudentFieldRow[]): string[] {
   const set = new Set(rows.map((r) => r.section?.trim()).filter((v): v is string => !!v));
   return [...set].sort(alphaComparator);
+}
+export function uniqueAcademicYears(rows: StudentFieldRow[]): string[] {
+  const set = new Set(rows.map((r) => r.academicYear?.trim()).filter((v): v is string => !!v));
+  return [...set].sort(yearBaseComparator);
 }
 
 /**

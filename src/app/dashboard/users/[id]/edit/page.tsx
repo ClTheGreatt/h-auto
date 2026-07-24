@@ -40,6 +40,7 @@ export default async function EditUserPage({
           course: user.course ?? "",
           yearLevel: user.yearLevel ?? "",
           section: user.section ?? "",
+          academicYear: user.academicYear ?? "",
           position: user.position ?? "",
           status: user.status,
         }}

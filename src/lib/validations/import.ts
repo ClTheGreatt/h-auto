@@ -74,6 +74,10 @@ export const studentImportRowSchema = z
   .object({
     ...baseRow,
     idNumber: z.string().trim().min(1, "idNumber is required"),
+    // Optional: blank is filled in from the idNumber prefix during row
+    // normalization (see normalizeImportRow), so by the time this schema
+    // runs it's either a value the file provided or the derived one.
+    academicYear: z.string().trim().optional().default(""),
     course: z.string().trim().min(1, "course is required"),
     yearLevel: z.string().trim().optional().default(""),
     section: z.string().trim().min(1, "section is required"),

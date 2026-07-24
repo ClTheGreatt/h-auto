@@ -135,9 +135,16 @@ model User {
   course       String?    // for students
   yearLevel    String?    // for students
   section      String?    // for students
+  academicYear String?    // for students — entry cohort, e.g. "2023-2024"
   position     String?    // for faculty
   profileImage String?
   status       UserStatus @default(ACTIVE)
+  // Graduation is orthogonal to `status`: a graduated student isn't
+  // "inactive", they're a completed student whose historical data must stay
+  // intact. Null means not graduated. Checked at the same revocation
+  // checkpoints as tokenVersion (see auth.ts / mobile-auth.ts) so existing
+  // sessions/tokens stop working the moment this is set.
+  graduatedAt  DateTime?
   lastLoginAt  DateTime?
   tourCompletedAt DateTime?
   // Bumped on password change or status change to INACTIVE.
@@ -162,6 +169,7 @@ notifications       AlertNotification[]
 
   @@index([role])
   @@index([status])
+  @@index([academicYear, section])
 }
 
 // ============================================================

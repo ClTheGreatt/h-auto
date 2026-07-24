@@ -130,6 +130,7 @@ export async function POST(req: NextRequest) {
             course: s.course || null,
             yearLevel: s.yearLevel || null,
             section: s.section || null,
+            academicYear: s.academicYear || null,
           },
         });
       }

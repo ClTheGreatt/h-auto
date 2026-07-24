@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
         profileImage: true,
         passwordHash: true,
         tokenVersion: true,
+        graduatedAt: true,
       },
     });
 
@@ -113,6 +114,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (user.graduatedAt) {
+      recordFailedAttempt(rateLimitKey);
+      return NextResponse.json(
+        {
+          error:
+            "This account has graduated and no longer has access. Please contact an administrator.",
+        },
+        { status: 403 }
+      );
+    }
+
     resetRateLimit(rateLimitKey);
 
     // Update lastLoginAt best-effort; don't fail login if this fails.
@@ -136,10 +148,12 @@ export async function POST(req: NextRequest) {
       "30d"
     );
 
-    // Strip passwordHash and tokenVersion before returning
-    const { passwordHash: _, tokenVersion: __, ...userSafe } = user;
+    // Strip passwordHash, tokenVersion, and graduatedAt (never graduated —
+    // login was just rejected above otherwise) before returning
+    const { passwordHash: _, tokenVersion: __, graduatedAt: ___, ...userSafe } = user;
     void _;
     void __;
+    void ___;
 
     return NextResponse.json({
       user: userSafe,

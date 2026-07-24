@@ -35,6 +35,9 @@ export async function assignStudent(
   if (!student || student.role !== "STUDENT_FARMER") {
     return { error: "Selected user is not a student farmer" };
   }
+  if (student.graduatedAt) {
+    return { error: "Cannot assign a graduated student to a plot." };
+  }
 
   const existing = await prisma.plotAssignment.findFirst({
     where: { plotId, studentId, status: "ACTIVE" },

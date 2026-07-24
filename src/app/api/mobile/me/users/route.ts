@@ -175,6 +175,7 @@ export async function POST(req: NextRequest) {
           course: rest.course || null,
           yearLevel: rest.yearLevel || null,
           section: rest.section || null,
+          academicYear: rest.academicYear || null,
           position: rest.position || null,
           passwordHash,
           mustChangePassword: true,

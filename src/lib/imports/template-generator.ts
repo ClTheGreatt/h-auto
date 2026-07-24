@@ -245,10 +245,10 @@ const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
 const STUDENT_COLUMNS: ColumnDef[] = makeColumns([...STUDENT_IMPORT_COLUMNS], STUDENT_REQUIRED_FIELDS);
 
 const STUDENT_EXAMPLE_ROWS: string[][] = [
-  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "BS Agriculture - Animal Science", "4th Year", "BSA-4A", "TempPass123!"],
-  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "BTVTEd - Animal Production", "3rd Year", "BTVTED-3B", "TempPass123!"],
-  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "BS Agriculture - Crop Science", "2nd Year", "BSA-2C", "TempPass123!"],
-  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "BS Agricultural and Biosystems Engineering", "4th Year", "BSABE-4D", "TempPass123!"],
+  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "2023-2024", "BS Agriculture - Animal Science", "4th Year", "BSA-4A", "TempPass123!"],
+  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "2024-2025", "BTVTEd - Animal Production", "3rd Year", "BTVTED-3B", "TempPass123!"],
+  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "2025-2026", "BS Agriculture - Crop Science", "2nd Year", "BSA-2C", "TempPass123!"],
+  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "2022-2023", "BS Agricultural and Biosystems Engineering", "4th Year", "BSABE-4D", "TempPass123!"],
 ];
 
 const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
@@ -258,6 +258,7 @@ const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "email", required: STUDENT_REQUIRED_FIELDS.includes("email"), description: "Must be @bpsu.edu.ph" },
   { name: "phoneNumber", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("phoneNumber"), description: "+639XXXXXXXXX, if provided" },
   { name: "idNumber", required: STUDENT_REQUIRED_FIELDS.includes("idNumber"), description: `Format: 12-34567 (2-digit year prefix ${STUDENT_ID_MIN}–${STUDENT_ID_MAX}, dash, 5 digits)` },
+  { name: "academicYear", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("academicYear"), description: "Entry cohort, e.g. 2023-2024. Leave blank to auto-derive from the idNumber prefix" },
   { name: "course", required: STUDENT_REQUIRED_FIELDS.includes("course"), description: "Pick from the dropdown — one of 5 official program names (listed below)" },
   { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Must be exactly: 1st Year, 2nd Year, 3rd Year, or 4th Year" },
   { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C" },

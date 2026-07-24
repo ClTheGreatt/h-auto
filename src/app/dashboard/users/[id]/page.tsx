@@ -63,6 +63,8 @@ export default async function UserDetailPage({
       course: true,
       yearLevel: true,
       section: true,
+      academicYear: true,
+      graduatedAt: true,
       position: true,
       profileImage: true,
       status: true,
@@ -104,6 +106,11 @@ export default async function UserDetailPage({
               <StatusBadge variant={statusVariant[user.status]}>
                 {user.status}
               </StatusBadge>
+              {user.graduatedAt && (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-700">
+                  Graduated {formatDateTime(user.graduatedAt)}
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -225,6 +232,14 @@ export default async function UserDetailPage({
                     Section
                   </dt>
                   <dd className="mt-1 text-gray-900">{user.section ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Academic year
+                  </dt>
+                  <dd className="mt-1 text-gray-900">
+                    {user.academicYear ?? "—"}
+                  </dd>
                 </div>
               </>
             ) : user.role === "FACULTY" ? (

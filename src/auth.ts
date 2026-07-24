@@ -35,6 +35,7 @@ const getUserForSessionCheck = cache(async (userId: string) => {
       tokenVersion: true,
       tourCompletedAt: true,
       mustChangePassword: true,
+      graduatedAt: true,
     },
   });
 });
@@ -77,7 +78,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user?.passwordHash ?? DUMMY_BCRYPT_HASH
         );
 
-        if (!user || !valid || user.status !== "ACTIVE") {
+        if (!user || !valid || user.status !== "ACTIVE" || user.graduatedAt) {
           recordFailedAttempt(rateLimitKey);
           return null;
         }
@@ -127,9 +128,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             tokenVersion: true,
             tourCompletedAt: true,
             mustChangePassword: true,
+            graduatedAt: true,
           },
         });
-        if (fresh && fresh.status === "ACTIVE") {
+        if (fresh && fresh.status === "ACTIVE" && !fresh.graduatedAt) {
           token.role = fresh.role;
           token.tokenVersion = fresh.tokenVersion;
           token.mustChangePassword = fresh.mustChangePassword;
@@ -142,11 +144,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       // Every subsequent request: re-check the DB. Returning null here
       // invalidates the session immediately (used to revoke suspended
-      // accounts and sessions superseded by a password change).
+      // accounts, graduated students, and sessions superseded by a password
+      // change).
       const fresh = await getUserForSessionCheck(token.id as string);
       if (
         !fresh ||
         fresh.status !== "ACTIVE" ||
+        fresh.graduatedAt ||
         fresh.tokenVersion !== token.tokenVersion
       ) {
         return null;

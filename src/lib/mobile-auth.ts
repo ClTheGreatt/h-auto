@@ -31,14 +31,16 @@ export async function getMobileUser(req: NextRequest) {
       position: true,
       profileImage: true,
       tokenVersion: true,
+      graduatedAt: true,
     },
   });
 
-  if (!user || user.status !== "ACTIVE") return null;
+  if (!user || user.status !== "ACTIVE" || user.graduatedAt) return null;
   // Token superseded by a password change (or any other tokenVersion bump).
   if (user.tokenVersion !== payload.tokenVersion) return null;
 
-  const { tokenVersion: _tokenVersion, ...userWithoutTokenVersion } = user;
+  const { tokenVersion: _tokenVersion, graduatedAt: _graduatedAt, ...userWithoutTokenVersion } = user;
   void _tokenVersion;
+  void _graduatedAt;
   return userWithoutTokenVersion;
 }

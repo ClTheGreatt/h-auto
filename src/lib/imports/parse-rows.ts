@@ -3,6 +3,7 @@ import { facultyImportRowSchema, studentImportRowSchema } from "@/lib/validation
 import {
   FACULTY_IMPORT_COLUMNS,
   STUDENT_IMPORT_COLUMNS,
+  deriveAcademicYearFromIdPrefix,
   type ImportRowType,
 } from "@/lib/constants/user-import";
 
@@ -28,6 +29,14 @@ export function normalizeImportRow(
     const value = raw[col];
     normalized[col] = typeof value === "string" ? value.trim() : value == null ? "" : String(value);
   }
+
+  // Student academicYear: if blank, derive from the idNumber prefix so the
+  // preview already shows what will actually be saved. A present value
+  // (however typed) is always used as given, never overwritten.
+  if (importType === "STUDENT_FARMER" && !normalized.academicYear) {
+    normalized.academicYear = deriveAcademicYearFromIdPrefix(normalized.idNumber) ?? "";
+  }
+
   return normalized;
 }
 

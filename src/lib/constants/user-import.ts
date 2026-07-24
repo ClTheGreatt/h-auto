@@ -66,6 +66,16 @@ export function isValidStudentIdPrefix(idNumber: string): boolean {
   return prefix >= min && prefix <= max;
 }
 
+// Derives the academic year (entry cohort) from a student idNumber's
+// 2-digit year prefix, e.g. "23-04567" -> "2023-2024". Returns null if the
+// idNumber doesn't match STUDENT_ID_REGEX — callers should leave
+// academicYear blank rather than guess from a malformed value.
+export function deriveAcademicYearFromIdPrefix(idNumber: string): string | null {
+  if (!STUDENT_ID_REGEX.test(idNumber)) return null;
+  const startYear = 2000 + parseInt(idNumber.slice(0, 2), 10);
+  return `${startYear}-${startYear + 1}`;
+}
+
 // Which columns are required, per import type. Single source of truth for:
 // the template's header asterisk/fill, the Instructions sheet's "Required
 // fields" note, and the preview table's header asterisk.
@@ -134,6 +144,7 @@ export const STUDENT_IMPORT_COLUMNS = [
   "email",
   "phoneNumber",
   "idNumber",
+  "academicYear",
   "course",
   "yearLevel",
   "section",

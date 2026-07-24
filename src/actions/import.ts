@@ -15,6 +15,7 @@ import {
   type StudentImportRow,
   type ImportRowType,
 } from "@/lib/validations/import";
+import { normalizeImportRow, formatZodIssue } from "@/lib/imports/parse-rows";
 
 type RawRow = Record<string, unknown>;
 
@@ -30,12 +31,15 @@ export async function commitImport(
   const schema =
     type === "FACULTY" ? facultyImportRowSchema : studentImportRowSchema;
 
-  // Re-validate on the server (never trust client)
+  // Re-validate on the server (never trust client). Normalize first — a
+  // column missing entirely must reach the schema as "", never `undefined`,
+  // and formatZodIssue is the same safety net used in the preview path.
   const validated: (FacultyImportRow | StudentImportRow)[] = [];
   const validationFailed: { email: string; reason: string }[] = [];
 
   for (const raw of rawRows) {
-    const parsed = schema.safeParse(raw);
+    const normalized = normalizeImportRow(raw, type);
+    const parsed = schema.safeParse(normalized);
     if (parsed.success) {
       validated.push(parsed.data);
     } else {
@@ -43,9 +47,7 @@ export async function commitImport(
         typeof raw.email === "string" ? raw.email : "(missing email)";
       validationFailed.push({
         email,
-        reason: parsed.error.issues
-          .map((i) => `${i.path.join(".") || "row"}: ${i.message}`)
-          .join("; "),
+        reason: parsed.error.issues.map(formatZodIssue).join("; "),
       });
     }
   }
@@ -113,6 +115,7 @@ export async function commitImport(
             course: s.course || null,
             yearLevel: s.yearLevel || null,
             section: s.section || null,
+            academicYear: s.academicYear || null,
           },
         });
       }

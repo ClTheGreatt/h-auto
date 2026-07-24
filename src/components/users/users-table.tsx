@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Users as UsersIcon } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Undo2, Users as UsersIcon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DeleteUserDialog } from "./delete-user-dialog";
+import { UngraduateStudentDialog } from "./ungraduate-student-dialog";
 import { StudentFarmerSection } from "./student-farmer-section";
 import { cn } from "@/lib/utils";
 import type { UserRole, UserStatus } from "@prisma/client";
@@ -37,6 +38,8 @@ export type UserRow = {
   course: string | null;
   yearLevel: string | null;
   section: string | null;
+  academicYear: string | null;
+  graduatedAt: Date | null;
 };
 
 const ROLE_ORDER: UserRole[] = [
@@ -211,6 +214,13 @@ export function UserTableRow({ user }: { user: UserRow }) {
       </TableCell>
       <TableCell className="px-4 py-3 text-gray-600">
         {user.idNumber ?? "—"}
+        {/* Graduated rows show academicYear so a repeating student is
+            visually distinguishable from the new batch in the same section. */}
+        {user.graduatedAt && user.academicYear && (
+          <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            {user.academicYear}
+          </span>
+        )}
       </TableCell>
       <TableCell className="px-3 py-2 text-right">
         <DropdownMenu>
@@ -230,6 +240,18 @@ export function UserTableRow({ user }: { user: UserRow }) {
                 Edit
               </Link>
             </DropdownMenuItem>
+            {user.graduatedAt && (
+              <UngraduateStudentDialog
+                userId={user.id}
+                userName={`${user.firstName} ${user.lastName}`}
+                trigger={
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <Undo2 className="w-4 h-4 mr-2" />
+                    Un-graduate
+                  </DropdownMenuItem>
+                }
+              />
+            )}
             <DeleteUserDialog
               userId={user.id}
               userName={`${user.firstName} ${user.lastName}`}

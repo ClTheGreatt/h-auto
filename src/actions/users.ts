@@ -84,6 +84,7 @@ const passwordHash = await bcrypt.hash(parsed.data.password, 10);
         course: rest.course || null,
         yearLevel: rest.yearLevel || null,
         section: rest.section || null,
+        academicYear: rest.academicYear || null,
         position: rest.position || null,
         passwordHash,
         mustChangePassword: true,
@@ -165,6 +166,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     course: rest.course || null,
     yearLevel: rest.yearLevel || null,
     section: rest.section || null,
+    academicYear: rest.academicYear || null,
     position: rest.position || null,
   };
 
@@ -303,4 +305,89 @@ export async function deactivateUser(id: string) {
         "Failed to deactivate user. Please contact your administrator if this persists.",
     };
   }
+}
+
+/**
+ * Bulk, reversible graduation — the Student Farmer counterpart to
+ * harvestPlot/unharvestPlot. Graduation is orthogonal to `status`; this
+ * never touches status and never cascades (growth logs, plot assignments,
+ * alerts all stay intact).
+ *
+ * All-or-nothing: any id that isn't a not-yet-graduated STUDENT_FARMER
+ * rejects the whole batch, rather than silently applying to a subset. In
+ * practice this should rarely trigger — the "Mark as graduated" dialog's
+ * candidate list is already built from a pre-filtered, non-graduated
+ * student query.
+ */
+export async function graduateStudents(userIds: string[], graduatedAt: Date) {
+  await requireAdmin();
+
+  if (userIds.length === 0) {
+    return { error: "No students selected" };
+  }
+
+  const matched = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, role: true, graduatedAt: true },
+  });
+
+  if (matched.length !== userIds.length) {
+    return { error: "One or more selected users could not be found." };
+  }
+  if (matched.some((u) => u.role !== "STUDENT_FARMER")) {
+    return { error: "Only student farmers can be marked as graduated." };
+  }
+  if (matched.some((u) => u.graduatedAt)) {
+    return { error: "One or more selected students are already graduated." };
+  }
+
+  await prisma.user.updateMany({
+    where: { id: { in: userIds } },
+    data: {
+      graduatedAt,
+      // Belt-and-suspenders: graduatedAt itself is already checked at every
+      // revocation checkpoint (auth.ts / mobile-auth.ts), but bumping this
+      // too matches the existing "state change that should kill sessions"
+      // convention used for deactivation/password changes.
+      tokenVersion: { increment: 1 },
+    },
+  });
+
+  revalidatePath("/dashboard/users");
+  return { success: true, count: userIds.length };
+}
+
+/**
+ * Reversible: clears graduatedAt so the account regains access. Mirrors
+ * unharvestPlot — no cascading changes, historical data untouched.
+ */
+export async function ungraduateStudents(userIds: string[]) {
+  await requireAdmin();
+
+  if (userIds.length === 0) {
+    return { error: "No students selected" };
+  }
+
+  const matched = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, role: true, graduatedAt: true },
+  });
+
+  if (matched.length !== userIds.length) {
+    return { error: "One or more selected users could not be found." };
+  }
+  if (matched.some((u) => u.role !== "STUDENT_FARMER")) {
+    return { error: "Only student farmers can be un-graduated." };
+  }
+  if (matched.some((u) => !u.graduatedAt)) {
+    return { error: "One or more selected students are not graduated." };
+  }
+
+  await prisma.user.updateMany({
+    where: { id: { in: userIds } },
+    data: { graduatedAt: null },
+  });
+
+  revalidatePath("/dashboard/users");
+  return { success: true, count: userIds.length };
 }

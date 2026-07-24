@@ -11,11 +11,14 @@ import { StatusFilter } from "@/components/users/status-filter";
 import { CourseFilter } from "@/components/users/course-filter";
 import { YearFilter } from "@/components/users/year-filter";
 import { SectionFilter } from "@/components/users/section-filter";
+import { AcademicYearFilter } from "@/components/users/academic-year-filter";
+import { GraduateStudentsDialog } from "@/components/users/graduate-students-dialog";
 import {
   groupStudents,
   uniqueCourses,
   uniqueYearLevels,
   uniqueSections,
+  uniqueAcademicYears,
 } from "@/lib/users/group-students";
 
 const VALID_ROLES: UserRole[] = [
@@ -37,6 +40,8 @@ export default async function UsersPage({
     course?: string;
     year?: string;
     section?: string;
+    academicYear?: string;
+    view?: string;
   }>;
 }) {
   await requireAdmin();
@@ -51,21 +56,30 @@ export default async function UsersPage({
     sp.status && VALID_STATUSES.includes(sp.status as UserStatus)
       ? (sp.status as UserStatus)
       : undefined;
+  // Active/Graduated tab. Applied as a plain graduatedAt where-clause across
+  // the whole query (not just students) — harmless for Admin/Faculty/Super
+  // Admin rows since graduatedAt is always null for them, so this behaves
+  // identically to a student-only-scoped filter without the extra code.
+  const view = sp.view === "graduated" ? "graduated" : "active";
 
-  // Course/Year/Section only mean anything for Student Farmers, so they only
-  // take effect when the Role filter is "All roles" or Student Farmer.
+  // Course/Year/Section/Academic year only mean anything for Student
+  // Farmers, so they only take effect when the Role filter is "All roles"
+  // or Student Farmer.
   const studentFiltersActive = !role || role === "STUDENT_FARMER";
 
-  // Baseline (unfiltered) roster of every student's course/year/section, used
-  // both to populate the filter dropdown options and to compute the "X of Y"
-  // totals shown on group headers while a filter narrows the main query.
+  // Baseline (unfiltered) roster of every student's course/year/section/
+  // academicYear, used both to populate the filter dropdown options and to
+  // compute the "X of Y" totals shown on group headers while a filter
+  // narrows the main query. Deliberately NOT scoped by `view` — the
+  // baseline represents the full roster regardless of the current tab.
   const studentFieldRows = await prisma.user.findMany({
     where: { role: "STUDENT_FARMER" },
-    select: { course: true, yearLevel: true, section: true },
+    select: { course: true, yearLevel: true, section: true, academicYear: true },
   });
   const courseOptions = uniqueCourses(studentFieldRows);
   const yearOptions = uniqueYearLevels(studentFieldRows);
   const sectionOptions = uniqueSections(studentFieldRows);
+  const academicYearOptions = uniqueAcademicYears(studentFieldRows);
 
   const course =
     studentFiltersActive && sp.course && courseOptions.includes(sp.course)
@@ -79,6 +93,12 @@ export default async function UsersPage({
     studentFiltersActive && sp.section && sectionOptions.includes(sp.section)
       ? sp.section
       : undefined;
+  const academicYear =
+    studentFiltersActive &&
+    sp.academicYear &&
+    academicYearOptions.includes(sp.academicYear)
+      ? sp.academicYear
+      : undefined;
 
   // Build Prisma filter
   const where: Prisma.UserWhereInput = {
@@ -87,6 +107,8 @@ export default async function UsersPage({
     ...(course && { course }),
     ...(yearLevel && { yearLevel }),
     ...(section && { section }),
+    ...(academicYear && { academicYear }),
+    graduatedAt: view === "graduated" ? { not: null } : null,
     ...(search && {
       OR: [
         { firstName: { contains: search, mode: "insensitive" } },
@@ -112,17 +134,35 @@ export default async function UsersPage({
       course: true,
       yearLevel: true,
       section: true,
+      academicYear: true,
+      graduatedAt: true,
     },
   });
 
   const totalUsers = users.length;
   const hasFilters = Boolean(
-    search || role || status || course || yearLevel || section
+    search || role || status || course || yearLevel || section || academicYear
   );
 
   const studentRows = users.filter((u) => u.role === "STUDENT_FARMER");
   const courseGroups = groupStudents(studentRows, studentFieldRows);
   const showStudentSection = studentFiltersActive;
+
+  // Build URL preserving filters when switching tabs (page resets implicitly
+  // since this page has no pagination).
+  function tabUrl(targetView: "active" | "graduated"): string {
+    const p = new URLSearchParams();
+    if (targetView === "graduated") p.set("view", "graduated");
+    if (search) p.set("search", search);
+    if (role) p.set("role", role);
+    if (status) p.set("status", status);
+    if (course) p.set("course", course);
+    if (yearLevel) p.set("year", yearLevel);
+    if (section) p.set("section", section);
+    if (academicYear) p.set("academicYear", academicYear);
+    const qs = p.toString();
+    return `/dashboard/users${qs ? "?" + qs : ""}`;
+  }
 
   return (
     <div className="w-full space-y-5">
@@ -155,6 +195,32 @@ export default async function UsersPage({
         </div>
       </div>
 
+      {/* Active/Graduated tabs */}
+      <div className="flex items-center gap-2">
+        <Link
+          href={tabUrl("active")}
+          className={
+            "px-3 py-1.5 rounded-md text-sm transition " +
+            (view === "active"
+              ? "bg-green-100 text-green-700 font-medium"
+              : "text-gray-600 hover:bg-gray-100")
+          }
+        >
+          Active
+        </Link>
+        <Link
+          href={tabUrl("graduated")}
+          className={
+            "px-3 py-1.5 rounded-md text-sm transition " +
+            (view === "graduated"
+              ? "bg-green-100 text-green-700 font-medium"
+              : "text-gray-600 hover:bg-gray-100")
+          }
+        >
+          Graduated
+        </Link>
+      </div>
+
       {/* Filters */}
       <div className="rounded-md border bg-white p-3 shadow-sm dark:bg-gray-900">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -180,6 +246,11 @@ export default async function UsersPage({
                 options={sectionOptions}
                 disabled={!studentFiltersActive}
               />
+              <AcademicYearFilter
+                current={academicYear}
+                options={academicYearOptions}
+                disabled={!studentFiltersActive}
+              />
             </div>
           </div>
 
@@ -202,6 +273,26 @@ export default async function UsersPage({
           </div>
         </div>
       </div>
+
+      {/* Mark as graduated — filter-then-confirm, only on the Active tab.
+          A section isn't a cohort (some students repeat a year), so this
+          always operates on the explicitly checked subset of the currently
+          filtered students, never a blind bulk-by-section action. */}
+      {view === "active" && showStudentSection && studentRows.length > 0 && (
+        <div className="flex justify-end">
+          <GraduateStudentsDialog
+            students={studentRows.map((s) => ({
+              id: s.id,
+              firstName: s.firstName,
+              lastName: s.lastName,
+              idNumber: s.idNumber,
+              course: s.course,
+              yearLevel: s.yearLevel,
+              section: s.section,
+            }))}
+          />
+        </div>
+      )}
 
       {/* Grouped table */}
       <div data-tour="users.list">

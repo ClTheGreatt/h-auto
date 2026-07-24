@@ -23,6 +23,7 @@ const baseUserSchema = z.object({
   course: z.string().optional().or(z.literal("")),
   yearLevel: z.string().optional().or(z.literal("")),
   section: z.string().optional().or(z.literal("")),
+  academicYear: z.string().optional().or(z.literal("")),
   position: z.string().optional().or(z.literal("")),
   status: z.enum(["ACTIVE", "INACTIVE"]),
 });

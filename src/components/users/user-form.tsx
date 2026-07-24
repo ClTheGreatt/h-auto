@@ -49,6 +49,7 @@ import {
   DEPARTMENTS,
   FACULTY_POSITIONS,
   studentIdPrefixRange,
+  deriveAcademicYearFromIdPrefix,
 } from "@/lib/constants/user-import";
 import { createUser, updateUser } from "@/actions/users";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
@@ -135,6 +136,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
       course: defaultValues?.course ?? "",
       yearLevel: defaultValues?.yearLevel ?? "",
       section: defaultValues?.section ?? "",
+      academicYear: defaultValues?.academicYear ?? "",
       position: defaultValues?.position ?? "",
       status: defaultValues?.status ?? "ACTIVE",
       password: "",
@@ -418,6 +420,25 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                             : undefined
                         }
                         {...field}
+                        onBlur={(e) => {
+                          field.onBlur();
+                          // Prefill academicYear from the idNumber prefix —
+                          // only when it's still blank, so this never
+                          // clobbers a value the admin already set/edited.
+                          if (
+                            watchedRole === "STUDENT_FARMER" &&
+                            !form.getValues("academicYear")
+                          ) {
+                            const derived = deriveAcademicYearFromIdPrefix(
+                              e.target.value.trim()
+                            );
+                            if (derived) {
+                              form.setValue("academicYear", derived, {
+                                shouldDirty: true,
+                              });
+                            }
+                          }
+                        }}
                       />
                     </FormControl>
                     {watchedRole === "FACULTY" && (
@@ -590,7 +611,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
             <CardHeader>
               <CardTitle>Student details</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <FormField
                 control={form.control}
                 name="course"
@@ -659,6 +680,22 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                     </FormControl>
                     <FormDescription className="text-xs">
                       Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="academicYear"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Academic year</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 2023-2024" {...field} />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Entry cohort — prefilled from the ID number, editable
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
