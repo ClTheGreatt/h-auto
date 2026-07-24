@@ -67,6 +67,12 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
     const roleParam = sp.get("role");
     const statusParam = sp.get("status");
+    // Opt-in filter for the plot-assignment student picker: a graduated
+    // student can still be status=ACTIVE (orthogonal), so it must be
+    // excluded explicitly rather than inferred from status. The general
+    // users list omits this so graduated students still show there (with
+    // a GRADUATED badge) — only the picker needs them gone entirely.
+    const excludeGraduated = sp.get("excludeGraduated") === "true";
 
     const where: Prisma.UserWhereInput = {
       ...(roleParam && VALID_ROLES.includes(roleParam as UserRole)
@@ -75,6 +81,7 @@ export async function GET(req: NextRequest) {
       ...(statusParam && VALID_STATUSES.includes(statusParam as UserStatus)
         ? { status: statusParam as UserStatus }
         : {}),
+      ...(excludeGraduated ? { graduatedAt: null } : {}),
     };
 
     const users = await prisma.user.findMany({
@@ -92,6 +99,8 @@ export async function GET(req: NextRequest) {
         profileImage: true,
         lastLoginAt: true,
         createdAt: true,
+        graduatedAt: true,
+        academicYear: true,
       },
     });
 
@@ -100,6 +109,7 @@ export async function GET(req: NextRequest) {
         ...u,
         lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
         createdAt: u.createdAt.toISOString(),
+        graduatedAt: u.graduatedAt?.toISOString() ?? null,
       })),
     });
   } catch (error) {

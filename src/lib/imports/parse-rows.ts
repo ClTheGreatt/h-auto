@@ -59,12 +59,14 @@ export function formatZodIssue(issue: ZodError["issues"][number]): string {
     : `${field}: ${issue.message}`;
 }
 
-// Shared by both the CSV and Excel parse paths: validates raw row objects
-// against the schema for the selected import type and flags duplicate emails.
-// Callers are expected to have already ruled out a wrong-template upload
-// (see detectImportTypeMismatch) — this only validates row content.
+// Shared by both the CSV and Excel parse paths (and the mobile app's
+// validate-only endpoint, whose rows arrive as parsed JSON of unknown
+// per-value type): validates raw row objects against the schema for the
+// selected import type and flags duplicate emails. Callers are expected to
+// have already ruled out a wrong-template upload (see
+// detectImportTypeMismatch) — this only validates row content.
 export function buildParsedRows(
-  data: Record<string, string>[],
+  data: Record<string, unknown>[],
   importType: ImportRowType
 ): ParsedRow[] {
   const schema =

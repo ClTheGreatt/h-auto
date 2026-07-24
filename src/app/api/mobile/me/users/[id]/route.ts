@@ -39,6 +39,8 @@ export async function GET(
         course: true,
         yearLevel: true,
         section: true,
+        academicYear: true,
+        graduatedAt: true,
         position: true,
         profileImage: true,
         status: true,
@@ -78,6 +80,7 @@ export async function GET(
         lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
+        graduatedAt: user.graduatedAt?.toISOString() ?? null,
       },
     });
   } catch (error) {
