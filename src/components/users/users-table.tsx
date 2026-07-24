@@ -208,15 +208,25 @@ export function UserTableRow({ user }: { user: UserRow }) {
         {user.email}
       </TableCell>
       <TableCell className="px-4 py-3">
-        <StatusBadge variant={statusVariant[user.status]}>
-          {user.status}
-        </StatusBadge>
+        <div className="flex items-center gap-1.5">
+          <StatusBadge variant={statusVariant[user.status]}>
+            {user.status}
+          </StatusBadge>
+          {/* Graduation is orthogonal to UserStatus — a graduated student
+              still shows ACTIVE. Without this, seeing "ACTIVE" on the
+              Graduated tab would read as a bug. */}
+          {user.role === "STUDENT_FARMER" && user.graduatedAt && (
+            <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
+              GRADUATED
+            </span>
+          )}
+        </div>
       </TableCell>
       <TableCell className="px-4 py-3 text-gray-600">
         {user.idNumber ?? "—"}
         {/* Graduated rows show academicYear so a repeating student is
             visually distinguishable from the new batch in the same section. */}
-        {user.graduatedAt && user.academicYear && (
+        {user.role === "STUDENT_FARMER" && user.graduatedAt && user.academicYear && (
           <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
             {user.academicYear}
           </span>
@@ -240,7 +250,7 @@ export function UserTableRow({ user }: { user: UserRow }) {
                 Edit
               </Link>
             </DropdownMenuItem>
-            {user.graduatedAt && (
+            {user.role === "STUDENT_FARMER" && user.graduatedAt && (
               <UngraduateStudentDialog
                 userId={user.id}
                 userName={`${user.firstName} ${user.lastName}`}

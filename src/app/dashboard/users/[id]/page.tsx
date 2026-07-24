@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/format-date";
@@ -9,13 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DeleteUserDialog } from "@/components/users/delete-user-dialog";
+import { UserDetailActionsMenu } from "@/components/users/user-detail-actions-menu";
 import type { UserRole, UserStatus } from "@prisma/client";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -106,9 +100,9 @@ export default async function UserDetailPage({
               <StatusBadge variant={statusVariant[user.status]}>
                 {user.status}
               </StatusBadge>
-              {user.graduatedAt && (
+              {user.role === "STUDENT_FARMER" && user.graduatedAt && (
                 <Badge variant="secondary" className="bg-gray-100 text-gray-700">
-                  Graduated {formatDateTime(user.graduatedAt)}
+                  GRADUATED {formatDateTime(user.graduatedAt)}
                 </Badge>
               )}
             </div>
@@ -121,28 +115,7 @@ export default async function UserDetailPage({
                 Edit
               </Link>
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DeleteUserDialog
-                  userId={user.id}
-                  userName={fullName}
-                  trigger={
-                    <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Deactivate
-                    </DropdownMenuItem>
-                  }
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserDetailActionsMenu userId={user.id} userName={fullName} />
           </div>
         </div>
       </div>
