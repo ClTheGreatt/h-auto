@@ -67,12 +67,11 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
     const roleParam = sp.get("role");
     const statusParam = sp.get("status");
-    // Opt-in filter for the plot-assignment student picker: a graduated
-    // student can still be status=ACTIVE (orthogonal), so it must be
-    // excluded explicitly rather than inferred from status. The general
-    // users list omits this so graduated students still show there (with
-    // a GRADUATED badge) — only the picker needs them gone entirely.
-    const excludeGraduated = sp.get("excludeGraduated") === "true";
+    // Active/Graduated tab (mirrors the web Users page): a graduated
+    // student can still be status=ACTIVE (orthogonal to status), so
+    // "active" means graduatedAt IS null, not status=ACTIVE. Absent/other
+    // values apply no graduatedAt filter at all (today's default).
+    const view = sp.get("view");
 
     const where: Prisma.UserWhereInput = {
       ...(roleParam && VALID_ROLES.includes(roleParam as UserRole)
@@ -81,7 +80,8 @@ export async function GET(req: NextRequest) {
       ...(statusParam && VALID_STATUSES.includes(statusParam as UserStatus)
         ? { status: statusParam as UserStatus }
         : {}),
-      ...(excludeGraduated ? { graduatedAt: null } : {}),
+      ...(view === "active" ? { graduatedAt: null } : {}),
+      ...(view === "graduated" ? { graduatedAt: { not: null } } : {}),
     };
 
     const users = await prisma.user.findMany({
@@ -101,6 +101,11 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         graduatedAt: true,
         academicYear: true,
+        // Needed for the Course > Year > Section grouping on the mobile
+        // Users list (student rows only; null for every other role).
+        course: true,
+        yearLevel: true,
+        section: true,
       },
     });
 

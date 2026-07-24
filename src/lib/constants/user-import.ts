@@ -2,6 +2,12 @@
 // the Zod schemas (src/lib/validations/import.ts), the Excel template
 // generator (src/lib/imports/template-generator.ts), and nowhere else —
 // the preview UI just renders whatever errors the schemas produce.
+//
+// MIRRORED IN h-auto-mobile: the enum lists, regexes, prefix-range helper,
+// and import-type-mismatch detection below are duplicated (by necessity —
+// h-auto-mobile is a separate npm package and can't import this file) in
+// h-auto-mobile/constants/user-import.ts. If you change a value here,
+// update that file too — they must move together.
 
 // Shared by faculty `department` and student `course` — same 5 canonical
 // program/department names for both roles.
