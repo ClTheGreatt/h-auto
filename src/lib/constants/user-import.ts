@@ -13,6 +13,39 @@ export const DEPARTMENTS = [
   "BS Agricultural and Biosystems Engineering",
 ] as const;
 
+// Final (graduating) year level per course, keyed by the same DEPARTMENTS
+// values used for student `course`. Everything is a 4-year program except
+// Agricultural and Biosystems Engineering, which is 5.
+export const COURSE_FINAL_YEAR: Record<(typeof DEPARTMENTS)[number], number> =
+  DEPARTMENTS.reduce(
+    (acc, course) => {
+      acc[course] = course === "BS Agricultural and Biosystems Engineering" ? 5 : 4;
+      return acc;
+    },
+    {} as Record<(typeof DEPARTMENTS)[number], number>
+  );
+
+// Advisory-only check for the graduation confirm dialog: is this student's
+// yearLevel below their course's final year? Returns a short note to render
+// inline, or null when there's nothing to flag (course/yearLevel missing,
+// yearLevel unparseable, or already at/past the final year). Never used to
+// filter or block — graduation is a per-student judgment call, this just
+// surfaces a heads-up.
+export function graduationYearWarning(
+  course: string | null,
+  yearLevel: string | null
+): string | null {
+  if (!course || !yearLevel) return null;
+  const finalYear = COURSE_FINAL_YEAR[course as (typeof DEPARTMENTS)[number]];
+  if (!finalYear) return null;
+  const currentYear = parseInt(yearLevel, 10);
+  if (Number.isNaN(currentYear)) return null;
+  if (currentYear < finalYear) {
+    return `${yearLevel} — check this is correct`;
+  }
+  return null;
+}
+
 export const FACULTY_POSITIONS = [
   "Instructor I",
   "Instructor II",

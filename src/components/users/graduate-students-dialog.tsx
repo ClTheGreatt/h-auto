@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { graduateStudents } from "@/actions/users";
+import { graduationYearWarning } from "@/lib/constants/user-import";
 
 type Candidate = {
   id: string;
@@ -50,6 +51,10 @@ export function GraduateStudentsDialog({ students }: { students: Candidate[] }) 
     }
     setOpen(next);
   }
+
+  const warnedCheckedCount = students.filter(
+    (s) => checked.has(s.id) && graduationYearWarning(s.course, s.yearLevel)
+  ).length;
 
   function toggle(id: string) {
     setChecked((prev) => {
@@ -117,28 +122,44 @@ export function GraduateStudentsDialog({ students }: { students: Candidate[] }) 
         </div>
 
         <div className="max-h-72 overflow-y-auto rounded-md border divide-y">
-          {students.map((s) => (
-            <label
-              key={s.id}
-              className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
-            >
-              <Checkbox
-                checked={checked.has(s.id)}
-                onCheckedChange={() => toggle(s.id)}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="font-medium">
-                  {s.firstName} {s.lastName}
+          {students.map((s) => {
+            const warning = graduationYearWarning(s.course, s.yearLevel);
+            return (
+              <label
+                key={s.id}
+                className="flex items-start gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
+              >
+                <Checkbox
+                  checked={checked.has(s.id)}
+                  onCheckedChange={() => toggle(s.id)}
+                  className="mt-0.5"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">
+                    {s.firstName} {s.lastName}
+                  </span>
+                  <span className="ml-1 text-xs text-gray-500">
+                    {[s.idNumber, s.course, s.yearLevel, s.section]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  {warning && (
+                    <span className="block text-xs text-amber-600 mt-0.5">
+                      {warning}
+                    </span>
+                  )}
                 </span>
-                <span className="ml-1 text-xs text-gray-500">
-                  {[s.idNumber, s.course, s.yearLevel, s.section]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </span>
-            </label>
-          ))}
+              </label>
+            );
+          })}
         </div>
+
+        {warnedCheckedCount > 0 && (
+          <p className="text-xs text-amber-600">
+            {warnedCheckedCount} selected student{warnedCheckedCount === 1 ? "" : "s"} may
+            not be graduating yet.
+          </p>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
