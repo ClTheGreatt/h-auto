@@ -50,13 +50,22 @@ export async function commitImport(
     }
   }
 
-  // Check existing emails in DB
+  // Check existing emails + ID numbers in DB
   const emails = validated.map((r) => r.email.toLowerCase());
+  const idNumbers = validated.map((r) => r.idNumber).filter(Boolean);
   const existing = await prisma.user.findMany({
-    where: { email: { in: emails } },
-    select: { email: true },
+    where: {
+      OR: [
+        { email: { in: emails } },
+        ...(idNumbers.length > 0 ? [{ idNumber: { in: idNumbers } }] : []),
+      ],
+    },
+    select: { email: true, idNumber: true },
   });
   const existingEmails = new Set(existing.map((u) => u.email.toLowerCase()));
+  const existingIdNumbers = new Set(
+    existing.map((u) => u.idNumber).filter((v): v is string => !!v)
+  );
 
   const created: string[] = [];
   const failed: { email: string; reason: string }[] = [...validationFailed];
@@ -64,6 +73,10 @@ export async function commitImport(
   for (const row of validated) {
     if (existingEmails.has(row.email.toLowerCase())) {
       failed.push({ email: row.email, reason: "Email already exists" });
+      continue;
+    }
+    if (row.idNumber && existingIdNumbers.has(row.idNumber)) {
+      failed.push({ email: row.email, reason: "ID number already exists" });
       continue;
     }
 

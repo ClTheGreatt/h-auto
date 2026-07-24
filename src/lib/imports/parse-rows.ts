@@ -20,9 +20,13 @@ export function buildParsedRows(
     importType === "FACULTY" ? facultyImportRowSchema : studentImportRowSchema;
 
   const emailCounts = new Map<string, number>();
+  const idNumberCounts = new Map<string, number>();
   data.forEach((row) => {
     const email = row.email?.trim().toLowerCase();
     if (email) emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
+
+    const idNumber = row.idNumber?.trim();
+    if (idNumber) idNumberCounts.set(idNumber, (idNumberCounts.get(idNumber) ?? 0) + 1);
   });
 
   return data.map((raw, idx) => {
@@ -44,6 +48,11 @@ export function buildParsedRows(
     const email = trimmed.email?.toLowerCase();
     if (email && (emailCounts.get(email) ?? 0) > 1) {
       errors.push("Duplicate email within this file");
+    }
+
+    const idNumber = trimmed.idNumber;
+    if (idNumber && (idNumberCounts.get(idNumber) ?? 0) > 1) {
+      errors.push("Duplicate ID number within this file");
     }
 
     return {

@@ -1,8 +1,20 @@
 import ExcelJS from "exceljs";
 import { YEAR_LEVELS } from "@/lib/validations/user";
+import {
+  DEPARTMENTS,
+  FACULTY_POSITIONS,
+  studentIdPrefixRange,
+} from "@/lib/constants/user-import";
 
 type ColumnDef = { header: string; key: string };
 type ColumnGuideEntry = { name: string; required: boolean; description: string };
+// Inline list: a literal comma-separated formula (fine for short lists —
+// Excel's classic data-validation list formula has a ~255-char limit).
+// Sheet range: references the hidden Lists sheet instead, for lists too
+// long to fit inline (e.g. the 18 faculty positions).
+type DropdownSpec =
+  | { columnKey: string; values: readonly string[] }
+  | { columnKey: string; sheetRange: string };
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
@@ -25,10 +37,12 @@ const BANDED_ROW_FILL: ExcelJS.Fill = {
 const REQUIRED_FONT = { bold: true, color: { argb: "FF16A34A" } };
 const OPTIONAL_FONT = { color: { argb: "FF6B7280" } };
 
+const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
+
 const COMMON_NOTES = [
   "All emails must end in @bpsu.edu.ph",
   "Passwords must be at least 8 characters with at least one letter and one number",
-  "Phone numbers should be in format +639XXXXXXXXX or 09XXXXXXXXX",
+  "Phone numbers, if provided, must be in format +639XXXXXXXXX (09XXXXXXXXX is NOT accepted for import)",
 ];
 
 const STUDENT_ONLY_NOTE =
@@ -39,11 +53,26 @@ const CLOSING_NOTES = [
   "Save as .xlsx or export to .csv — both formats are accepted",
 ];
 
+// Hidden lookup sheet backing the position/department/course dropdowns —
+// FACULTY_POSITIONS has 18 entries, too long for an inline list formula
+// (Excel's classic ~255-char limit), so it's referenced by cell range
+// instead. DEPARTMENTS is short enough to inline but lives here too for
+// one consistent lookup source.
+const POSITION_RANGE = `Lists!$A$2:$A$${1 + FACULTY_POSITIONS.length}`;
+const DEPARTMENT_RANGE = `Lists!$B$2:$B$${1 + DEPARTMENTS.length}`;
+
+function buildListsSheet(workbook: ExcelJS.Workbook) {
+  const sheet = workbook.addWorksheet("Lists", { state: "veryHidden" });
+  sheet.getColumn(1).values = ["Position", ...FACULTY_POSITIONS];
+  sheet.getColumn(2).values = ["Department", ...DEPARTMENTS];
+  return sheet;
+}
+
 function buildDataSheet(
   workbook: ExcelJS.Workbook,
   columns: ColumnDef[],
   rows: string[][],
-  dropdown?: { columnKey: string; values: readonly string[] }
+  dropdowns?: DropdownSpec[]
 ) {
   const sheet = workbook.addWorksheet("Data");
   sheet.columns = columns.map((c) => ({ header: c.header, key: c.key }));
@@ -62,14 +91,19 @@ function buildDataSheet(
     sheet.getColumn(idx + 1).width = Math.max(15, longestValue + 2);
   });
 
-  if (dropdown) {
-    const colIndex = columns.findIndex((c) => c.key === dropdown.columnKey) + 1;
-    for (let r = 2; r <= 1000; r++) {
-      sheet.getCell(r, colIndex).dataValidation = {
-        type: "list",
-        allowBlank: true,
-        formulae: [`"${dropdown.values.join(",")}"`],
-      };
+  if (dropdowns) {
+    for (const dropdown of dropdowns) {
+      const colIndex = columns.findIndex((c) => c.key === dropdown.columnKey) + 1;
+      if (colIndex < 1) continue;
+      const formula =
+        "values" in dropdown ? `"${dropdown.values.join(",")}"` : dropdown.sheetRange;
+      for (let r = 2; r <= 1000; r++) {
+        sheet.getCell(r, colIndex).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [formula],
+        };
+      }
     }
   }
 
@@ -144,10 +178,10 @@ const FACULTY_COLUMNS: ColumnDef[] = [
 ];
 
 const FACULTY_EXAMPLE_ROWS: string[][] = [
-  ["Maria Elena", "Santos", "Cruz", "maria.santos@bpsu.edu.ph", "+639171234567", "EMP-2020-001", "College of Computer Studies", "Associate Professor", "TempPass123!"],
-  ["Roberto", "Reyes", "Bautista", "roberto.reyes@bpsu.edu.ph", "+639181112233", "EMP-2019-045", "College of Computer Studies", "Instructor", "TempPass123!"],
-  ["Jennifer", "Aquino", "Villanueva", "jennifer.aquino@bpsu.edu.ph", "+639172345678", "EMP-2021-089", "College of Agriculture and Aquaculture", "Assistant Professor", "TempPass123!"],
-  ["Michael", "Torres", "Delos Reyes", "michael.torres@bpsu.edu.ph", "+639191122334", "EMP-2018-102", "College of Computer Studies", "Department Chair", "TempPass123!"],
+  ["Maria Elena", "Santos", "Cruz", "maria.santos@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III", "TempPass123!"],
+  ["Roberto", "Reyes", "Bautista", "roberto.reyes@bpsu.edu.ph", "+639181112233", "201900-0045", "BS Agriculture - Crop Science", "Instructor I", "TempPass123!"],
+  ["Jennifer", "Aquino", "Villanueva", "jennifer.aquino@bpsu.edu.ph", "+639172345678", "202100-0089", "BTVTEd - Animal Production", "Assistant Professor II", "TempPass123!"],
+  ["Michael", "Torres", "Delos Reyes", "michael.torres@bpsu.edu.ph", "+639191122334", "201800-0102", "BS Agricultural and Biosystems Engineering", "Professor I", "TempPass123!"],
 ];
 
 const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
@@ -155,10 +189,10 @@ const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "middleName", required: false, description: "Middle name if applicable" },
   { name: "lastName", required: true, description: "Family name / surname" },
   { name: "email", required: true, description: "Must be @bpsu.edu.ph" },
-  { name: "phoneNumber", required: false, description: "Contact number in PH format" },
-  { name: "idNumber", required: false, description: "Employee ID" },
-  { name: "department", required: false, description: "Department or unit name" },
-  { name: "position", required: false, description: "Job title" },
+  { name: "phoneNumber", required: false, description: "+639XXXXXXXXX, if provided" },
+  { name: "idNumber", required: true, description: "Format: 123456-1234 (6 digits, dash, 4 digits)" },
+  { name: "department", required: true, description: "Pick from the dropdown — one of 5 official department names" },
+  { name: "position", required: true, description: "Pick from the dropdown — one of 18 official faculty ranks" },
   { name: "password", required: true, description: "Initial password (user can change later)" },
 ];
 
@@ -176,10 +210,10 @@ const STUDENT_COLUMNS: ColumnDef[] = [
 ];
 
 const STUDENT_EXAMPLE_ROWS: string[][] = [
-  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "Bachelor of Information Technology Major in Network and Web Application", "4th Year", "NW4D", "TempPass123!"],
-  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "Bachelor of Information Technology Major in Software Development", "3rd Year", "SD3A", "TempPass123!"],
-  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "Bachelor of Information Technology Major in Network and Web Application", "2nd Year", "NW2C", "TempPass123!"],
-  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "Bachelor of Information Technology Major in Digital Arts", "4th Year", "DA4B", "TempPass123!"],
+  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "BS Agriculture - Animal Science", "4th Year", "BSA-4A", "TempPass123!"],
+  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "BTVTEd - Animal Production", "3rd Year", "BTVTED-3B", "TempPass123!"],
+  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "BS Agriculture - Crop Science", "2nd Year", "BSA-2C", "TempPass123!"],
+  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "BS Agricultural and Biosystems Engineering", "4th Year", "BSABE-4D", "TempPass123!"],
 ];
 
 const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
@@ -187,11 +221,11 @@ const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "middleName", required: false, description: "Middle name if applicable" },
   { name: "lastName", required: true, description: "Family name / surname" },
   { name: "email", required: true, description: "Must be @bpsu.edu.ph" },
-  { name: "phoneNumber", required: false, description: "Contact number in PH format" },
-  { name: "idNumber", required: false, description: "Student ID number" },
-  { name: "course", required: false, description: "Course/program (e.g. Bachelor of Information Technology...)" },
+  { name: "phoneNumber", required: false, description: "+639XXXXXXXXX, if provided" },
+  { name: "idNumber", required: true, description: `Format: 12-34567 (2-digit year prefix ${STUDENT_ID_MIN}–${STUDENT_ID_MAX}, dash, 5 digits)` },
+  { name: "course", required: true, description: "Pick from the dropdown — one of 5 official program names" },
   { name: "yearLevel", required: false, description: "Must be exactly: 1st Year, 2nd Year, 3rd Year, or 4th Year" },
-  { name: "section", required: false, description: "Section code (e.g. NW4D)" },
+  { name: "section", required: true, description: "Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C" },
   { name: "password", required: true, description: "Initial password (user can change later)" },
 ];
 
@@ -200,12 +234,21 @@ export async function generateFacultyTemplate(): Promise<Buffer> {
   workbook.creator = "H-Auto";
   workbook.created = new Date();
 
-  buildDataSheet(workbook, FACULTY_COLUMNS, FACULTY_EXAMPLE_ROWS);
+  buildListsSheet(workbook);
+  buildDataSheet(workbook, FACULTY_COLUMNS, FACULTY_EXAMPLE_ROWS, [
+    { columnKey: "department", sheetRange: DEPARTMENT_RANGE },
+    { columnKey: "position", sheetRange: POSITION_RANGE },
+  ]);
   buildInstructionsSheet(
     workbook,
     "H-Auto User Import Template — Faculty",
     FACULTY_COLUMN_GUIDE,
-    [...COMMON_NOTES, ...CLOSING_NOTES]
+    [
+      ...COMMON_NOTES,
+      `Valid positions (18): ${FACULTY_POSITIONS.join(", ")}`,
+      `Valid departments (5): ${DEPARTMENTS.join(", ")}`,
+      ...CLOSING_NOTES,
+    ]
   );
 
   return toBuffer(workbook);
@@ -216,15 +259,22 @@ export async function generateStudentTemplate(): Promise<Buffer> {
   workbook.creator = "H-Auto";
   workbook.created = new Date();
 
-  buildDataSheet(workbook, STUDENT_COLUMNS, STUDENT_EXAMPLE_ROWS, {
-    columnKey: "yearLevel",
-    values: YEAR_LEVELS,
-  });
+  buildListsSheet(workbook);
+  buildDataSheet(workbook, STUDENT_COLUMNS, STUDENT_EXAMPLE_ROWS, [
+    { columnKey: "course", sheetRange: DEPARTMENT_RANGE },
+    { columnKey: "yearLevel", values: YEAR_LEVELS },
+  ]);
   buildInstructionsSheet(
     workbook,
     "H-Auto User Import Template — Student",
     STUDENT_COLUMN_GUIDE,
-    [...COMMON_NOTES, STUDENT_ONLY_NOTE, ...CLOSING_NOTES]
+    [
+      ...COMMON_NOTES,
+      STUDENT_ONLY_NOTE,
+      `Valid courses (5): ${DEPARTMENTS.join(", ")}`,
+      "Section prefix must match the course's program (BSA / BTVTED / BSABE) — not cross-checked automatically",
+      ...CLOSING_NOTES,
+    ]
   );
 
   return toBuffer(workbook);
