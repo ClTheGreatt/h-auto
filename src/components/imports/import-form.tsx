@@ -31,6 +31,8 @@ import { buildParsedRows, type ParsedRow } from "@/lib/imports/parse-rows";
 import {
   FACULTY_REQUIRED_FIELDS,
   STUDENT_REQUIRED_FIELDS,
+  detectImportTypeMismatch,
+  importTypeMismatchMessage,
 } from "@/lib/constants/user-import";
 
 type ImportResult = {
@@ -59,12 +61,22 @@ export function ImportForm() {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (h) => h.trim(),
+      // Strip the "required field" asterisk the template header carries
+      // (e.g. "idNumber *") so required columns still match the schema's
+      // plain field names when a template is exported/re-uploaded as CSV.
+      transformHeader: (h) => h.trim().replace(/\s*\*$/, ""),
       complete: (results) => {
         if (results.errors.length > 0) {
           toast.error(
             `CSV parse error: ${results.errors[0].message}. Please check the file format.`
           );
+          return;
+        }
+
+        const headers = results.meta.fields ?? [];
+        const detectedType = detectImportTypeMismatch(headers, importType);
+        if (detectedType) {
+          toast.error(importTypeMismatchMessage(importType, detectedType));
           return;
         }
 

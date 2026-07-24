@@ -5,6 +5,9 @@ import {
   FACULTY_POSITIONS,
   FACULTY_REQUIRED_FIELDS,
   STUDENT_REQUIRED_FIELDS,
+  FACULTY_IMPORT_COLUMNS,
+  STUDENT_IMPORT_COLUMNS,
+  IMPORT_TYPE_MARKER,
   studentIdPrefixRange,
 } from "@/lib/constants/user-import";
 
@@ -69,10 +72,14 @@ const CLOSING_NOTES = [
 const POSITION_RANGE = `Lists!$A$2:$A$${1 + FACULTY_POSITIONS.length}`;
 const DEPARTMENT_RANGE = `Lists!$B$2:$B$${1 + DEPARTMENTS.length}`;
 
-function buildListsSheet(workbook: ExcelJS.Workbook) {
+// Column D, row 1 carries a machine-readable marker (unused by any dropdown
+// range, which only reference columns A/B from row 2 down) so the parse
+// route can detect "wrong template uploaded" before validating any rows.
+function buildListsSheet(workbook: ExcelJS.Workbook, importType: "FACULTY" | "STUDENT_FARMER") {
   const sheet = workbook.addWorksheet("Lists", { state: "veryHidden" });
   sheet.getColumn(1).values = ["Position", ...FACULTY_POSITIONS];
   sheet.getColumn(2).values = ["Department", ...DEPARTMENTS];
+  sheet.getCell(1, 4).value = IMPORT_TYPE_MARKER[importType];
   return sheet;
 }
 
@@ -214,10 +221,7 @@ async function toBuffer(workbook: ExcelJS.Workbook): Promise<Buffer> {
   return Buffer.from(buffer);
 }
 
-const FACULTY_COLUMNS: ColumnDef[] = makeColumns(
-  ["firstName", "middleName", "lastName", "email", "phoneNumber", "idNumber", "department", "position", "password"],
-  FACULTY_REQUIRED_FIELDS
-);
+const FACULTY_COLUMNS: ColumnDef[] = makeColumns([...FACULTY_IMPORT_COLUMNS], FACULTY_REQUIRED_FIELDS);
 
 const FACULTY_EXAMPLE_ROWS: string[][] = [
   ["Maria Elena", "Santos", "Cruz", "maria.santos@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III", "TempPass123!"],
@@ -238,10 +242,7 @@ const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "password", required: FACULTY_REQUIRED_FIELDS.includes("password"), description: "Initial password (user can change later)" },
 ];
 
-const STUDENT_COLUMNS: ColumnDef[] = makeColumns(
-  ["firstName", "middleName", "lastName", "email", "phoneNumber", "idNumber", "course", "yearLevel", "section", "password"],
-  STUDENT_REQUIRED_FIELDS
-);
+const STUDENT_COLUMNS: ColumnDef[] = makeColumns([...STUDENT_IMPORT_COLUMNS], STUDENT_REQUIRED_FIELDS);
 
 const STUDENT_EXAMPLE_ROWS: string[][] = [
   ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "BS Agriculture - Animal Science", "4th Year", "BSA-4A", "TempPass123!"],
@@ -268,7 +269,7 @@ export async function generateFacultyTemplate(): Promise<Buffer> {
   workbook.creator = "H-Auto";
   workbook.created = new Date();
 
-  buildListsSheet(workbook);
+  buildListsSheet(workbook, "FACULTY");
   buildDataSheet(workbook, FACULTY_COLUMNS, FACULTY_EXAMPLE_ROWS, [
     { columnKey: "department", sheetRange: DEPARTMENT_RANGE },
     { columnKey: "position", sheetRange: POSITION_RANGE },
@@ -294,7 +295,7 @@ export async function generateStudentTemplate(): Promise<Buffer> {
   workbook.creator = "H-Auto";
   workbook.created = new Date();
 
-  buildListsSheet(workbook);
+  buildListsSheet(workbook, "STUDENT_FARMER");
   buildDataSheet(workbook, STUDENT_COLUMNS, STUDENT_EXAMPLE_ROWS, [
     { columnKey: "course", sheetRange: DEPARTMENT_RANGE },
     { columnKey: "yearLevel", values: YEAR_LEVELS },

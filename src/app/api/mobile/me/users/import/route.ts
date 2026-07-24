@@ -12,6 +12,7 @@ import {
   type StudentImportRow,
   type ImportRowType,
 } from "@/lib/validations/import";
+import { normalizeImportRow, formatZodIssue } from "@/lib/imports/parse-rows";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -62,7 +63,11 @@ export async function POST(req: NextRequest) {
   const validationFailed: { email: string; reason: string }[] = [];
 
   for (const raw of rawRows) {
-    const parsed = schema.safeParse(raw);
+    // Normalize first — a column the mobile client's CSV omitted entirely
+    // must reach the schema as "", never `undefined`, or Zod's own
+    // "expected string, received undefined" leaks through unformatted.
+    const normalized = normalizeImportRow(raw, type);
+    const parsed = schema.safeParse(normalized);
     if (parsed.success) {
       validated.push(parsed.data);
     } else {
@@ -70,14 +75,7 @@ export async function POST(req: NextRequest) {
         typeof raw.email === "string" ? raw.email : "(missing email)";
       validationFailed.push({
         email,
-        reason: parsed.error.issues
-          .map((i) => {
-            const field = i.path.join(".") || "row";
-            return i.message.toLowerCase().startsWith(field.toLowerCase())
-              ? i.message
-              : `${field}: ${i.message}`;
-          })
-          .join("; "),
+        reason: parsed.error.issues.map(formatZodIssue).join("; "),
       });
     }
   }

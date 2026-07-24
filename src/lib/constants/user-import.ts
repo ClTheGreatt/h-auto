@@ -109,3 +109,98 @@ export function enumMismatchMessage(
   const preview = validValues.slice(0, 3).join(", ");
   return `${fieldName} must be one of: ${preview}, ... (${validValues.length} ${unitLabel})`;
 }
+
+// Full column list per import type, in template/upload order. Single source
+// of truth for: the template generator's Data-sheet columns, and row
+// normalization before validation (so a column that's entirely absent from
+// the uploaded file — not just blank — still reaches the schema as "",
+// never `undefined`).
+export const FACULTY_IMPORT_COLUMNS = [
+  "firstName",
+  "middleName",
+  "lastName",
+  "email",
+  "phoneNumber",
+  "idNumber",
+  "department",
+  "position",
+  "password",
+] as const;
+
+export const STUDENT_IMPORT_COLUMNS = [
+  "firstName",
+  "middleName",
+  "lastName",
+  "email",
+  "phoneNumber",
+  "idNumber",
+  "course",
+  "yearLevel",
+  "section",
+  "password",
+] as const;
+
+// Columns that only ever appear on ONE side — used to detect "wrong
+// template uploaded" from header shape alone, when no machine-readable
+// marker is available (plain CSV, or a hand-built file).
+export const FACULTY_DISTINCTIVE_FIELDS = ["department", "position"] as const;
+export const STUDENT_DISTINCTIVE_FIELDS = ["course", "section"] as const;
+
+export type ImportRowType = "FACULTY" | "STUDENT_FARMER";
+
+// Machine-readable marker written into each generated template's hidden
+// "Lists" sheet (see template-generator.ts), read back on parse to catch a
+// mismatched upload before any per-row validation runs.
+export const IMPORT_TYPE_MARKER: Record<ImportRowType, string> = {
+  FACULTY: "H-AUTO-IMPORT-TYPE:FACULTY",
+  STUDENT_FARMER: "H-AUTO-IMPORT-TYPE:STUDENT_FARMER",
+};
+
+export function parseImportTypeMarker(value: unknown): ImportRowType | null {
+  if (value === IMPORT_TYPE_MARKER.FACULTY) return "FACULTY";
+  if (value === IMPORT_TYPE_MARKER.STUDENT_FARMER) return "STUDENT_FARMER";
+  return null;
+}
+
+// Fallback for files with no marker: infer the actual type from which
+// distinctive columns are present. Returns the detected type only when it
+// disagrees with `selectedType` — null means "no mismatch detected" (either
+// it matches, or the shape is ambiguous, in which case per-row validation
+// is left to report specifics).
+export function detectImportTypeMismatch(
+  headers: readonly string[],
+  selectedType: ImportRowType
+): ImportRowType | null {
+  const headerSet = new Set(headers.map((h) => h.replace(/\s*\*$/, "").trim()));
+  const hasFacultyFields = FACULTY_DISTINCTIVE_FIELDS.some((f) => headerSet.has(f));
+  const hasStudentFields = STUDENT_DISTINCTIVE_FIELDS.some((f) => headerSet.has(f));
+
+  if (selectedType === "FACULTY" && hasStudentFields && !hasFacultyFields) {
+    return "STUDENT_FARMER";
+  }
+  if (selectedType === "STUDENT_FARMER" && hasFacultyFields && !hasStudentFields) {
+    return "FACULTY";
+  }
+  return null;
+}
+
+const IMPORT_TYPE_STEP1_LABEL: Record<ImportRowType, string> = {
+  FACULTY: "Faculty members",
+  STUDENT_FARMER: "Student farmers",
+};
+
+const IMPORT_TYPE_TEMPLATE_LABEL: Record<ImportRowType, string> = {
+  FACULTY: "Faculty",
+  STUDENT_FARMER: "Student Farmer",
+};
+
+export function importTypeMismatchMessage(
+  selectedType: ImportRowType,
+  detectedType: ImportRowType
+): string {
+  return (
+    `This is a ${IMPORT_TYPE_TEMPLATE_LABEL[detectedType]} template, but ` +
+    `"${IMPORT_TYPE_STEP1_LABEL[selectedType]}" is selected in Step 1. ` +
+    `Switch the import type or upload the matching template.`
+  );
+}

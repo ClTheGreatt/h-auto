@@ -1,8 +1,10 @@
+import type { ZodError } from "zod";
+import { facultyImportRowSchema, studentImportRowSchema } from "@/lib/validations/import";
 import {
-  facultyImportRowSchema,
-  studentImportRowSchema,
+  FACULTY_IMPORT_COLUMNS,
+  STUDENT_IMPORT_COLUMNS,
   type ImportRowType,
-} from "@/lib/validations/import";
+} from "@/lib/constants/user-import";
 
 export type ParsedRow = {
   rowNumber: number;
@@ -10,8 +12,48 @@ export type ParsedRow = {
   errors: string[];
 };
 
+// Normalizes a raw parsed row (from either CSV or Excel) to exactly the
+// columns the selected import type expects, as strings. This is what keeps
+// a column that's entirely ABSENT from the file (e.g. the wrong template
+// was uploaded) from reaching the schema as `undefined` — Zod's own
+// "expected string, received undefined" default would otherwise bypass
+// every custom "X is required" message on that field.
+export function normalizeImportRow(
+  raw: Record<string, unknown>,
+  importType: ImportRowType
+): Record<string, string> {
+  const columns = importType === "FACULTY" ? FACULTY_IMPORT_COLUMNS : STUDENT_IMPORT_COLUMNS;
+  const normalized: Record<string, string> = {};
+  for (const col of columns) {
+    const value = raw[col];
+    normalized[col] = typeof value === "string" ? value.trim() : value == null ? "" : String(value);
+  }
+  return normalized;
+}
+
+// Turns a Zod issue into a display-ready message. Every field in the import
+// schemas carries an explicit custom message, so "invalid_type" (Zod's
+// generic "expected X, received Y") should never fire in practice — this is
+// the safety net in case some path still reaches the schema with a raw
+// `undefined`/wrong-typed value.
+export function formatZodIssue(issue: ZodError["issues"][number]): string {
+  const field = issue.path.join(".") || "row";
+  if (issue.code === "invalid_type") {
+    return `${field} is invalid`;
+  }
+  // Most import messages already self-name their field (e.g. "idNumber is
+  // required") — only prefix the ones that don't (shared validators like
+  // bpsuEmail/passwordStrengthSchema), to avoid "email: Email is
+  // required"-style duplication.
+  return issue.message.toLowerCase().startsWith(field.toLowerCase())
+    ? issue.message
+    : `${field}: ${issue.message}`;
+}
+
 // Shared by both the CSV and Excel parse paths: validates raw row objects
 // against the schema for the selected import type and flags duplicate emails.
+// Callers are expected to have already ruled out a wrong-template upload
+// (see detectImportTypeMismatch) — this only validates row content.
 export function buildParsedRows(
   data: Record<string, string>[],
   importType: ImportRowType
@@ -19,41 +61,23 @@ export function buildParsedRows(
   const schema =
     importType === "FACULTY" ? facultyImportRowSchema : studentImportRowSchema;
 
+  const normalizedRows = data.map((raw) => normalizeImportRow(raw, importType));
+
   const emailCounts = new Map<string, number>();
   const idNumberCounts = new Map<string, number>();
-  data.forEach((row) => {
-    const email = row.email?.trim().toLowerCase();
+  normalizedRows.forEach((row) => {
+    const email = row.email.toLowerCase();
     if (email) emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
 
-    const idNumber = row.idNumber?.trim();
+    const idNumber = row.idNumber;
     if (idNumber) idNumberCounts.set(idNumber, (idNumberCounts.get(idNumber) ?? 0) + 1);
   });
 
-  return data.map((raw, idx) => {
-    const trimmed: Record<string, string> = {};
-    for (const [k, v] of Object.entries(raw)) {
-      trimmed[k] = typeof v === "string" ? v.trim() : String(v ?? "");
-    }
-
+  return normalizedRows.map((trimmed, idx) => {
     const result = schema.safeParse(trimmed);
-    const errors: string[] = [];
+    const errors: string[] = result.success ? [] : result.error.issues.map(formatZodIssue);
 
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        const field = issue.path.join(".") || "row";
-        // Most import messages already self-name their field (e.g. "idNumber
-        // is required") — only prefix the ones that don't (shared validators
-        // like bpsuEmail/passwordStrengthSchema), to avoid "email: Email is
-        // required"-style duplication.
-        errors.push(
-          issue.message.toLowerCase().startsWith(field.toLowerCase())
-            ? issue.message
-            : `${field}: ${issue.message}`
-        );
-      }
-    }
-
-    const email = trimmed.email?.toLowerCase();
+    const email = trimmed.email.toLowerCase();
     if (email && (emailCounts.get(email) ?? 0) > 1) {
       errors.push("Duplicate email within this file");
     }

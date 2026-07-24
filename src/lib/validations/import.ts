@@ -11,6 +11,7 @@ import {
   studentIdPrefixRange,
   isValidStudentIdPrefix,
   enumMismatchMessage,
+  type ImportRowType,
 } from "@/lib/constants/user-import";
 
 // Import-only phone rule (stricter than the interactive form's phPhone,
@@ -111,4 +112,4 @@ export const studentImportRowSchema = z
 
 export type FacultyImportRow = z.infer<typeof facultyImportRowSchema>;
 export type StudentImportRow = z.infer<typeof studentImportRowSchema>;
-export type ImportRowType = "FACULTY" | "STUDENT_FARMER";
+export type { ImportRowType };
