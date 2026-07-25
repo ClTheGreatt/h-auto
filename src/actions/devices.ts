@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { deviceSchema, type DeviceFormValues } from "@/lib/validations/device";
+import { hashApiKey } from "@/lib/devices/hash-key";
 
 function generateApiKey(): string {
   return "h-auto_" + randomBytes(24).toString("hex");
@@ -26,11 +27,14 @@ export async function createDevice(input: DeviceFormValues) {
   });
   if (plotHasDevice) return { error: "This plot already has a device" };
 
+  const rawKey = generateApiKey();
+
   const device = await prisma.device.create({
     data: {
       deviceCode: parsed.data.deviceCode,
       plotId: parsed.data.plotId,
-      apiKey: generateApiKey(),
+      apiKey: rawKey,
+      apiKeyHash: hashApiKey(rawKey),
       firmwareVersion: parsed.data.firmwareVersion || null,
       status: "OFFLINE",
     },
@@ -75,7 +79,7 @@ export async function regenerateApiKey(id: string) {
     const newKey = generateApiKey();
     await prisma.device.update({
       where: { id },
-      data: { apiKey: newKey },
+      data: { apiKey: newKey, apiKeyHash: hashApiKey(newKey) },
     });
     revalidatePath("/dashboard/devices");
     return { success: true, apiKey: newKey };

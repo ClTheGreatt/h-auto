@@ -294,7 +294,16 @@ model Device {
   id          String       @id @default(cuid())
   deviceCode  String       @unique // physical device identifier
   plotId      String       @unique
+  // Plaintext key, kept only for the lazy-migration fallback in
+  // /api/sensors/ingest — do not read this for new auth logic. Slated for
+  // removal once all devices are confirmed backfilled onto apiKeyHash.
   apiKey      String       @unique // for authenticating ESP32 POSTs
+  // SHA-256 hex digest of apiKey. Deterministic (unlike bcrypt) so the
+  // unique-indexed findUnique lookup ingest relies on still works in O(1);
+  // SHA-256 is appropriate here because apiKey is 48 hex chars of
+  // crypto-random entropy (randomBytes(24)), not a human-chosen password —
+  // there's nothing for bcrypt's deliberate slowness to protect against.
+  apiKeyHash  String?      @unique
   firmwareVersion String?
   lastSeenAt  DateTime?
   status      DeviceStatus @default(OFFLINE)

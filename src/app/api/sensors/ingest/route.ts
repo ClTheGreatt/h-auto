@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sensorReadingSchema } from "@/lib/validations/device";
+import { hashApiKey } from "@/lib/devices/hash-key";
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get("x-api-key");
@@ -8,10 +9,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing API key" }, { status: 401 });
   }
 
-  const device = await prisma.device.findUnique({
-    where: { apiKey },
+  const keyHash = hashApiKey(apiKey);
+  let device = await prisma.device.findUnique({
+    where: { apiKeyHash: keyHash },
     select: { id: true, plotId: true, status: true },
   });
+
+  if (!device) {
+    // Lazy migration fallback: devices registered before apiKeyHash existed
+    // only have the plaintext apiKey set. Match on that, then backfill
+    // apiKeyHash so the device's next request hits the hash path directly.
+    // apiKey is slated for removal once every device is confirmed
+    // backfilled and posting against the hash path.
+    const plaintextMatch = await prisma.device.findUnique({
+      where: { apiKey },
+      select: { id: true, plotId: true, status: true },
+    });
+    if (plaintextMatch) {
+      await prisma.device.update({
+        where: { id: plaintextMatch.id },
+        data: { apiKeyHash: keyHash },
+      });
+      device = plaintextMatch;
+    }
+  }
 
   if (!device) {
     return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
