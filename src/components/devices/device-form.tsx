@@ -204,6 +204,12 @@ export function DeviceForm({
           </CardContent>
         </Card>
 
+        {mode === "create" && (
+          <p className="text-xs text-gray-500">
+            The device API key is shown only once after registration. Copy it
+            immediately.
+          </p>
+        )}
         <div className="flex gap-3">
           <Button type="submit" disabled={submitting}>
             {submitting

@@ -183,7 +183,7 @@ export default async function UsersPage({
           >
             <Link href="/dashboard/users/import">
               <Upload className="w-4 h-4 mr-2" />
-              Import CSV
+              Import users
             </Link>
           </Button>
           <Button data-tour="users.add-button" className="flex-1 sm:flex-none" asChild>

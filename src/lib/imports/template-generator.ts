@@ -224,10 +224,10 @@ async function toBuffer(workbook: ExcelJS.Workbook): Promise<Buffer> {
 const FACULTY_COLUMNS: ColumnDef[] = makeColumns([...FACULTY_IMPORT_COLUMNS], FACULTY_REQUIRED_FIELDS);
 
 const FACULTY_EXAMPLE_ROWS: string[][] = [
-  ["Maria Elena", "Santos", "Cruz", "maria.santos@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III", "TempPass123!"],
-  ["Roberto", "Reyes", "Bautista", "roberto.reyes@bpsu.edu.ph", "+639181112233", "201900-0045", "BS Agriculture - Crop Science", "Instructor I", "TempPass123!"],
-  ["Jennifer", "Aquino", "Villanueva", "jennifer.aquino@bpsu.edu.ph", "+639172345678", "202100-0089", "BTVTEd - Animal Production", "Assistant Professor II", "TempPass123!"],
-  ["Michael", "Torres", "Delos Reyes", "michael.torres@bpsu.edu.ph", "+639191122334", "201800-0102", "BS Agricultural and Biosystems Engineering", "Professor I", "TempPass123!"],
+  ["Maria Elena", "Santos", "Cruz", "maria.cruz@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III", "TempPass123!"],
+  ["Roberto", "Reyes", "Bautista", "roberto.bautista@bpsu.edu.ph", "+639181112233", "201900-0045", "BS Agriculture - Crop Science", "Instructor I", "TempPass123!"],
+  ["Jennifer", "Aquino", "Villanueva", "jennifer.villanueva@bpsu.edu.ph", "+639172345678", "202100-0089", "BTVTEd - Animal Production", "Assistant Professor II", "TempPass123!"],
+  ["Michael", "Torres", "Delos Reyes", "michael.delosreyes@bpsu.edu.ph", "+639191122334", "201800-0102", "BS Agricultural and Biosystems Engineering", "Professor I", "TempPass123!"],
 ];
 
 const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [

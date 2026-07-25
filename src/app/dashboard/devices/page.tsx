@@ -33,15 +33,17 @@ export default async function DevicesPage() {
         </Button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-md p-4 flex items-start gap-3">
-        <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-900">
-          <strong>Testing without hardware?</strong> Use the &quot;Simulate
-          reading&quot; option from the menu on each device to generate fake
-          sensor data. Useful for development and demo before your physical
-          ESP32 arrives.
+      {process.env.NEXT_PUBLIC_ENABLE_SIMULATION === "true" && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-900">
+            <strong>Testing without hardware?</strong> Use the &quot;Simulate
+            reading&quot; option from the menu on each device to generate fake
+            sensor data. Useful for development and demo before your physical
+            ESP32 arrives.
+          </div>
         </div>
-      </div>
+      )}
 
       <div data-tour="devices.list">
         <DevicesTable devices={devices} />

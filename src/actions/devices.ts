@@ -104,6 +104,10 @@ export async function deleteDevice(id: string) {
 export async function simulateReading(deviceId: string) {
   await requireAdmin();
 
+  if (process.env.NEXT_PUBLIC_ENABLE_SIMULATION !== "true") {
+    return { error: "Simulation is disabled" };
+  }
+
   const device = await prisma.device.findUnique({
     where: { id: deviceId },
     include: {

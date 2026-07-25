@@ -61,6 +61,8 @@ type DeviceRow = {
   _count: { readings: number };
 };
 
+const SIMULATION_ENABLED = process.env.NEXT_PUBLIC_ENABLE_SIMULATION === "true";
+
 const statusVariant: Record<DeviceStatus, StatusVariant> = {
   ONLINE: "success",
   OFFLINE: "danger",
@@ -197,15 +199,17 @@ export function DevicesTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleSimulate(d.id)}
-                        disabled={simulatingId === d.id}
-                      >
-                        <Zap className="w-4 h-4 mr-2" />
-                        {simulatingId === d.id
-                          ? "Simulating..."
-                          : "Simulate reading"}
-                      </DropdownMenuItem>
+                      {SIMULATION_ENABLED && (
+                        <DropdownMenuItem
+                          onClick={() => handleSimulate(d.id)}
+                          disabled={simulatingId === d.id}
+                        >
+                          <Zap className="w-4 h-4 mr-2" />
+                          {simulatingId === d.id
+                            ? "Simulating..."
+                            : "Simulate reading"}
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem asChild>
                         <Link href={`/dashboard/devices/${d.id}/edit`}>
                           <Pencil className="w-4 h-4 mr-2" />
