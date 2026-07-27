@@ -72,7 +72,7 @@ export function PasswordChangeForm() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Lock className="w-4 h-4 text-gray-500" />
+          <Lock className="w-4 h-4 text-muted-foreground" />
           Change password
         </CardTitle>
       </CardHeader>

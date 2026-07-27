@@ -86,7 +86,7 @@ export function Breadcrumbs() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex items-center flex-wrap gap-1 text-sm text-gray-500 mb-4"
+      className="flex items-center flex-wrap gap-1 text-sm text-muted-foreground mb-4"
     >
       {crumbs.map((crumb, idx) => {
         const isLast = idx === crumbs.length - 1;
@@ -96,7 +96,7 @@ export function Breadcrumbs() {
               <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
             )}
             {isLast ? (
-              <span aria-current="page" className="text-gray-900 font-medium">
+              <span aria-current="page" className="text-foreground font-medium">
                 {crumb.label}
               </span>
             ) : (

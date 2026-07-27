@@ -21,13 +21,13 @@ export default async function ArchivedPlotsPage() {
       <div>
         <Link
           href="/dashboard/plots"
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+          className="text-sm text-muted-foreground hover:text-gray-700 flex items-center gap-1 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to plots
         </Link>
-        <h1 className="text-2xl font-semibold text-gray-900">Archived Plots</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-semibold text-foreground">Archived Plots</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Plots archived by administrators. Historical data preserved. Can be
           restored.
         </p>

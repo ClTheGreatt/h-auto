@@ -138,7 +138,7 @@ export function GraduateStudentsDialog({ students }: { students: Candidate[] }) 
                   <span className="font-medium">
                     {s.firstName} {s.lastName}
                   </span>
-                  <span className="ml-1 text-xs text-gray-500">
+                  <span className="ml-1 text-xs text-muted-foreground">
                     {[s.idNumber, s.course, s.yearLevel, s.section]
                       .filter(Boolean)
                       .join(" · ")}

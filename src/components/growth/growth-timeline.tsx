@@ -56,7 +56,7 @@ export function GrowthTimeline({
 
   if (logs.length === 0) {
     return (
-      <div className="text-center py-8 text-sm text-gray-500">
+      <div className="text-center py-8 text-sm text-muted-foreground">
         <Sprout className="w-8 h-8 mx-auto text-gray-300 mb-2" />
         No growth logs yet for this plot.
       </div>
@@ -97,7 +97,7 @@ export function GrowthTimeline({
                       {log.stage.name}
                     </Badge>
                   )}
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
                     {new Date(log.createdAt).toLocaleString()}
                   </span>
@@ -117,13 +117,13 @@ export function GrowthTimeline({
                   )}
                 </div>
 
-                <div className="bg-white border rounded-md p-4 space-y-3">
+                <div className="bg-card border rounded-md p-4 space-y-3">
                   {(log.plantHeightCm != null || log.leafCount != null) && (
                     <div className="flex gap-4 text-sm">
                       {log.plantHeightCm != null && (
                         <div className="flex items-center gap-1.5">
                           <Ruler className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             {log.plantHeightCm} cm tall
                           </span>
                         </div>
@@ -131,7 +131,7 @@ export function GrowthTimeline({
                       {log.leafCount != null && (
                         <div className="flex items-center gap-1.5">
                           <Leaf className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             {log.leafCount} leaves
                           </span>
                         </div>
@@ -141,7 +141,7 @@ export function GrowthTimeline({
 
                   {log.observations && (
                     <div>
-                      <div className="text-xs font-medium text-gray-500 mb-1">
+                      <div className="text-xs font-medium text-muted-foreground mb-1">
                         OBSERVATIONS
                       </div>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">
@@ -152,7 +152,7 @@ export function GrowthTimeline({
 
                   {log.notes && (
                     <div>
-                      <div className="text-xs font-medium text-gray-500 mb-1">
+                      <div className="text-xs font-medium text-muted-foreground mb-1">
                         NOTES
                       </div>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">
@@ -169,10 +169,10 @@ export function GrowthTimeline({
                     log.phosphorus != null ||
                     log.potassium != null) && (
                     <div>
-                      <div className="text-xs font-medium text-gray-500 mb-1.5">
+                      <div className="text-xs font-medium text-muted-foreground mb-1.5">
                         CONDITIONS AT TIME OF LOG
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-gray-600">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
                         {log.soilMoisture != null && (
                           <span className="flex items-center gap-1.5">
                             <Droplets className="w-4 h-4 text-blue-400" />
@@ -218,7 +218,7 @@ export function GrowthTimeline({
                           onClick={() =>
                             setLightbox({ images: log.images, index: i })
                           }
-                          className="aspect-square rounded overflow-hidden bg-gray-100 hover:opacity-90 transition"
+                          className="aspect-square rounded overflow-hidden bg-muted hover:opacity-90 transition"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img

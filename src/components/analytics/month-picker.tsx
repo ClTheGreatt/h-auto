@@ -118,7 +118,7 @@ export function MonthPicker({
               className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Previous year"
             >
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </button>
             <span className="text-sm font-semibold text-foreground">
               {viewYear}
@@ -130,7 +130,7 @@ export function MonthPicker({
               className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Next year"
             >
-              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
 

@@ -214,7 +214,7 @@ export function ImportForm() {
             <CardTitle>Step 1: Choose import type</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="inline-flex rounded-md border bg-white p-1">
+            <div className="inline-flex rounded-md border bg-card p-1">
               <button
                 type="button"
                 onClick={() => setImportType("FACULTY")}
@@ -222,7 +222,7 @@ export function ImportForm() {
                   "px-4 py-1.5 text-sm rounded transition-colors",
                   importType === "FACULTY"
                     ? "bg-green-100 text-green-700 font-medium"
-                    : "text-gray-600 hover:bg-gray-50"
+                    : "text-muted-foreground hover:bg-muted"
                 )}
               >
                 Faculty members
@@ -234,7 +234,7 @@ export function ImportForm() {
                   "px-4 py-1.5 text-sm rounded transition-colors",
                   importType === "STUDENT_FARMER"
                     ? "bg-green-100 text-green-700 font-medium"
-                    : "text-gray-600 hover:bg-gray-50"
+                    : "text-muted-foreground hover:bg-muted"
                 )}
               >
                 Student farmers
@@ -248,7 +248,7 @@ export function ImportForm() {
             <CardTitle>Step 2: Download the template</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               The template shows the exact column headers you need, with an
               Instructions sheet explaining each one. Fill in your{" "}
               {importType === "FACULTY" ? "faculty" : "student"} data, and
@@ -276,13 +276,13 @@ export function ImportForm() {
             />
             <label
               htmlFor="csv-upload"
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+              className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-muted transition-colors"
             >
               <Upload className="w-8 h-8 text-gray-400 mb-2" />
               <p className="text-sm font-medium text-gray-700">
                 Click to upload a CSV or Excel file
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 You&apos;ll see a preview before anything is saved
               </p>
             </label>
@@ -303,7 +303,7 @@ export function ImportForm() {
                 <FileText className="w-5 h-5 text-gray-400" />
                 <div>
                   <div className="text-sm font-medium">{fileName}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {rows.length} row(s) parsed •{" "}
                     {importType === "FACULTY" ? "Faculty" : "Student"} import
                   </div>
@@ -323,11 +323,11 @@ export function ImportForm() {
           </CardContent>
         </Card>
 
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           <span className="text-red-500">*</span> Required field
         </p>
 
-        <div className="border rounded-md bg-white overflow-auto">
+        <div className="border rounded-md bg-card overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -352,7 +352,7 @@ export function ImportForm() {
                     key={row.rowNumber}
                     className={cn(!isValid && "bg-red-50/50")}
                   >
-                    <TableCell className="text-xs text-gray-500">
+                    <TableCell className="text-xs text-muted-foreground">
                       {row.rowNumber}
                     </TableCell>
                     <TableCell>
@@ -375,7 +375,7 @@ export function ImportForm() {
                       )}
                     </TableCell>
                     {allColumns.map((col) => (
-                      <TableCell key={col} className="text-xs text-gray-600 max-w-[150px] truncate">
+                      <TableCell key={col} className="text-xs text-muted-foreground max-w-[150px] truncate">
                         {col === "password" && row.raw[col]
                           ? "••••••"
                           : row.raw[col] || "—"}
@@ -428,7 +428,7 @@ export function ImportForm() {
       <Card>
         <CardContent className="py-12 text-center">
           <div className="inline-block w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mb-4" />
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Importing {validCount} user(s)...
           </p>
         </CardContent>
@@ -448,7 +448,7 @@ export function ImportForm() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold">Import complete</h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Processed {result.totalProcessed} row(s) from {fileName}
                 </p>
               </div>
@@ -479,7 +479,7 @@ export function ImportForm() {
               <CardTitle className="text-base">Failed rows</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-md bg-white">
+              <div className="border rounded-md bg-card">
                 <Table>
                   <TableHeader>
                     <TableRow>

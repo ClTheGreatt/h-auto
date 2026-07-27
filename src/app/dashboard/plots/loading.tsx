@@ -9,7 +9,7 @@ export default function PlotsLoading() {
         <div className="h-10 w-32 skeleton rounded-md" />
       </div>
 
-      <div className="bg-white border rounded-md overflow-hidden">
+      <div className="bg-card border rounded-md overflow-hidden">
         <div className="border-b p-4 grid grid-cols-7 gap-4">
           {[1, 2, 3, 4, 5, 6, 7].map((i) => (
             <div key={i} className="h-4 skeleton rounded" />

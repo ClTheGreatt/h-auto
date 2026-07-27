@@ -70,7 +70,7 @@ export function StudentFarmerSection({
   }
 
   return (
-    <section className="overflow-hidden rounded-md border bg-white shadow-sm dark:bg-gray-900">
+    <section className="overflow-hidden rounded-md border bg-card shadow-sm">
       {/* Section header, matches RoleSection styling */}
       <div className="flex items-center gap-3 border-b px-4 py-3">
         <div className="min-w-0 flex-1">
@@ -78,18 +78,18 @@ export function StudentFarmerSection({
             <h2 className={cn("text-sm font-semibold", STUDENT_FARMER_META.badgeColor)}>
               {STUDENT_FARMER_META.label}
             </h2>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {countLabel(totalCount, totalBaseline, hasFilters)}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {STUDENT_FARMER_META.description}
           </p>
         </div>
       </div>
 
       {courseGroups.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-gray-500">
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
           No student farmers match the current filters. Try adjusting your
           search or filters.
         </div>
@@ -152,7 +152,7 @@ function CourseRows({
             ) : (
               <h3 className="text-base font-semibold">{abbreviated}</h3>
             )}
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {countLabel(course.count, course.totalCount, hasFilters)}
             </span>
           </div>
@@ -162,7 +162,7 @@ function CourseRows({
       {course.isUncategorized ? (
         <>
           <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={5} className="px-4 pt-0 pb-1 text-xs text-gray-500">
+            <TableCell colSpan={5} className="px-4 pt-0 pb-1 text-xs text-muted-foreground">
               These users are missing course, year, or section information.
             </TableCell>
           </TableRow>
@@ -207,7 +207,7 @@ function YearRows({
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {year.label}
             </h4>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {countLabel(year.count, year.totalCount, hasFilters)}
             </span>
           </div>

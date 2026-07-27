@@ -111,11 +111,11 @@ export default function AboutPage() {
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-green-600 mb-4 shadow-lg">
           <Sprout className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900">H-Auto</h1>
-        <p className="text-lg text-gray-600 mt-2">
+        <h1 className="text-3xl font-bold text-foreground">H-Auto</h1>
+        <p className="text-lg text-muted-foreground mt-2">
           Online Smart Gardening Monitoring System
         </p>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           for Vegetables using Microcontrollers
         </p>
         <div className="flex items-center justify-center gap-2 mt-4">
@@ -184,16 +184,16 @@ export default function AboutPage() {
               <GraduationCap className="w-6 h-6 text-green-700" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="font-semibold text-foreground">
                 Bataan Peninsula State University
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 College of Computer Studies
               </p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Bachelor of Science in Information Technology
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Academic Year 2025-2026
               </p>
             </div>
@@ -235,7 +235,7 @@ export default function AboutPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="text-xs text-gray-500">{member.role}</div>
+                  <div className="text-xs text-muted-foreground">{member.role}</div>
                 </div>
               </div>
             ))}
@@ -258,10 +258,10 @@ export default function AboutPage() {
                     <Icon className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-foreground">
                       {feature.title}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {feature.description}
                     </div>
                   </div>
@@ -284,7 +284,7 @@ export default function AboutPage() {
           <div className="space-y-4">
             {TECH_STACK.map((stack, idx) => (
               <div key={idx}>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                   {stack.category}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -301,7 +301,7 @@ export default function AboutPage() {
       </Card>
 
       {/* Footer */}
-      <div className="text-center text-sm text-gray-500 pt-4 pb-8">
+      <div className="text-center text-sm text-muted-foreground pt-4 pb-8">
         <p>AY 2025-2026</p>
         <p className="mt-1">© 2026 H-Auto Development Team</p>
         <p className="mt-1">Bataan Peninsula State University</p>

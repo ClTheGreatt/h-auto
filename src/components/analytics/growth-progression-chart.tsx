@@ -36,7 +36,7 @@ export function GrowthProgressionChart({
 
   if (chartData.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
+      <div className="text-center py-12 text-sm text-muted-foreground border border-dashed rounded-md">
         No growth logs in this time range.
       </div>
     );

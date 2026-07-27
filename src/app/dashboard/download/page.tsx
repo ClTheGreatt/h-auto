@@ -16,10 +16,10 @@ export default function DownloadPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+        <h1 className="text-2xl font-semibold text-foreground">
           Download the mobile app
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Install H-Auto on your Android phone to log observations, view your
           plots, and receive alerts in the field.
         </p>
@@ -33,10 +33,10 @@ export default function DownloadPage() {
               <Sprout className="w-7 h-7 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-gray-900 dark:text-gray-100">
+              <div className="font-semibold text-foreground">
                 H-Auto for Android
               </div>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted-foreground">
                 Version {APP_VERSION} · Android 7.0 and up
               </div>
             </div>

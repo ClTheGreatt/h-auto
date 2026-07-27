@@ -32,7 +32,7 @@ export function PaginationControls({
 
   if (totalPages <= 1) {
     return (
-      <p className="text-sm text-gray-500 mt-4">
+      <p className="text-sm text-muted-foreground mt-4">
         {totalItems} {itemLabel}
       </p>
     );
@@ -40,7 +40,7 @@ export function PaginationControls({
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-4 gap-3">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted-foreground">
         Page {currentPage} of {totalPages} ({totalItems} {itemLabel})
       </p>
       <div className="flex items-center gap-2">

@@ -121,7 +121,7 @@ export function Sidebar({
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all",
           isActive
             ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 font-medium shadow-sm"
-            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:translate-x-0.5"
+            : "text-gray-700 dark:text-gray-300 hover:bg-muted hover:translate-x-0.5"
         )}
       >
   <Icon className="w-4 h-4 flex-shrink-0" />

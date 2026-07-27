@@ -233,8 +233,8 @@ export default async function HelpPage() {
             <HelpCircle className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Help & Documentation</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-semibold text-foreground">Help & Documentation</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Step-by-step guides for using H-Auto effectively.
             </p>
           </div>
@@ -270,7 +270,7 @@ export default async function HelpPage() {
         .filter((s) => s.visible)
         .map((section) => (
           <div key={section.title}>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
+            <h2 className="text-lg font-semibold text-foreground mb-3">
               {section.title}
             </h2>
             <div className="space-y-3">
@@ -305,7 +305,7 @@ export default async function HelpPage() {
 
       {/* FAQ */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">
+        <h2 className="text-lg font-semibold text-foreground mb-3">
           Frequently asked questions
         </h2>
         <div className="space-y-3">

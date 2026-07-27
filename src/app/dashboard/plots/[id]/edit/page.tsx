@@ -51,7 +51,7 @@ export default async function EditPlotPage({
     <div className="space-y-6 max-w-4xl">
       <div>
         <BackButton label="Back" />
-        <h1 className="text-2xl font-semibold text-gray-900">Edit {plot.name}</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Edit {plot.name}</h1>
       </div>
 
       <PlotForm

@@ -62,7 +62,7 @@ const chartData = Array.from(timeMap.values())
 
   if (chartData.length === 0) {
     return (
-      <div className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md">
+      <div className="text-center py-12 text-sm text-muted-foreground border border-dashed rounded-md">
         No data for this time range.
       </div>
     );

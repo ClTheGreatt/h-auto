@@ -11,14 +11,14 @@ export default async function ChangePasswordPage() {
 
   return (
     <SessionProvider session={session}>
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-muted p-4">
         <div className="w-full max-w-md space-y-6">
           <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
             <Sprout className="w-6 h-6" />
             <span className="text-lg font-semibold">H-Auto</span>
           </div>
 
-          <p className="text-sm text-center text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-center text-muted-foreground">
             Change your password below. If this is your first login, we
             recommend changing your temporary password now for security.
           </p>

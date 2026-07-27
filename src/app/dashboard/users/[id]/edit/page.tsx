@@ -19,10 +19,10 @@ export default async function EditUserPage({
     <div className="space-y-6 max-w-4xl">
       <div>
         <BackButton label="Back" />
-        <h1 className="text-2xl font-semibold text-gray-900">
+        <h1 className="text-2xl font-semibold text-foreground">
           Edit {user.firstName} {user.lastName}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">{user.email}</p>
+        <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
       </div>
 
       <UserForm

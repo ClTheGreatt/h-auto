@@ -10,10 +10,10 @@ export default function NotFound() {
           <Sprout className="w-8 h-8 text-white" />
         </div>
         <div className="text-7xl font-bold text-gray-200 mb-2">404</div>
-        <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+        <h1 className="text-2xl font-semibold text-foreground mb-2">
           Page not found
         </h1>
-        <p className="text-gray-500 mb-8">
+        <p className="text-muted-foreground mb-8">
           The page you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
         <Button asChild className="bg-green-600 hover:bg-green-700">

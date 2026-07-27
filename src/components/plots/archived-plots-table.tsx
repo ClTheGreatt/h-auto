@@ -69,19 +69,19 @@ export function ArchivedPlotsTable({ plots }: { plots: ArchivedPlotRow[] }) {
                   {plot.name}
                 </Link>
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot.location ?? "—"}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot.crop?.name ?? "—"}
               </TableCell>
-              <TableCell className="text-gray-600 whitespace-nowrap">
+              <TableCell className="text-muted-foreground whitespace-nowrap">
                 {plot.archivedAt ? timeAgo(plot.archivedAt) : "—"}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot._count.growthLogs}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot._count.sensorReadings}
               </TableCell>
               <TableCell>

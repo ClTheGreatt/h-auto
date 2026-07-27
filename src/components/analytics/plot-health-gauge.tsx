@@ -41,7 +41,7 @@ export function PlotHealthGauge({
         <div className="text-3xl font-bold" style={{ color }}>
           {Math.round(optimalPercent)}%
         </div>
-        <div className="text-xs text-gray-500 mt-1">Optimal range</div>
+        <div className="text-xs text-muted-foreground mt-1">Optimal range</div>
       </div>
     </div>
   );

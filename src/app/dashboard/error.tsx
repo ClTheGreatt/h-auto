@@ -15,10 +15,10 @@ export default function DashboardError({
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-100 mb-4">
           <AlertCircle className="w-7 h-7 text-red-600" />
         </div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-2">
+        <h1 className="text-xl font-semibold text-foreground mb-2">
           Couldn&apos;t load this page
         </h1>
-        <p className="text-gray-500 text-sm mb-6">
+        <p className="text-muted-foreground text-sm mb-6">
           An unexpected error occurred while loading this section.
         </p>
         <Button onClick={reset} className="bg-green-600 hover:bg-green-700">

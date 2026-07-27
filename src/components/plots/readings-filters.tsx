@@ -59,7 +59,7 @@ export function ReadingsFilters({
             className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
               isActive
                 ? "bg-green-600 text-white border-green-600"
-                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                : "bg-card text-gray-700 border-border hover:bg-muted"
             }`}
           >
             {r.label}
@@ -74,14 +74,14 @@ export function ReadingsFilters({
           className={`appearance-none pl-8 pr-7 py-1.5 rounded-full text-sm border cursor-pointer transition-colors ${
             month
               ? "bg-green-600 text-white border-green-600"
-              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+              : "bg-card text-gray-700 border-border hover:bg-muted"
           }`}
         >
-          <option value="" className="text-gray-900">
+          <option value="" className="text-foreground">
             By month
           </option>
           {availableMonths.map((m) => (
-            <option key={m} value={m} className="text-gray-900">
+            <option key={m} value={m} className="text-foreground">
               {formatMonth(m)}
             </option>
           ))}
@@ -95,7 +95,7 @@ export function ReadingsFilters({
 
       <button
         onClick={() => update({ order: order === "desc" ? "asc" : null })}
-        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border bg-card text-gray-700 border-border hover:bg-muted"
       >
         <ArrowDownUp className="w-3.5 h-3.5 text-gray-400" />
         {order === "desc" ? "Newest" : "Oldest"}

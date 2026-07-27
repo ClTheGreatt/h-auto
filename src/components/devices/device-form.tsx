@@ -108,7 +108,7 @@ export function DeviceForm({
             only be shown once. Save it somewhere safe — you&apos;ll paste it
             into your firmware code.
           </p>
-          <div className="bg-white border border-amber-300 rounded-md p-3 font-mono text-xs break-all">
+          <div className="bg-card border border-amber-300 rounded-md p-3 font-mono text-xs break-all">
             {generatedKey}
           </div>
           <div className="flex gap-3">
@@ -205,7 +205,7 @@ export function DeviceForm({
         </Card>
 
         {mode === "create" && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             The device API key is shown only once after registration. Copy it
             immediately.
           </p>

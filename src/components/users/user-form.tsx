@@ -504,7 +504,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       <SelectItem value="INACTIVE">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Deactivated users lose access but their data is preserved.
                     Set to Active to restore access.
                   </p>

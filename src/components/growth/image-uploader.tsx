@@ -105,7 +105,7 @@ export function ImageUploader({
           {value.map((url, i) => (
             <div
               key={url + i}
-              className="relative aspect-square border rounded-md overflow-hidden bg-gray-100 group"
+              className="relative aspect-square border rounded-md overflow-hidden bg-muted group"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -139,7 +139,7 @@ export function ImageUploader({
           onDrop={handleDrop}
           className={
             "border-2 border-dashed rounded-md p-6 text-center transition " +
-            (dragOver ? "border-green-500 bg-green-50" : "border-gray-300")
+            (dragOver ? "border-green-500 bg-green-50" : "border-border")
           }
         >
           <input
@@ -155,17 +155,17 @@ export function ImageUploader({
           {uploading ? (
             <div className="flex flex-col items-center gap-2 py-2">
               <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
-              <p className="text-sm text-gray-600">Uploading...</p>
+              <p className="text-sm text-muted-foreground">Uploading...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                 <ImageIcon className="w-5 h-5 text-gray-400" />
               </div>
               <p className="text-sm font-medium text-gray-700">
                 Drag and drop or click to upload
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 JPEG, PNG, WebP, GIF up to 5MB • {remainingSlots} slot
                 {remainingSlots !== 1 ? "s" : ""} remaining
               </p>
@@ -186,7 +186,7 @@ export function ImageUploader({
       )}
 
       {!canAddMore && value.length >= maxImages && (
-        <p className="text-xs text-gray-500 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Maximum {maxImages} images reached. Remove one to add more.
         </p>
       )}

@@ -33,21 +33,21 @@ export function EmptyState({
       className={
         compact
           ? "text-center py-8"
-          : "text-center py-16 px-6 border border-dashed border-gray-300 rounded-lg bg-white"
+          : "text-center py-16 px-6 border border-dashed border-border rounded-lg bg-card"
       }
     >
       <div
         className={
           compact
-            ? "inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 mb-2"
-            : "inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 mb-4"
+            ? "inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-2"
+            : "inline-flex items-center justify-center w-14 h-14 rounded-full bg-muted mb-4"
         }
       >
         <Icon className={compact ? "w-5 h-5 text-gray-400" : "w-6 h-6 text-gray-400"} />
       </div>
-      <h3 className="text-sm font-medium text-gray-900">{title}</h3>
+      <h3 className="text-sm font-medium text-foreground">{title}</h3>
       {description && (
-        <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
           {description}
         </p>
       )}

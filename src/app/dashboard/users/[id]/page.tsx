@@ -81,7 +81,7 @@ export default async function UserDetailPage({
       <div>
         <Link
           href="/dashboard/users"
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+          className="text-sm text-muted-foreground hover:text-gray-700 flex items-center gap-1 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to users
@@ -89,7 +89,7 @@ export default async function UserDetailPage({
 
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{fullName}</h1>
+            <h1 className="text-2xl font-semibold text-foreground">{fullName}</h1>
             <div className="flex items-center gap-2 mt-2">
               <Badge
                 variant="secondary"
@@ -101,7 +101,7 @@ export default async function UserDetailPage({
                 {user.status}
               </StatusBadge>
               {user.role === "STUDENT_FARMER" && user.graduatedAt && (
-                <Badge variant="secondary" className="bg-gray-100 text-gray-700">
+                <Badge variant="secondary" className="bg-muted text-gray-700">
                   GRADUATED {formatDateTime(user.graduatedAt)}
                 </Badge>
               )}
@@ -137,24 +137,24 @@ export default async function UserDetailPage({
             </Avatar>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm flex-1">
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Email
                 </dt>
-                <dd className="mt-1 text-gray-900">{user.email}</dd>
+                <dd className="mt-1 text-foreground">{user.email}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Phone
                 </dt>
-                <dd className="mt-1 text-gray-900">
+                <dd className="mt-1 text-foreground">
                   {user.phoneNumber ?? "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Middle name
                 </dt>
-                <dd className="mt-1 text-gray-900">
+                <dd className="mt-1 text-foreground">
                   {user.middleName ?? "—"}
                 </dd>
               </div>
@@ -179,38 +179,38 @@ export default async function UserDetailPage({
             {user.role === "STUDENT_FARMER" ? (
               <>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     ID Number
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.idNumber ?? "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Course
                   </dt>
-                  <dd className="mt-1 text-gray-900">{user.course ?? "—"}</dd>
+                  <dd className="mt-1 text-foreground">{user.course ?? "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Year Level
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.yearLevel ?? "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Section
                   </dt>
-                  <dd className="mt-1 text-gray-900">{user.section ?? "—"}</dd>
+                  <dd className="mt-1 text-foreground">{user.section ?? "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Academic year
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.academicYear ?? "—"}
                   </dd>
                 </div>
@@ -218,26 +218,26 @@ export default async function UserDetailPage({
             ) : user.role === "FACULTY" ? (
               <>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Employee ID
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.idNumber ?? "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Department
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.department ?? "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Position
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.position ?? "—"}
                   </dd>
                 </div>
@@ -245,27 +245,27 @@ export default async function UserDetailPage({
             ) : (
               <>
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Employee ID
                   </dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dd className="mt-1 text-foreground">
                     {user.idNumber ?? "—"}
                   </dd>
                 </div>
                 {user.department && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Department
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.department}</dd>
+                    <dd className="mt-1 text-foreground">{user.department}</dd>
                   </div>
                 )}
                 {user.position && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Position
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.position}</dd>
+                    <dd className="mt-1 text-foreground">{user.position}</dd>
                   </div>
                 )}
               </>
@@ -282,26 +282,26 @@ export default async function UserDetailPage({
         <CardContent>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Account created
               </dt>
-              <dd className="mt-1 text-gray-900">
+              <dd className="mt-1 text-foreground">
                 {formatDateTime(user.createdAt)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Last updated
               </dt>
-              <dd className="mt-1 text-gray-900">
+              <dd className="mt-1 text-foreground">
                 {formatDateTime(user.updatedAt)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Last login
               </dt>
-              <dd className="mt-1 text-gray-900">
+              <dd className="mt-1 text-foreground">
                 {user.lastLoginAt
                   ? formatDateTime(user.lastLoginAt)
                   : "Never signed in"}

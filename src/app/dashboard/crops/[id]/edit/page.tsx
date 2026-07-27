@@ -28,16 +28,16 @@ export default async function EditCropPage({
       <div>
         <Link
           href="/dashboard/crops"
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+          className="text-sm text-muted-foreground hover:text-gray-700 flex items-center gap-1 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to crops
         </Link>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Edit {crop.name}</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Edit {crop.name}</h1>
             {crop.variety && (
-              <p className="text-sm text-gray-500 mt-1">{crop.variety}</p>
+              <p className="text-sm text-muted-foreground mt-1">{crop.variety}</p>
             )}
           </div>
           <PresetToggle cropId={crop.id} initialValue={crop.isPreset} />

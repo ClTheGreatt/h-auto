@@ -11,13 +11,13 @@ export default async function ImportUsersPage() {
       <div>
         <Link
           href="/dashboard/users"
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+          className="text-sm text-muted-foreground hover:text-gray-700 flex items-center gap-1 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to users
         </Link>
-        <h1 className="text-2xl font-semibold text-gray-900">Import users</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-semibold text-foreground">Import users</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Bulk-create faculty members or student farmers from a CSV file.
         </p>
       </div>

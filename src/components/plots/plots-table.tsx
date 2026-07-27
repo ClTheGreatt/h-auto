@@ -111,13 +111,13 @@ export function PlotsTable({
                   {plot.name}
                 </Link>
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot.location ?? "—"}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot.crop?.name ?? "—"}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot.currentStage?.name ?? "—"}
               </TableCell>
               <TableCell>
@@ -125,7 +125,7 @@ export function PlotsTable({
                   {statusLabels[plot.status]}
                 </StatusBadge>
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {plot._count.assignments > 0
                   ? `${plot._count.assignments} assigned`
                   : "None"}

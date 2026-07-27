@@ -43,10 +43,10 @@ export default async function ProfilePage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">
+        <h1 className="text-2xl font-semibold text-foreground">
           Profile & Settings
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Manage your account information and preferences.
         </p>
       </div>
@@ -63,7 +63,7 @@ export default async function ProfilePage() {
               <h2 className="text-lg font-semibold">
                 {user.firstName} {user.lastName}
               </h2>
-              <p className="text-sm text-gray-500">{user.email}</p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
               <div className="flex items-center gap-2 mt-2">
                 <Badge
                   variant="secondary"
@@ -104,30 +104,30 @@ export default async function ProfilePage() {
         <CardContent>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Email
               </dt>
-              <dd className="mt-1 text-gray-900">{user.email}</dd>
+              <dd className="mt-1 text-foreground">{user.email}</dd>
             </div>
             {user.idNumber && (
               <div>
-                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   ID Number
                 </dt>
-                <dd className="mt-1 text-gray-900">{user.idNumber}</dd>
+                <dd className="mt-1 text-foreground">{user.idNumber}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Role
               </dt>
-              <dd className="mt-1 text-gray-900 capitalize">{roleLabel}</dd>
+              <dd className="mt-1 text-foreground capitalize">{roleLabel}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Member since
               </dt>
-              <dd className="mt-1 text-gray-900">
+              <dd className="mt-1 text-foreground">
                 {user.createdAt.toLocaleDateString("en-US", {
                   month: "long",
                   day: "numeric",
@@ -139,18 +139,18 @@ export default async function ProfilePage() {
               <>
                 {user.department && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Department
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.department}</dd>
+                    <dd className="mt-1 text-foreground">{user.department}</dd>
                   </div>
                 )}
                 {user.position && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Position
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.position}</dd>
+                    <dd className="mt-1 text-foreground">{user.position}</dd>
                   </div>
                 )}
               </>
@@ -159,32 +159,32 @@ export default async function ProfilePage() {
               <>
                 {user.course && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Course
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.course}</dd>
+                    <dd className="mt-1 text-foreground">{user.course}</dd>
                   </div>
                 )}
                 {user.yearLevel && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Year level
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.yearLevel}</dd>
+                    <dd className="mt-1 text-foreground">{user.yearLevel}</dd>
                   </div>
                 )}
                 {user.section && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Section
                     </dt>
-                    <dd className="mt-1 text-gray-900">{user.section}</dd>
+                    <dd className="mt-1 text-foreground">{user.section}</dd>
                   </div>
                 )}
               </>
             )}
           </dl>
-          <p className="text-xs text-gray-500 mt-4">
+          <p className="text-xs text-muted-foreground mt-4">
             To update your role, department, or other administrative details,
             please contact an administrator.
           </p>

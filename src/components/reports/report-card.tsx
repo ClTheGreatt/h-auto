@@ -110,7 +110,7 @@ export function ReportCard({
           </div>
           <div className="flex-1">
             <CardTitle className="text-base">{title}</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">{description}</p>
+            <p className="text-xs text-muted-foreground mt-1">{description}</p>
           </div>
         </div>
       </CardHeader>

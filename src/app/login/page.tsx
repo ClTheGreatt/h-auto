@@ -138,15 +138,15 @@ export default function LoginPage() {
               <Sprout className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="text-lg font-bold text-gray-900 dark:text-white">H-Auto</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Smart Gardening</div>
+              <div className="text-lg font-bold text-foreground">H-Auto</div>
+              <div className="text-xs text-muted-foreground">Smart Gardening</div>
             </div>
           </div>
 
           {/* Header */}
           <div className="space-y-2">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h2>
-            <p className="text-gray-500 dark:text-gray-400">
+            <h2 className="text-3xl font-bold text-foreground">Welcome back</h2>
+            <p className="text-muted-foreground">
               Sign in to access your monitoring dashboard
             </p>
           </div>
@@ -223,8 +223,8 @@ export default function LoginPage() {
           </form>
 
           {/* Footer */}
-          <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-800">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-center pt-4 border-t border-border">
+            <p className="text-xs text-muted-foreground">
               Need an account? Contact your system administrator.
             </p>
           </div>
