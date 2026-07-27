@@ -468,7 +468,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               control={form.control}
               name="role"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                 <FormLabel>Role <RequiredMark /></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
@@ -491,7 +491,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               control={form.control}
               name="status"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-0">
                   <FormLabel>Status <RequiredMark /></FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
@@ -552,7 +552,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 control={form.control}
                 name="department"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="min-w-0">
                     <FormLabel>
                       Department
                       {isCreate && <RequiredMark />}
@@ -579,7 +579,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 control={form.control}
                 name="position"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="min-w-0">
                     <FormLabel>
                       Position
                       {isCreate && <RequiredMark />}
@@ -616,7 +616,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 control={form.control}
                 name="course"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="min-w-0">
                     <FormLabel>
                       Course
                       {isCreate && <RequiredMark />}
@@ -643,7 +643,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 control={form.control}
                 name="yearLevel"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="min-w-0">
                     <FormLabel>
                       Year level
                       {isCreate && <RequiredMark />}

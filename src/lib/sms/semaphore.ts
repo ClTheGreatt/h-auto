@@ -43,19 +43,59 @@ export async function sendSMS(
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
-    const data = await response.json();
+    const rawBody = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      console.error(
+        `[sms] Semaphore returned non-JSON response (status ${response.status}): ${rawBody.slice(0, 500)}`
+      );
+      return {
+        success: false,
+        error: `Semaphore error (status ${response.status}): ${
+          rawBody.slice(0, 200) || "empty response"
+        }`,
+      };
+    }
 
     if (Array.isArray(data) && data[0]?.message_id) {
       return { success: true, messageId: String(data[0].message_id) };
     }
-    return {
-      success: false,
-      error: data[0]?.message ?? "Unknown response from Semaphore",
-    };
+
+    // Not the success shape — Semaphore's error responses vary, so try
+    // each known shape before falling back to a generic message. Never
+    // log formData/apiKey here, only the response Semaphore sent back.
+    console.error(
+      `[sms] Semaphore send failed (status ${response.status}): ${rawBody.slice(0, 500)}`
+    );
+    return { success: false, error: extractSemaphoreError(data) };
   } catch (e) {
     return {
       success: false,
       error: e instanceof Error ? e.message : "Network error",
     };
   }
+}
+
+// Semaphore's success shape is always an array of message objects. On
+// failure it can be: an array whose first item carries an error/message
+// field, a plain object with `message` or `error`, or a plain object of
+// field -> validation-error-array (e.g. {"number": ["...required."]}).
+function extractSemaphoreError(data: unknown): string {
+  if (Array.isArray(data)) {
+    const first = data[0] as Record<string, unknown> | undefined;
+    if (typeof first?.message === "string") return first.message;
+    if (typeof first?.error === "string") return first.error;
+  } else if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.error === "string") return obj.error;
+    for (const value of Object.values(obj)) {
+      if (Array.isArray(value) && typeof value[0] === "string") {
+        return value[0];
+      }
+    }
+  }
+  return `Unknown response from Semaphore: ${JSON.stringify(data).slice(0, 200)}`;
 }
