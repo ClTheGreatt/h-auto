@@ -127,15 +127,15 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
       <div>
         <Link
           href={`/dashboard/plots/${id}`}
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+          className="text-sm text-muted-foreground hover:text-gray-700 flex items-center gap-1 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to plot
         </Link>
-        <h1 className="text-2xl font-semibold text-gray-900">
+        <h1 className="text-2xl font-semibold text-foreground">
           Readings history
         </h1>
-        <p className="text-sm text-gray-500 mt-1">{plot.name}</p>
+        <p className="text-sm text-muted-foreground mt-1">{plot.name}</p>
         {plot.device && <LiveRefresh />}
       </div>
 
@@ -148,7 +148,7 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
 
       {items.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-gray-500">
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
             No readings found for this filter.
           </CardContent>
         </Card>
@@ -163,7 +163,7 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
                 <CardContent className="p-0 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b text-left text-gray-500">
+                      <tr className="border-b text-left text-muted-foreground">
                         <th className="px-4 py-2 font-medium">Time</th>
                         <th className="px-4 py-2 font-medium">Soil</th>
                         <th className="px-4 py-2 font-medium">Temp</th>
@@ -177,7 +177,7 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
                     <tbody>
                       {g.items.map((r) => (
                         <tr key={r.id} className="border-b last:border-0">
-                          <td className="px-4 py-2 text-gray-600 whitespace-nowrap">
+                          <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">
                             {r.recordedAt.toLocaleTimeString("en-US", {
                               hour: "numeric",
                               minute: "2-digit",

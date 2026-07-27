@@ -129,7 +129,7 @@ function ActionCard({
         "relative group flex items-start gap-3 p-3 rounded-md border transition-all",
         primary
           ? "border-green-200 bg-green-50/50 hover:border-green-300 hover:bg-green-50 hover:shadow-sm"
-          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+          : "border-border bg-card hover:border-border hover:bg-muted"
       )}
     >
       <div
@@ -137,16 +137,16 @@ function ActionCard({
           "p-2 rounded-md flex-shrink-0 transition-colors",
           primary
             ? "bg-green-100 text-green-700 group-hover:bg-green-200"
-            : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
+            : "bg-muted text-muted-foreground group-hover:bg-gray-200"
         )}
       >
         <Icon className="w-4 h-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-gray-900 truncate">
+        <div className="text-sm font-medium text-foreground truncate">
           {label}
         </div>
-        <div className="text-xs text-gray-500 truncate">{description}</div>
+        <div className="text-xs text-muted-foreground truncate">{description}</div>
       </div>
       {badge && (
         <Badge

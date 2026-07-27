@@ -145,7 +145,7 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
   const meta = ROLE_META[role];
 
   return (
-    <section className="overflow-hidden rounded-md border bg-white shadow-sm dark:bg-gray-900">
+    <section className="overflow-hidden rounded-md border bg-card shadow-sm">
       {/* Section header */}
       <div className="flex items-center gap-3 border-b px-4 py-3">
         <div className="min-w-0 flex-1">
@@ -153,11 +153,11 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
             <h2 className={cn("text-sm font-semibold", meta.badgeColor)}>
               {meta.label}
             </h2>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {users.length}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-gray-500">{meta.description}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{meta.description}</p>
         </div>
       </div>
 
@@ -204,7 +204,7 @@ export function UserTableRow({ user }: { user: UserRow }) {
       <TableCell className="px-4 py-3 font-medium">
         {user.firstName} {user.lastName}
       </TableCell>
-      <TableCell className="truncate px-4 py-3 text-gray-600">
+      <TableCell className="truncate px-4 py-3 text-muted-foreground">
         {user.email}
       </TableCell>
       <TableCell className="px-4 py-3">
@@ -222,12 +222,12 @@ export function UserTableRow({ user }: { user: UserRow }) {
           )}
         </div>
       </TableCell>
-      <TableCell className="px-4 py-3 text-gray-600">
+      <TableCell className="px-4 py-3 text-muted-foreground">
         {user.idNumber ?? "—"}
         {/* Graduated rows show academicYear so a repeating student is
             visually distinguishable from the new batch in the same section. */}
         {user.role === "STUDENT_FARMER" && user.graduatedAt && user.academicYear && (
-          <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+          <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
             {user.academicYear}
           </span>
         )}

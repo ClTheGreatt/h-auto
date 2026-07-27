@@ -169,8 +169,8 @@ export default async function UsersPage({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-foreground">Users</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage user accounts, roles, and permissions.
           </p>
         </div>
@@ -203,7 +203,7 @@ export default async function UsersPage({
             "px-3 py-1.5 rounded-md text-sm transition " +
             (view === "active"
               ? "bg-green-100 text-green-700 font-medium"
-              : "text-gray-600 hover:bg-gray-100")
+              : "text-muted-foreground hover:bg-muted")
           }
         >
           Active
@@ -214,7 +214,7 @@ export default async function UsersPage({
             "px-3 py-1.5 rounded-md text-sm transition " +
             (view === "graduated"
               ? "bg-green-100 text-green-700 font-medium"
-              : "text-gray-600 hover:bg-gray-100")
+              : "text-muted-foreground hover:bg-muted")
           }
         >
           Graduated
@@ -222,7 +222,7 @@ export default async function UsersPage({
       </div>
 
       {/* Filters */}
-      <div className="rounded-md border bg-white p-3 shadow-sm dark:bg-gray-900">
+      <div className="rounded-md border bg-card p-3 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <div className="w-full sm:w-[380px] lg:w-[460px]">
@@ -254,7 +254,7 @@ export default async function UsersPage({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 text-sm text-gray-500 lg:justify-end">
+          <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground lg:justify-end">
             <span className="whitespace-nowrap">
               {totalUsers === 0
                 ? "No users match your filters"

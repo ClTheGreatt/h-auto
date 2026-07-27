@@ -131,8 +131,8 @@ export default async function PlotsPage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Plots</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-semibold text-foreground">Plots</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             {role === "STUDENT_FARMER"
               ? "Plots assigned to you for monitoring."
               : "Manage vegetable plots and assigned students."}
@@ -164,7 +164,7 @@ export default async function PlotsPage({
             "px-3 py-1.5 rounded-md text-sm transition " +
             (view === "active"
               ? "bg-green-100 text-green-700 font-medium"
-              : "text-gray-600 hover:bg-gray-100")
+              : "text-muted-foreground hover:bg-muted")
           }
         >
           Active
@@ -175,7 +175,7 @@ export default async function PlotsPage({
             "px-3 py-1.5 rounded-md text-sm transition " +
             (view === "completed"
               ? "bg-green-100 text-green-700 font-medium"
-              : "text-gray-600 hover:bg-gray-100")
+              : "text-muted-foreground hover:bg-muted")
           }
         >
           Completed
@@ -205,7 +205,7 @@ export default async function PlotsPage({
       </div>
 
       {/* Results count */}
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-muted-foreground">
         {totalPlots === 0
           ? "No plots match your filters"
           : `${totalPlots} plot${totalPlots === 1 ? "" : "s"}${hasFilters ? " (filtered)" : ""}`}

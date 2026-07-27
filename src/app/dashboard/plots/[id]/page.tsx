@@ -159,7 +159,7 @@ export default async function PlotDetailPage({
       <div>
         <Link
           href="/dashboard/plots"
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-4"
+          className="text-sm text-muted-foreground hover:text-gray-700 flex items-center gap-1 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to plots
@@ -214,7 +214,7 @@ export default async function PlotDetailPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-gray-900">
+              <h1 className="text-2xl font-semibold text-foreground">
                 {plot.name}
               </h1>
               <Badge variant="secondary" className={statusColors[plot.status]}>
@@ -222,7 +222,7 @@ export default async function PlotDetailPage({
               </Badge>
             </div>
             {plot.location && (
-              <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
                 <MapPinned className="w-3 h-3" />
                 {plot.location}
               </p>
@@ -252,7 +252,7 @@ export default async function PlotDetailPage({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Sprout className="w-4 h-4" />
               Crop
             </CardTitle>
@@ -261,35 +261,35 @@ export default async function PlotDetailPage({
             {plot.crop ? (
               <>
                 <div className="font-medium">{plot.crop.name}</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {plot.crop.variety ?? "-"}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-muted-foreground mt-1">
                   Stage: {plot.currentStage?.name ?? "Not set"}
                 </div>
               </>
             ) : (
-              <div className="text-sm text-gray-500">No crop planted</div>
+              <div className="text-sm text-muted-foreground">No crop planted</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Schedule
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <div>
-              <span className="text-gray-500">Planted:</span>{" "}
+              <span className="text-muted-foreground">Planted:</span>{" "}
               {plot.plantingDate
                 ? new Date(plot.plantingDate).toLocaleDateString()
                 : "-"}
             </div>
             <div>
-              <span className="text-gray-500">Harvest:</span>{" "}
+              <span className="text-muted-foreground">Harvest:</span>{" "}
               {plot.expectedHarvest
                 ? new Date(plot.expectedHarvest).toLocaleDateString()
                 : "-"}
@@ -299,7 +299,7 @@ export default async function PlotDetailPage({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Ruler className="w-4 h-4" />
               Size
             </CardTitle>
@@ -339,7 +339,7 @@ export default async function PlotDetailPage({
         </CardHeader>
       <CardContent>
           {!plot.device ? (
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               No device linked to this plot yet. Link one from the Devices tab
               to start receiving readings.{" "}
               {canEditPlot && !isArchived && (
@@ -352,7 +352,7 @@ export default async function PlotDetailPage({
               )}
             </div>
           ) : !latestReading ? (
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               Device {plot.device.deviceCode} is linked but hasn&apos;t
               reported yet. First reading will appear here.
             </div>

@@ -56,7 +56,7 @@ export function LatestReadings({
 }) {
   if (!reading) {
     return (
-      <div className="text-center py-8 text-sm text-gray-500">
+      <div className="text-center py-8 text-sm text-muted-foreground">
         No sensor readings yet. Once a device is linked and reporting, data will
         appear here.
       </div>
@@ -139,7 +139,7 @@ export function LatestReadings({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         Last updated {new Date(reading.recordedAt).toLocaleString()}
       </p>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -148,7 +148,7 @@ export function LatestReadings({
           return (
             <div
               key={item.label}
-              className="border rounded-md p-3 bg-gray-50"
+              className="border rounded-md p-3 bg-muted"
             >
               <div className="flex items-center justify-between mb-2">
                 <Icon className="w-4 h-4 text-gray-400" />
@@ -161,7 +161,7 @@ export function LatestReadings({
                   </Badge>
                 )}
               </div>
-              <div className="text-xs text-gray-500">{item.label}</div>
+              <div className="text-xs text-muted-foreground">{item.label}</div>
               <div className="font-semibold">
                 {item.value != null ? `${item.value} ${item.unit}` : "—"}
               </div>

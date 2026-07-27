@@ -48,7 +48,7 @@ export function Header({
   }
 
   return (
-  <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+  <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
       {/* Left: Mobile menu trigger */}
       <div className="flex items-center gap-3">
         <MobileSidebar role={role} />
@@ -61,7 +61,7 @@ export function Header({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="flex items-center gap-3 h-auto py-1.5 px-2 hover:bg-gray-100"
+            className="flex items-center gap-3 h-auto py-1.5 px-2 hover:bg-muted"
           >
         <Avatar className="w-9 h-9">
               {image && <AvatarImage src={image} alt={fullName} />}
@@ -70,8 +70,8 @@ export function Header({
               </AvatarFallback>
             </Avatar>
             <div className="hidden md:block text-left">
-              <div className="text-sm font-medium text-gray-900">{fullName}</div>
-              <div className="text-xs text-gray-500 capitalize">{roleLabel}</div>
+              <div className="text-sm font-medium text-foreground">{fullName}</div>
+              <div className="text-xs text-muted-foreground capitalize">{roleLabel}</div>
             </div>
             <ChevronDown className="w-4 h-4 text-gray-400 hidden md:block" />
           </Button>
@@ -80,7 +80,7 @@ export function Header({
           <DropdownMenuLabel>
             <div className="flex flex-col gap-1">
               <span className="font-medium">{fullName}</span>
-              <span className="text-xs text-gray-500 font-normal truncate">
+              <span className="text-xs text-muted-foreground font-normal truncate">
                 {email}
               </span>
               <Badge

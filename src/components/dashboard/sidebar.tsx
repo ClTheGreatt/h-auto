@@ -134,9 +134,9 @@ export function Sidebar({
   return (
     <aside
       data-tour="sidebar.container"
-      className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full"
+      className="w-64 bg-card border-r border-border flex flex-col h-full"
     >
-      <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+      <div className="p-6 border-b border-border">
         <Link
           href="/dashboard"
           onClick={onNavigate}
@@ -146,8 +146,8 @@ export function Sidebar({
             <Sprout className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="font-bold text-gray-900">H-Auto</div>
-            <div className="text-xs text-gray-500">Smart Gardening</div>
+            <div className="font-bold text-foreground">H-Auto</div>
+            <div className="text-xs text-muted-foreground">Smart Gardening</div>
           </div>
         </Link>
       </div>
@@ -176,12 +176,12 @@ export function Sidebar({
         <div className="flex-1" />
 
         {/* Secondary navigation */}
-        <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
+        <div className="pt-3 border-t border-border space-y-1">
           {visibleSecondary.map(renderItem)}
         </div>
       </nav>
 
-      <div className="p-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500 text-center">
+      <div className="p-3 border-t border-border text-xs text-gray-400 dark:text-gray-500 text-center">
         H-Auto 
       </div>
     </aside>

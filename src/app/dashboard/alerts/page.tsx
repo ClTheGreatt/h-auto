@@ -164,8 +164,8 @@ export default async function AlertsPage({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Alerts</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-semibold text-foreground">Alerts</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Environmental conditions outside the ideal thresholds for each plot&apos;s
           current growth stage.
         </p>
@@ -180,7 +180,7 @@ export default async function AlertsPage({
             "px-3 py-1.5 rounded-md text-sm transition " +
             (!showResolved
               ? "bg-green-100 text-green-700 font-medium"
-              : "text-gray-600 hover:bg-gray-100")
+              : "text-muted-foreground hover:bg-muted")
           }
         >
           Open
@@ -194,7 +194,7 @@ export default async function AlertsPage({
             "px-3 py-1.5 rounded-md text-sm transition " +
             (showResolved
               ? "bg-green-100 text-green-700 font-medium"
-              : "text-gray-600 hover:bg-gray-100")
+              : "text-muted-foreground hover:bg-muted")
           }
         >
           Resolved
@@ -227,7 +227,7 @@ export default async function AlertsPage({
       </div>
 
       {/* Results count */}
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-muted-foreground">
         {totalAlerts === 0
           ? `No ${showResolved ? "resolved" : "open"} alerts match your filters`
           : `${totalAlerts} ${showResolved ? "resolved" : "open"} alert${totalAlerts === 1 ? "" : "s"}${hasFilters ? " (filtered)" : ""}`}

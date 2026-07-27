@@ -153,10 +153,10 @@ export default async function DashboardPage() {
       {/* Welcome header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-semibold text-foreground">
             Welcome back, {userName}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {isAdmin && "System overview and recent activity."}
             {isFaculty && "Your students' plots and recent monitoring activity."}
             {isStudent && "Your assigned plots and recent observations."}
@@ -177,7 +177,7 @@ export default async function DashboardPage() {
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {isStudent ? "My Plots" : "Total Plots"}
                   </p>
                   <p className="text-2xl font-semibold mt-1">{plotCount}</p>
@@ -195,7 +195,7 @@ export default async function DashboardPage() {
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Open Alerts
                   </p>
                   <p className="text-2xl font-semibold mt-1">{openAlertCount}</p>
@@ -218,7 +218,7 @@ export default async function DashboardPage() {
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Logs This Week
                   </p>
                   <p className="text-2xl font-semibold mt-1">{recentLogCount}</p>
@@ -237,7 +237,7 @@ export default async function DashboardPage() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Active Users
                     </p>
                     <p className="text-2xl font-semibold mt-1">{userCount}</p>
@@ -255,7 +255,7 @@ export default async function DashboardPage() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Assignments
                     </p>
                     <p className="text-2xl font-semibold mt-1">
@@ -298,7 +298,7 @@ export default async function DashboardPage() {
                     <h3 className="font-medium">{plot.name}</h3>
                     <Sprout className="w-4 h-4 text-green-500" />
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     {plot.crop?.name ?? "No crop"}
                     {plot.currentStage && ` - ${plot.currentStage.name}`}
                   </p>
@@ -332,8 +332,8 @@ export default async function DashboardPage() {
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-100 dark:bg-green-950 mb-3">
                   <CheckCircle2 className="w-7 h-7 text-green-600 dark:text-green-400" />
                 </div>
-                <h3 className="text-sm font-medium text-gray-900">No open alerts</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-sm font-medium text-foreground">No open alerts</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   {recentlyResolvedAlert?.resolvedAt
                     ? `Last alert resolved ${daysAgoLabel(recentlyResolvedAlert.resolvedAt, nowMs)}`
                     : "All plots within optimal range."}
@@ -353,7 +353,7 @@ export default async function DashboardPage() {
                   <Link
                     key={alert.id}
                     href={`/dashboard/plots/${alert.plot.id}`}
-                    className="flex items-start gap-3 p-2 -mx-2 rounded hover:bg-gray-50 transition"
+                    className="flex items-start gap-3 p-2 -mx-2 rounded hover:bg-muted transition"
                   >
                     <div
                       className={
@@ -381,7 +381,7 @@ export default async function DashboardPage() {
                           {alert.severity}
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-600 mt-0.5 truncate">
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
                         {alert.message}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
@@ -419,14 +419,14 @@ export default async function DashboardPage() {
                   const initials =
                     `${log.user.firstName[0]}${log.user.lastName[0]}`.toUpperCase();
                   const stageColor = log.stage
-                    ? STAGE_BADGE_COLORS[log.stage.name] ?? "bg-gray-100 text-gray-600"
+                    ? STAGE_BADGE_COLORS[log.stage.name] ?? "bg-muted text-muted-foreground"
                     : null;
                   const thumbnail = log.images[0]?.imageUrl;
                   return (
                     <Link
                       key={log.id}
                       href={`/dashboard/plots/${log.plot.id}`}
-                      className="flex items-start gap-3 p-2 -mx-2 rounded hover:bg-gray-50 transition"
+                      className="flex items-start gap-3 p-2 -mx-2 rounded hover:bg-muted transition"
                     >
                       <Avatar className="w-8 h-8 flex-shrink-0">
                         {log.user.profileImage && (
@@ -441,7 +441,7 @@ export default async function DashboardPage() {
                           <span className="font-medium">
                             {log.user.firstName} {log.user.lastName}
                           </span>
-                          <span className="text-gray-500">logged</span>
+                          <span className="text-muted-foreground">logged</span>
                           <span className="font-medium text-green-700">
                             {log.plot.name}
                           </span>
@@ -455,7 +455,7 @@ export default async function DashboardPage() {
                           )}
                         </div>
                         {log.observations && (
-                          <p className="text-xs text-gray-600 mt-0.5 truncate">
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {truncate(log.observations, OBSERVATION_TRUNCATE_LENGTH)}
                           </p>
                         )}

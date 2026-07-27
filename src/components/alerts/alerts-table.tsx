@@ -117,7 +117,7 @@ export function AlertsTable({
   }
 
   return (
-    <div className="border rounded-md bg-white overflow-x-auto">
+    <div className="border rounded-md bg-card overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -202,7 +202,7 @@ export function AlertsTable({
                   </TableCell>
                   <TableCell>
                     {total === 0 ? (
-                      <span className="text-xs text-gray-500">No recipients</span>
+                      <span className="text-xs text-muted-foreground">No recipients</span>
                     ) : (
                       <div className="flex items-center gap-2 text-xs">
                         <span className="flex items-center gap-1 text-green-600">
@@ -224,7 +224,7 @@ export function AlertsTable({
                       <div className="flex flex-col gap-0.5">
                         <Badge
                           variant="secondary"
-                          className="bg-gray-100 text-gray-700 w-fit"
+                          className="bg-muted text-gray-700 w-fit"
                         >
                           <CheckCircle2 className="w-3 h-3 mr-1" />
                           Resolved
@@ -244,7 +244,7 @@ export function AlertsTable({
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-500 whitespace-nowrap">
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {timeAgo(alert.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -262,24 +262,24 @@ export function AlertsTable({
                 </TableRow>
 
                 {isExpanded && (
-                  <TableRow className="bg-gray-50">
+                  <TableRow className="bg-muted">
                     <TableCell colSpan={8} className="py-3">
                       <div className="space-y-3 px-2">
                         <div>
-                          <div className="text-xs font-medium text-gray-500 mb-1">
+                          <div className="text-xs font-medium text-muted-foreground mb-1">
                             ALERT TYPE
                           </div>
-                          <code className="text-xs bg-white px-2 py-0.5 rounded border">
+                          <code className="text-xs bg-card px-2 py-0.5 rounded border">
                             {alert.type}
                           </code>
                         </div>
 
                         <div>
-                          <div className="text-xs font-medium text-gray-500 mb-1">
+                          <div className="text-xs font-medium text-muted-foreground mb-1">
                             NOTIFICATION DELIVERY
                           </div>
                           {alert.notifications.length === 0 ? (
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               No recipients (no active assignments for this plot)
                             </p>
                           ) : (
@@ -287,13 +287,13 @@ export function AlertsTable({
                               {alert.notifications.map((n) => (
                                 <div
                                   key={n.id}
-                                  className="flex items-center justify-between bg-white border rounded px-3 py-1.5 text-xs"
+                                  className="flex items-center justify-between bg-card border rounded px-3 py-1.5 text-xs"
                                 >
                                   <div>
                                     <span className="font-medium">
                                       {n.user.firstName} {n.user.lastName}
                                     </span>
-                                    <span className="text-gray-500 ml-2">
+                                    <span className="text-muted-foreground ml-2">
                                       {n.user.phoneNumber ?? "No phone"}
                                     </span>
                                   </div>
@@ -301,7 +301,7 @@ export function AlertsTable({
                                     {n.status === "SENT" && (
                                       <Badge
                                         variant="secondary"
-                                        className="bg-green-100 text-green-700 text-xs"
+                                        className="bg-success-bg text-success-text text-xs"
                                       >
                                         Sent
                                       </Badge>
@@ -317,7 +317,7 @@ export function AlertsTable({
                                     {n.status === "PENDING" && (
                                       <Badge
                                         variant="secondary"
-                                        className="bg-gray-100 text-gray-700 text-xs"
+                                        className="bg-muted text-gray-700 text-xs"
                                       >
                                         Pending
                                       </Badge>
