@@ -248,7 +248,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Student Activity Report",
         description:
-          "This report is also available to Admins. Unlike Faculty who see only their students, you see all students in the system. This is useful for generating academic activity reports for defense presentations or grading.",
+          "This report is also available to Admins. Unlike Faculty who see only their students, you see all students in the system. This is useful for generating academic activity reports for reviews or grading.",
         side: "bottom",
         onNextClick: navigateAndAdvance(
           router,

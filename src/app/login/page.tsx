@@ -123,7 +123,7 @@ export default function LoginPage() {
           <div className="text-sm text-green-100/80">
             <div>Bataan Peninsula State University</div>
             <div className="text-xs mt-1 text-green-100/60">
-              Capstone Project | College of CCST
+              College of CCST
             </div>
           </div>
         </div>

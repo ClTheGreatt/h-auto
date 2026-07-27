@@ -152,7 +152,7 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Reports",
         description:
-          "This page lets you export data as PDF or Excel files. Available report types include Sensor Readings, Plot Performance, Growth Logs, and Alerts. Select a report type and plot filter, then click download. This is useful for progress reports, defense documentation, or personal data backup.",
+          "This page lets you export data as PDF or Excel files. Available report types include Sensor Readings, Plot Performance, Growth Logs, and Alerts. Select a report type and plot filter, then click download. This is useful for progress reports, official documentation, or personal record-keeping.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
