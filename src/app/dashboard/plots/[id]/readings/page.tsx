@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ReadingsFilters } from "@/components/plots/readings-filters";
+import { LiveRefresh } from "@/components/plots/live-refresh";
 
 const PAGE_SIZE = 50;
 const DAY = 24 * 60 * 60 * 1000;
@@ -39,6 +40,7 @@ export default async function PlotReadingsPage({
     select: {
       id: true,
       name: true,
+      device: { select: { id: true } },
       assignments: {
         where: { status: "ACTIVE" },
         select: { studentId: true },
@@ -134,6 +136,7 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
           Readings history
         </h1>
         <p className="text-sm text-gray-500 mt-1">{plot.name}</p>
+        {plot.device && <LiveRefresh />}
       </div>
 
       <ReadingsFilters

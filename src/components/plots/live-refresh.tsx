@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function LiveRefresh({ intervalMs = 10000 }: { intervalMs?: number }) {
+// 30s while the ESP32 posts every ~1 min; relax to 60000 once it posts
+// every 5 min instead.
+export const POLL_INTERVAL_MS = 30000;
+
+export function LiveRefresh({ intervalMs = POLL_INTERVAL_MS }: { intervalMs?: number }) {
   const router = useRouter();
   const [active, setActive] = useState(true);
 
