@@ -18,7 +18,7 @@ export default async function DevicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">IoT Devices</h1>
           <p className="text-sm text-muted-foreground mt-1">

@@ -211,7 +211,7 @@ export default async function PlotDetailPage({
           </div>
         )}
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold text-foreground">
