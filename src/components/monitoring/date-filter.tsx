@@ -21,7 +21,7 @@ export function DateFilter({ current }: { current?: string }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 border rounded-md px-2.5 h-9 bg-white">
+    <div className="flex items-center gap-1.5 border rounded-md px-2.5 h-9 bg-card">
       <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
       <input
         type="date"

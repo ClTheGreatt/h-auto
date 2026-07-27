@@ -67,7 +67,7 @@ export function LogFeedItem({ log }: { log: LogProps }) {
 
   return (
     <>
-      <article className="bg-white border rounded-lg overflow-hidden hover:shadow-sm transition flex flex-col">
+      <article className="bg-card border rounded-lg overflow-hidden hover:shadow-sm transition flex flex-col">
         {/* Header */}
         <div className="p-3 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -128,7 +128,7 @@ export function LogFeedItem({ log }: { log: LogProps }) {
               // Single image: 16:9 ratio (not too tall)
               <button
                 onClick={() => setLightboxIndex(0)}
-                className="relative aspect-[16/9] overflow-hidden bg-gray-100 group block w-full"
+                className="relative aspect-[16/9] overflow-hidden bg-muted group block w-full"
               >
                 <Image
                   src={log.images[0].imageUrl}
@@ -152,7 +152,7 @@ export function LogFeedItem({ log }: { log: LogProps }) {
                   <button
                     key={img.id}
                     onClick={() => setLightboxIndex(idx)}
-                    className="relative aspect-square overflow-hidden bg-gray-100 group"
+                    className="relative aspect-square overflow-hidden bg-muted group"
                   >
                     <Image
                       src={img.imageUrl}
@@ -182,7 +182,7 @@ export function LogFeedItem({ log }: { log: LogProps }) {
           )}
 
           {(log.plantHeightCm || log.leafCount) && (
-            <div className="flex items-center gap-3 text-xs text-gray-500 pt-1">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
               {log.plantHeightCm && (
                 <span className="flex items-center gap-1">
                   <Ruler className="w-3 h-3" />
@@ -209,7 +209,7 @@ export function LogFeedItem({ log }: { log: LogProps }) {
               <div className="text-[10px] font-medium text-gray-400 uppercase mb-1">
                 Conditions at time of log
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {log.soilMoisture != null && (
                   <span className="flex items-center gap-1">
                     <Droplets className="w-3 h-3 text-blue-400" />
@@ -247,7 +247,7 @@ export function LogFeedItem({ log }: { log: LogProps }) {
           )}
 
           {log.notes && (
-            <p className="text-xs text-gray-500 italic pt-1.5 border-t mt-1.5 line-clamp-2">
+            <p className="text-xs text-muted-foreground italic pt-1.5 border-t mt-1.5 line-clamp-2">
               Note: {log.notes}
             </p>
           )}

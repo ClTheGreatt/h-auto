@@ -119,7 +119,7 @@ export function PlotAssignments({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium">Assigned student farmers</h3>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             {assignments.length === 0
               ? "No one is assigned yet."
               : `${assignments.length} student${assignments.length === 1 ? "" : "s"} monitoring this plot.`}
@@ -149,7 +149,7 @@ export function PlotAssignments({
                     </SelectTrigger>
                     <SelectContent>
                       {unassigned.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-gray-500">
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
                           No available students
                         </div>
                       ) : (
@@ -204,7 +204,7 @@ export function PlotAssignments({
             return (
               <div
                 key={a.id}
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-md"
+                className="flex items-center gap-3 p-3 bg-muted rounded-md"
               >
                 <Avatar className="w-9 h-9">
                   <AvatarFallback className="bg-green-100 text-green-700 text-xs">
@@ -215,12 +215,12 @@ export function PlotAssignments({
                   <div className="text-sm font-medium">
                     {a.student.firstName} {a.student.lastName}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {a.student.email}
                     {a.student.course && ` • ${a.student.course}`}
                   </div>
                   {a.notes && (
-                    <div className="text-xs text-gray-600 mt-1 italic">
+                    <div className="text-xs text-muted-foreground mt-1 italic">
                       &ldquo;{a.notes}&rdquo;
                     </div>
                   )}

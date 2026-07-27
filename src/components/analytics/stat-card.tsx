@@ -27,12 +27,12 @@ export function StatCard({
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               {label}
             </p>
             <p className="text-2xl font-semibold mt-1">{value}</p>
             {sublabel && (
-              <p className="text-xs text-gray-500 mt-1">{sublabel}</p>
+              <p className="text-xs text-muted-foreground mt-1">{sublabel}</p>
             )}
           </div>
           <div className={"p-2 rounded-md " + accentColors[accent]}>

@@ -15,7 +15,7 @@ function handleClick(range: TimeRange) {
     router.push(`${pathname}?${params.toString()}`);
   }
   return (
-    <div className="inline-flex items-center bg-gray-100 rounded-md p-1 gap-1">
+    <div className="inline-flex items-center bg-muted rounded-md p-1 gap-1">
       {TIME_RANGES.map((r) => (
         <button
           key={r.value}
@@ -24,8 +24,8 @@ function handleClick(range: TimeRange) {
           className={
             "px-3 py-1 text-xs rounded transition " +
             (current === r.value
-              ? "bg-white text-green-700 font-medium shadow-sm"
-              : "text-gray-600 hover:text-gray-900")
+              ? "bg-card text-green-700 font-medium shadow-sm"
+              : "text-muted-foreground hover:text-foreground")
           }
         >
           {r.label}

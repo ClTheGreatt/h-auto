@@ -98,7 +98,7 @@ export function MonthPicker({
           "inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-md text-xs border cursor-pointer transition " +
           (current
             ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50")
+            : "bg-card text-gray-700 border-border hover:bg-muted")
         }
       >
         <Calendar
@@ -108,26 +108,26 @@ export function MonthPicker({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 z-50 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+        <div className="absolute right-0 mt-1 z-50 w-64 rounded-lg border border-border bg-card p-3 shadow-lg">
           {/* Year stepper */}
           <div className="flex items-center justify-between mb-2">
             <button
               type="button"
               onClick={() => setViewYear((y) => y - 1)}
               disabled={viewYear <= minYear}
-              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Previous year"
             >
               <ChevronLeft className="w-4 h-4 text-gray-600" />
             </button>
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="text-sm font-semibold text-foreground">
               {viewYear}
             </span>
             <button
               type="button"
               onClick={() => setViewYear((y) => y + 1)}
               disabled={viewYear >= maxYear}
-              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Next year"
             >
               <ChevronRight className="w-4 h-4 text-gray-600" />
@@ -166,7 +166,7 @@ export function MonthPicker({
             <button
               type="button"
               onClick={clearMonth}
-              className="mt-2 w-full text-center text-xs text-gray-500 hover:text-gray-700 py-1"
+              className="mt-2 w-full text-center text-xs text-muted-foreground hover:text-gray-700 py-1"
             >
               Clear month filter
             </button>

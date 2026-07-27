@@ -64,8 +64,8 @@ export default async function AssignmentsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Assignments</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-semibold text-foreground">Assignments</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           {role === "STUDENT_FARMER"
             ? "Plots assigned to you for monitoring."
             : role === "FACULTY"
@@ -81,7 +81,7 @@ export default async function AssignmentsPage({
       {assignments.length === 0 ? (
         <div
           data-tour="assignments.list"
-          className="text-center py-12 text-sm text-gray-500 border border-dashed rounded-md"
+          className="text-center py-12 text-sm text-muted-foreground border border-dashed rounded-md"
         >
           <ClipboardList className="w-8 h-8 mx-auto text-gray-300 mb-2" />
           No active assignments yet.
@@ -108,7 +108,7 @@ export default async function AssignmentsPage({
               <Link
                 key={a.id}
                 href={`/dashboard/plots/${a.plot.id}`}
-                className="bg-white border rounded-md p-4 hover:shadow-sm hover:border-green-300 transition"
+                className="bg-card border rounded-md p-4 hover:shadow-sm hover:border-green-300 transition"
               >
                 <div className="flex items-start gap-3">
                   <Avatar className="w-10 h-10">
@@ -125,7 +125,7 @@ export default async function AssignmentsPage({
                         {a.plot.name}
                       </Badge>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {a.plot.crop?.name ?? "No crop"}
                       {a.plot.location && ` • ${a.plot.location}`}
                     </div>

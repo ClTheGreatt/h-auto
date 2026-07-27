@@ -54,18 +54,18 @@ export function ArchivedCropsTable({ crops }: { crops: ArchivedCropRow[] }) {
               <TableCell className="font-medium whitespace-nowrap">
                 {crop.name}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {crop.variety ?? "—"}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {crop.daysToHarvest} days
               </TableCell>
-              <TableCell className="text-gray-600 whitespace-nowrap">
+              <TableCell className="text-muted-foreground whitespace-nowrap">
                 {crop.archivedAt
                   ? `${timeAgo(crop.archivedAt)} (${formatDate(crop.archivedAt)})`
                   : "—"}
               </TableCell>
-              <TableCell className="text-gray-600">
+              <TableCell className="text-muted-foreground">
                 {crop._count.plots > 0
                   ? `${crop._count.plots} plot${crop._count.plots === 1 ? "" : "s"}`
                   : "None"}

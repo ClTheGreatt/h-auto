@@ -113,13 +113,13 @@ export function ObservationsChart({
           onClick={close}
         >
           <div
-            className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col"
+            className="bg-card rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-green-600" />
-                <h3 className="text-sm font-semibold text-gray-900">
+                <h3 className="text-sm font-semibold text-foreground">
                   Observations on {selected.label}
                 </h3>
               </div>
@@ -140,7 +140,7 @@ export function ObservationsChart({
               )}
 
               {!loading && logs && logs.length === 0 && (
-                <div className="text-center py-8 text-sm text-gray-500">
+                <div className="text-center py-8 text-sm text-muted-foreground">
                   No observations found.
                 </div>
               )}
@@ -155,10 +155,10 @@ export function ObservationsChart({
                         query: { date: log.day, plotId: log.plotId },
                       }}
                       onClick={close}
-                      className="block border rounded-md p-3 hover:bg-gray-50 transition"
+                      className="block border rounded-md p-3 hover:bg-muted transition"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-foreground">
                           {log.userName}
                         </span>
                         <span className="text-xs text-gray-400">
@@ -170,7 +170,7 @@ export function ObservationsChart({
                           })}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                         <MapPin className="w-3 h-3" />
                         {log.plotName}
                         {log.stageName && (

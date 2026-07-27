@@ -420,8 +420,8 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             {selectedPlot
               ? `Detailed insights for ${selectedPlot.name}.`
               : role === "FACULTY"
@@ -478,14 +478,14 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Sensor trends</CardTitle>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Average soil moisture, temperature, and humidity over time
             {selectedPlot && ` for ${selectedPlot.name}`}.
           </p>
         </CardHeader>
         <CardContent>
           {sensorTrends.length === 0 ? (
-            <div className="text-center py-12 text-sm text-gray-500">
+            <div className="text-center py-12 text-sm text-muted-foreground">
               No sensor data in this range.
             </div>
           ) : (
@@ -498,13 +498,13 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Light intensity</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Average light intensity over time.
             </p>
           </CardHeader>
           <CardContent>
             {sensorTrends.length === 0 ? (
-              <div className="text-center py-12 text-sm text-gray-500">
+              <div className="text-center py-12 text-sm text-muted-foreground">
                 No sensor data in this range.
               </div>
             ) : (
@@ -516,13 +516,13 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Nutrients (NPK)</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Average nitrogen, phosphorus, and potassium over time.
             </p>
           </CardHeader>
           <CardContent>
             {sensorTrends.length === 0 ? (
-              <div className="text-center py-12 text-sm text-gray-500">
+              <div className="text-center py-12 text-sm text-muted-foreground">
                 No sensor data in this range.
               </div>
             ) : (
@@ -535,14 +535,14 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Observations</CardTitle>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Growth log entries recorded over time
             {selectedPlot && ` for ${selectedPlot.name}`}.
           </p>
         </CardHeader>
         <CardContent>
           {observationsByDate.length === 0 ? (
-            <div className="text-center py-12 text-sm text-gray-500">
+            <div className="text-center py-12 text-sm text-muted-foreground">
               No observations in this range.
             </div>
           ) : (
@@ -559,13 +559,13 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Alerts over time</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Alert count by severity.
             </p>
           </CardHeader>
           <CardContent>
             {alertsByDate.length === 0 ? (
-              <div className="text-center py-12 text-sm text-gray-500">
+              <div className="text-center py-12 text-sm text-muted-foreground">
                 No alerts in this range.
               </div>
             ) : (
@@ -577,7 +577,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Alerts by type</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Breakdown by sensor type and severity.
             </p>
           </CardHeader>
@@ -590,7 +590,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Plot health summary</CardTitle>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {selectedPlot ? (
               <>
                 Showing one plot.{" "}
@@ -608,7 +608,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         </CardHeader>
         <CardContent className="p-0">
           {plots.length === 0 ? (
-            <div className="text-center py-12 text-sm text-gray-500">
+            <div className="text-center py-12 text-sm text-muted-foreground">
               No plots to analyze.
             </div>
           ) : (
@@ -631,7 +631,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
                       "flex items-center gap-4 p-4 transition " +
                       (isSelected
                         ? "bg-green-50 hover:bg-green-100"
-                        : "hover:bg-gray-50")
+                        : "hover:bg-muted")
                     }
                   >
                     <div className="flex-1 min-w-0">
@@ -659,7 +659,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         {plot.location ?? "No location"} •{" "}
                         {plot._count.alerts > 0
                           ? `${plot._count.alerts} open alert${plot._count.alerts === 1 ? "" : "s"}`

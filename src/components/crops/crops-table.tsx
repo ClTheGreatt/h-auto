@@ -163,7 +163,7 @@ export function CropsTable({
       </div>
 
       {/* Result count + clear */}
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div>
           {total === 0 ? (
             <span>No results</span>
@@ -239,10 +239,10 @@ export function CropsTable({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-gray-600">
+                  <TableCell className="text-muted-foreground">
                     {crop.variety ?? "—"}
                   </TableCell>
-                  <TableCell className="text-gray-600">
+                  <TableCell className="text-muted-foreground">
                     {crop.daysToHarvest} days
                   </TableCell>
                   <TableCell>
@@ -299,7 +299,7 @@ export function CropsTable({
 
 {/* Bottom count (consistency w/ Plots) */}
       {crops.length > 0 && (
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-muted-foreground">
           {total} crop{total !== 1 ? "s" : ""}
           {totalPages > 1 && <> · Page {page} of {totalPages}</>}
         </div>
@@ -308,7 +308,7 @@ export function CropsTable({
       {/* 📄 Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <div className="text-gray-500">
+          <div className="text-muted-foreground">
             Page {page} of {totalPages}
           </div>
           <div className="flex gap-2">

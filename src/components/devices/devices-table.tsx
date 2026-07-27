@@ -174,7 +174,7 @@ export function DevicesTable({
                     {d.plot.name}
                   </Link>
                   {d.plot.location && (
-                    <div className="text-xs text-gray-500">{d.plot.location}</div>
+                    <div className="text-xs text-muted-foreground">{d.plot.location}</div>
                   )}
                 </TableCell>
                 <TableCell>
@@ -182,13 +182,13 @@ export function DevicesTable({
                     {computedStatus(d)}
                   </StatusBadge>
                 </TableCell>
-                <TableCell className="text-sm text-gray-600">
+                <TableCell className="text-sm text-muted-foreground">
                   {formatLastSeen(d.lastSeenAt)}
                 </TableCell>
-                <TableCell className="text-sm text-gray-600">
+                <TableCell className="text-sm text-muted-foreground">
                   {d.firmwareVersion ?? "—"}
                 </TableCell>
-                <TableCell className="text-sm text-gray-600">
+                <TableCell className="text-sm text-muted-foreground">
                   {d._count.readings}
                 </TableCell>
                 <TableCell>
@@ -319,7 +319,7 @@ export function DevicesTable({
               Save this key now — it will only be shown once.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="bg-gray-50 border rounded-md p-3 font-mono text-xs break-all">
+          <div className="bg-muted border rounded-md p-3 font-mono text-xs break-all">
             {newKey}
           </div>
           <AlertDialogFooter>

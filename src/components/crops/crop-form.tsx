@@ -288,8 +288,8 @@ export function CropForm({
         <div>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Growth stages</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-lg font-semibold text-foreground">Growth stages</h2>
+              <p className="text-sm text-muted-foreground">
                 Define each stage and the ideal thresholds for that stage.
               </p>
             </div>
@@ -332,7 +332,7 @@ export function CropForm({
           </div>
         </div>
 
-        <div className="flex gap-3 sticky bottom-0 bg-gray-50 py-4 border-t">
+        <div className="flex gap-3 sticky bottom-0 bg-muted py-4 border-t">
           <Button type="submit" disabled={submitting}>
             {submitting ? "Saving..." : mode === "create" ? "Create crop" : "Save changes"}
           </Button>
@@ -460,15 +460,15 @@ function ThresholdPair({
   const maxName = `stages.${index}.max${field}` as const;
 
   return (
-    <div className="border rounded-md p-3 bg-gray-50">
-      <div className="text-xs font-medium text-gray-600 mb-2">{label}</div>
+    <div className="border rounded-md p-3 bg-muted">
+      <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
       <div className="grid grid-cols-2 gap-2">
         <FormField
           control={control}
           name={minName}
           render={({ field: f }) => (
             <FormItem>
-              <FormLabel className="text-xs text-gray-500">Min</FormLabel>
+              <FormLabel className="text-xs text-muted-foreground">Min</FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -487,7 +487,7 @@ function ThresholdPair({
           name={maxName}
           render={({ field: f }) => (
             <FormItem>
-              <FormLabel className="text-xs text-gray-500">Max</FormLabel>
+              <FormLabel className="text-xs text-muted-foreground">Max</FormLabel>
               <FormControl>
                 <Input
                   type="number"

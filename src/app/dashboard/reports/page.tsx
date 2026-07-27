@@ -72,8 +72,8 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Reports</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-semibold text-foreground">Reports</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Generate and export PDF or Excel reports for documentation, analysis,
           and capstone defense.
         </p>

@@ -133,8 +133,8 @@ export default async function MonitoringPage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Monitoring</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-semibold text-foreground">Monitoring</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             {role === "STUDENT_FARMER"
               ? "Recent growth observations from your assigned plots."
               : "Recent growth observations from all monitored plots."}
@@ -156,7 +156,7 @@ export default async function MonitoringPage({
       {/* Active filters indicator */}
       {hasFilters && (
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-500">Filtered:</span>
+          <span className="text-muted-foreground">Filtered:</span>
           {selectedPlotId && (
             <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
               {plots.find((p) => p.id === selectedPlotId)?.name}
@@ -211,7 +211,7 @@ export default async function MonitoringPage({
         </div>
       ) : (
         <>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {totalLogs} observation{totalLogs === 1 ? "" : "s"}
             {totalPages > 1 && ` • Page ${safePage} of ${totalPages}`}
           </div>
@@ -225,7 +225,7 @@ export default async function MonitoringPage({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 Page {safePage} of {totalPages}
               </div>
               <div className="flex items-center gap-2">
@@ -239,7 +239,7 @@ export default async function MonitoringPage({
                         ...(safePage - 1 > 1 && { page: safePage - 1 }),
                       },
                     }}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
+                    className="px-3 py-1.5 text-sm border rounded hover:bg-muted"
                   >
                     Previous
                   </Link>
@@ -254,7 +254,7 @@ export default async function MonitoringPage({
                         page: safePage + 1,
                       },
                     }}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
+                    className="px-3 py-1.5 text-sm border rounded hover:bg-muted"
                   >
                     Next
                   </Link>
