@@ -35,11 +35,33 @@ import {
   importTypeMismatchMessage,
 } from "@/lib/constants/user-import";
 
+type CreatedCredential = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  tempPassword: string;
+};
+
 type ImportResult = {
   success: string[];
+  credentials: CreatedCredential[];
   failed: { email: string; reason: string }[];
   totalProcessed: number;
 };
+
+// Quotes every field and doubles embedded quotes — CSV-safe for names with
+// commas (e.g. "Dela Cruz, Jr.") or quote characters.
+function csvField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function todayLocalDateStamp(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 type Phase = "idle" | "preview" | "committing" | "done";
 
@@ -174,6 +196,30 @@ export function ImportForm() {
     if (res.failed.length > 0) {
       toast.warning(`${res.failed.length} row(s) failed`);
     }
+  }
+
+  // Client-side only — the plaintext already reached this component in the
+  // commitImport() response and must never round-trip to the server again.
+  // BOM prefix keeps Excel rendering Filipino names with diacritics correctly.
+  function downloadCredentialsCsv() {
+    if (!result || result.credentials.length === 0) return;
+
+    const header = ["firstName", "lastName", "email", "tempPassword"].map(csvField).join(",");
+    const lines = result.credentials.map((c) =>
+      [c.firstName, c.lastName, c.email, c.tempPassword].map(csvField).join(",")
+    );
+    const BOM = "﻿";
+    const csv = BOM + [header, ...lines].join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `h-auto-credentials-${todayLocalDateStamp()}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   }
 
   function resetForm() {
@@ -456,6 +502,55 @@ export function ImportForm() {
   if (phase === "done" && result) {
     return (
       <div className="space-y-4">
+        {result.credentials.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div>
+                These temporary passwords are shown only once. They cannot be
+                recovered after you leave this page — only the hashed form is
+                stored. Download or copy them now.
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Temporary credentials</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button onClick={downloadCredentialsCsv}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download credentials (.csv)
+                </Button>
+                <div className="border rounded-md bg-card overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Temporary password</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.credentials.map((c, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-sm">
+                            {c.firstName} {c.lastName}
+                          </TableCell>
+                          <TableCell className="text-sm">{c.email}</TableCell>
+                          <TableCell className="text-sm font-mono">
+                            {c.tempPassword}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         <Card>
           <CardContent className="py-6">
             <div className="flex items-center gap-3 mb-4">
