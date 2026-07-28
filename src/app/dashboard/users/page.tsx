@@ -148,6 +148,24 @@ export default async function UsersPage({
   const courseGroups = groupStudents(studentRows, studentFieldRows);
   const showStudentSection = studentFiltersActive;
 
+  // Faculty group's "Advised sections" column — one query for every faculty
+  // row currently on the page, grouped by facultyId, never per-row.
+  const facultyIds = users
+    .filter((u) => u.role === "FACULTY")
+    .map((u) => u.id);
+  const advisoryRows =
+    facultyIds.length > 0
+      ? await prisma.facultySectionAdvisory.findMany({
+          where: { facultyId: { in: facultyIds } },
+          select: { facultyId: true, section: true },
+          orderBy: { section: "asc" },
+        })
+      : [];
+  const advisoriesByFacultyId: Record<string, string[]> = {};
+  for (const row of advisoryRows) {
+    (advisoriesByFacultyId[row.facultyId] ??= []).push(row.section);
+  }
+
   // Build URL preserving filters when switching tabs (page resets implicitly
   // since this page has no pagination).
   function tabUrl(targetView: "active" | "graduated"): string {
@@ -301,6 +319,7 @@ export default async function UsersPage({
           showStudentSection={showStudentSection}
           courseGroups={courseGroups}
           hasFilters={hasFilters}
+          advisoriesByFacultyId={advisoriesByFacultyId}
         />
       </div>
     </div>

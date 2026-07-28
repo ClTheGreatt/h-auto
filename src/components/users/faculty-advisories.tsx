@@ -40,11 +40,16 @@ export function FacultyAdvisories({
   const [draft, setDraft] = useState("");
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Two-step guard for clearing a previously non-empty list — set once the
+  // user has clicked Save on an empty draft and needs to click again to
+  // actually confirm. Reset on any further edit to the draft.
+  const [confirmClearing, setConfirmClearing] = useState(false);
 
   function openDialog() {
     setPending(sections);
     setDraft("");
     setInlineError(null);
+    setConfirmClearing(false);
     setDialogOpen(true);
   }
 
@@ -55,7 +60,9 @@ export function FacultyAdvisories({
     // Client-side check is UX only (fast feedback) — the server
     // re-validates against the exact same SECTION_REGEX regardless.
     if (!SECTION_REGEX.test(value)) {
-      setInlineError(`"${value}" doesn't look like a valid section (e.g. BSA-1A).`);
+      setInlineError(
+        "Invalid section format. Expected e.g. BSA-4A (BSA, BTVTED, or BSABE + year 1-4 + letter)."
+      );
       return;
     }
 
@@ -69,13 +76,28 @@ export function FacultyAdvisories({
     setPending((prev) => [...prev, value]);
     setDraft("");
     setInlineError(null);
+    setConfirmClearing(false);
   }
 
   function removeSection(value: string) {
     setPending((prev) => prev.filter((s) => s !== value));
+    setConfirmClearing(false);
   }
 
+  const hadSections = sections.length > 0;
+  const isEmptyDraft = pending.length === 0;
+  // Nothing to clear and nothing to add — saving would be a pure no-op.
+  const saveDisabled = submitting || (isEmptyDraft && !hadSections);
+  // Draft would wipe out a previously non-empty list — require a second,
+  // explicit click before it actually happens.
+  const showConfirmStep = isEmptyDraft && hadSections;
+
   async function handleSave() {
+    if (showConfirmStep && !confirmClearing) {
+      setConfirmClearing(true);
+      return;
+    }
+
     setSubmitting(true);
     const result = await setFacultyAdvisories(facultyId, pending);
     setSubmitting(false);
@@ -88,6 +110,7 @@ export function FacultyAdvisories({
     toast.success("Advised sections updated");
     setSections(pending);
     setDialogOpen(false);
+    setConfirmClearing(false);
     router.refresh();
   }
 
@@ -106,6 +129,7 @@ export function FacultyAdvisories({
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button
+                type="button"
                 size="sm"
                 variant="outline"
                 onClick={(e) => {
@@ -180,14 +204,19 @@ export function FacultyAdvisories({
               </div>
               <DialogFooter>
                 <Button
+                  type="button"
                   variant="outline"
                   onClick={() => setDialogOpen(false)}
                   disabled={submitting}
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSave} disabled={submitting}>
-                  {submitting ? "Saving..." : "Save"}
+                <Button type="submit" onClick={handleSave} disabled={saveDisabled}>
+                  {submitting
+                    ? "Saving..."
+                    : showConfirmStep
+                    ? "Confirm: remove all sections"
+                    : "Save"}
                 </Button>
               </DialogFooter>
             </DialogContent>

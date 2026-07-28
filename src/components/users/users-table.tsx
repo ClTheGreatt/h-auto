@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import {
   DropdownMenu,
@@ -104,11 +105,15 @@ export function UsersTable({
   showStudentSection,
   courseGroups,
   hasFilters,
+  advisoriesByFacultyId,
 }: {
   users: UserRow[];
   showStudentSection: boolean;
   courseGroups: CourseGroup[];
   hasFilters: boolean;
+  // Faculty only — one section-list per facultyId, fetched in a single
+  // query by the page. Absent entirely for every other role's table.
+  advisoriesByFacultyId?: Record<string, string[]>;
 }) {
   if (users.length === 0 && !showStudentSection) {
     return (
@@ -132,7 +137,12 @@ export function UsersTable({
   return (
     <div className="space-y-4">
       {otherRoles.map((role) => (
-        <RoleSection key={role} role={role} users={grouped[role]} />
+        <RoleSection
+          key={role}
+          role={role}
+          users={grouped[role]}
+          advisoriesByFacultyId={role === "FACULTY" ? advisoriesByFacultyId : undefined}
+        />
       ))}
       {showStudentSection && (
         <StudentFarmerSection courseGroups={courseGroups} hasFilters={hasFilters} />
@@ -141,7 +151,15 @@ export function UsersTable({
   );
 }
 
-function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
+function RoleSection({
+  role,
+  users,
+  advisoriesByFacultyId,
+}: {
+  role: UserRole;
+  users: UserRow[];
+  advisoriesByFacultyId?: Record<string, string[]>;
+}) {
   const meta = ROLE_META[role];
 
   return (
@@ -161,7 +179,7 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
         </div>
       </div>
 
-      <UserRowsTable users={users} />
+      <UserRowsTable users={users} advisoriesByFacultyId={advisoriesByFacultyId} />
     </section>
   );
 }
@@ -169,31 +187,52 @@ function RoleSection({ role, users }: { role: UserRole; users: UserRow[] }) {
 // Shared column widths, so any table built from these pieces (RoleSection's
 // own table, or the Student Farmers single continuous table) lines up
 // identically regardless of how many rows/labels are interleaved above it.
-export function UserTableColgroup() {
+// `showAdvisories` is only ever passed for the Faculty section's own table.
+export function UserTableColgroup({
+  showAdvisories = false,
+}: {
+  showAdvisories?: boolean;
+} = {}) {
   return (
     <colgroup>
-      <col className="w-[32%]" />
-      <col className="w-[36%]" />
-      <col className="w-[14%]" />
-      <col className="w-[14%]" />
+      <col className="w-[26%]" />
+      <col className="w-[28%]" />
+      <col className="w-[12%]" />
+      <col className="w-[12%]" />
+      {showAdvisories && <col className="w-[16%]" />}
       <col className="w-12" />
     </colgroup>
   );
 }
 
-export function UserTableHeaderRow() {
+export function UserTableHeaderRow({
+  showAdvisories = false,
+}: {
+  showAdvisories?: boolean;
+} = {}) {
   return (
     <TableRow>
       <TableHead className="px-4 text-xs">Name</TableHead>
       <TableHead className="px-4 text-xs">Email</TableHead>
       <TableHead className="px-4 text-xs">Status</TableHead>
       <TableHead className="px-4 text-xs">ID number</TableHead>
+      {showAdvisories && (
+        <TableHead className="px-4 text-xs">Advised sections</TableHead>
+      )}
       <TableHead className="px-3"></TableHead>
     </TableRow>
   );
 }
 
-export function UserTableRow({ user }: { user: UserRow }) {
+export function UserTableRow({
+  user,
+  advisedSections,
+}: {
+  user: UserRow;
+  // Only ever passed by the Faculty section's table. `undefined` (Admin,
+  // Super Admin, Student Farmer rows) renders no extra cell at all.
+  advisedSections?: string[];
+}) {
   const router = useRouter();
 
   return (
@@ -232,6 +271,21 @@ export function UserTableRow({ user }: { user: UserRow }) {
           </span>
         )}
       </TableCell>
+      {advisedSections !== undefined && (
+        <TableCell className="px-4 py-3">
+          {advisedSections.length === 0 ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {advisedSections.map((s) => (
+                <Badge key={s} variant="secondary" className="text-xs">
+                  {s}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </TableCell>
+      )}
       <TableCell className="px-3 py-2 text-right">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -284,17 +338,31 @@ export function UserTableRow({ user }: { user: UserRow }) {
 
 // Standalone table with its own header, used for role sections that have no
 // sub-grouping (Super Admin, Admin, Faculty).
-export function UserRowsTable({ users }: { users: UserRow[] }) {
+export function UserRowsTable({
+  users,
+  advisoriesByFacultyId,
+}: {
+  users: UserRow[];
+  advisoriesByFacultyId?: Record<string, string[]>;
+}) {
+  const showAdvisories = advisoriesByFacultyId !== undefined;
+
   return (
     <div>
       <Table className="min-w-[760px] table-fixed">
-        <UserTableColgroup />
+        <UserTableColgroup showAdvisories={showAdvisories} />
         <TableHeader>
-          <UserTableHeaderRow />
+          <UserTableHeaderRow showAdvisories={showAdvisories} />
         </TableHeader>
         <TableBody>
           {users.map((user) => (
-            <UserTableRow key={user.id} user={user} />
+            <UserTableRow
+              key={user.id}
+              user={user}
+              advisedSections={
+                showAdvisories ? advisoriesByFacultyId[user.id] ?? [] : undefined
+              }
+            />
           ))}
         </TableBody>
       </Table>
