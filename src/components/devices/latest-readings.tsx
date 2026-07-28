@@ -16,7 +16,7 @@ import {
   type StageThresholds,
 } from "@/lib/sensors/threshold-status";
 import { ThresholdBar } from "@/components/sensors/threshold-bar";
-import { formatDateTimeManila } from "@/lib/format-date";
+import { formatDateTime } from "@/lib/format-date";
 
 type Reading = SensorReadingValues & {
   id: string;
@@ -54,7 +54,7 @@ export function LatestReadings({
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Last updated {formatDateTimeManila(reading.recordedAt)}
+        Last updated {formatDateTime(reading.recordedAt)}
       </p>
       {!stage && (
         <p className="text-xs text-muted-foreground italic">

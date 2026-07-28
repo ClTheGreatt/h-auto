@@ -29,6 +29,7 @@ export function timeAgo(date: Date | string | null | undefined): string {
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";
   return new Date(date).toLocaleDateString("en-US", {
+    timeZone: "Asia/Manila",
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -41,42 +42,6 @@ export function formatDate(date: Date | string | null | undefined): string {
  * Use for: detail pages, audit logs, exact event timestamps.
  */
 export function formatDateTime(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  return new Date(date).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-/**
- * Same output shape as formatDate, but pinned to Asia/Manila regardless of
- * whether this runs server-side (Node/Vercel defaults to UTC) or
- * client-side (whatever the visitor's device is set to) — neither implicit
- * default is reliably correct for a BPSU-only app. Deliberately a separate
- * function rather than adding timeZone to formatDate itself: formatDate is
- * also used by report/export generators whose output must not change in
- * this batch.
- */
-export function formatDateManila(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/**
- * Same output shape as formatDateTime, but pinned to Asia/Manila for the
- * same reason as formatDateManila above — kept separate from formatDateTime
- * so report/export/mobile callers of that function are unaffected.
- */
-export function formatDateTimeManila(date: Date | string | null | undefined): string {
   if (!date) return "—";
   return new Date(date).toLocaleString("en-US", {
     timeZone: "Asia/Manila",

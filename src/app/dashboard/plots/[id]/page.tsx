@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
-import { formatDateManila, formatDateTimeManila } from "@/lib/format-date";
+import { formatDate, formatDateTime } from "@/lib/format-date";
 import { isDeviceOnline } from "@/lib/utils/device-status";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
@@ -334,11 +334,11 @@ export default async function PlotDetailPage({
           <CardContent className="space-y-1 text-sm">
             <div>
               <span className="text-muted-foreground">Planted:</span>{" "}
-              {plot.plantingDate ? formatDateManila(plot.plantingDate) : "-"}
+              {plot.plantingDate ? formatDate(plot.plantingDate) : "-"}
             </div>
             <div>
               <span className="text-muted-foreground">Harvest:</span>{" "}
-              {plot.expectedHarvest ? formatDateManila(plot.expectedHarvest) : "-"}
+              {plot.expectedHarvest ? formatDate(plot.expectedHarvest) : "-"}
             </div>
           </CardContent>
         </Card>
@@ -401,7 +401,7 @@ export default async function PlotDetailPage({
               {!deviceOnline && (
                 <p className="text-sm text-muted-foreground mb-3">
                   No data for {formatStaleDuration(staleDurationMs)}
-                  {" · "}Last reading {formatDateTimeManila(latestReading.recordedAt)}
+                  {" · "}Last reading {formatDateTime(latestReading.recordedAt)}
                 </p>
               )}
               <div className={!deviceOnline ? "opacity-60" : undefined}>
