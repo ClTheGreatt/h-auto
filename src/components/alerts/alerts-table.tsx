@@ -55,10 +55,15 @@ const severityRailClass: Record<AlertSeverity, string> = {
   CRITICAL: "border-l-danger-border",
 };
 
-const severityTintClass: Record<AlertSeverity, string> = {
-  INFO: "bg-info-bg/40",
-  WARNING: "bg-warning-bg/40",
-  CRITICAL: "bg-danger-bg/40",
+// UI-5: alert cards no longer use a surface tint — at card height (~250px)
+// even a reduced-opacity fill still covers a large area and reads as
+// dominant. A thin matching-color border on the other 3 edges (paired with
+// the existing full-strength border-l-4 rail) gives the same severity
+// signal without a wash.
+const severityBorderClass: Record<AlertSeverity, string> = {
+  INFO: "border-info-border",
+  WARNING: "border-warning-border",
+  CRITICAL: "border-danger-border",
 };
 
 const severityTextClass: Record<AlertSeverity, string> = {
@@ -178,6 +183,24 @@ export function AlertsTable({
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  // Separate from `expanded` (notification-recipient Details toggle) on
+  // purpose — two independent disclosures per alert, and unlike Details
+  // (single global toggle), multiple suggestion boxes can be open at once.
+  const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  function toggleSuggestion(id: string) {
+    setExpandedSuggestions((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function handleResolve(id: string) {
     setResolvingId(id);
@@ -246,9 +269,9 @@ export function AlertsTable({
                   <Fragment key={alert.id}>
                     <div
                       className={cn(
-                        "border-l-4 p-3",
+                        "border border-l-4 p-3",
                         severityRailClass[alert.severity],
-                        severityTintClass[alert.severity],
+                        severityBorderClass[alert.severity],
                         alert.resolved && "opacity-60"
                       )}
                     >
@@ -286,22 +309,35 @@ export function AlertsTable({
 
                           {alert.suggestionTitle && (
                             <div className="mt-2 rounded-md border border-border bg-muted p-3">
-                              <div
-                                className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${severityTextClass[alert.severity]}`}
+                              <button
+                                type="button"
+                                onClick={() => toggleSuggestion(alert.id)}
+                                className="flex items-center gap-1.5 text-sm text-foreground w-full text-left"
                               >
-                                <Lightbulb className="h-3.5 w-3.5" />
-                                Suggested action
-                              </div>
-                              <div className="mt-1 text-sm font-semibold text-foreground">
-                                {alert.suggestionTitle}
-                              </div>
-                              {alert.suggestionSteps.length > 0 && (
-                                <ol className="mt-1.5 list-decimal list-inside space-y-0.5 text-sm text-muted-foreground">
-                                  {alert.suggestionSteps.map((s, i) => (
-                                    <li key={i}>{s}</li>
-                                  ))}
-                                </ol>
-                              )}
+                                {expandedSuggestions.has(alert.id) ? (
+                                  <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                )}
+                                <Lightbulb
+                                  className={`h-3.5 w-3.5 shrink-0 ${severityTextClass[alert.severity]}`}
+                                />
+                                <span>
+                                  Suggested action: {alert.suggestionTitle}
+                                  {alert.suggestionSteps.length > 0 &&
+                                    ` — ${alert.suggestionSteps.length} step${
+                                      alert.suggestionSteps.length === 1 ? "" : "s"
+                                    }`}
+                                </span>
+                              </button>
+                              {expandedSuggestions.has(alert.id) &&
+                                alert.suggestionSteps.length > 0 && (
+                                  <ol className="mt-2 ml-4.5 list-decimal list-inside space-y-0.5 text-sm text-muted-foreground">
+                                    {alert.suggestionSteps.map((s, i) => (
+                                      <li key={i}>{s}</li>
+                                    ))}
+                                  </ol>
+                                )}
                             </div>
                           )}
 

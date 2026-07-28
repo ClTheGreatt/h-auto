@@ -173,7 +173,7 @@ export default async function AlertsPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-350">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Alerts</h1>

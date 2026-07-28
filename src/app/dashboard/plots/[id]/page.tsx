@@ -334,15 +334,11 @@ export default async function PlotDetailPage({
           <CardContent className="space-y-1 text-sm">
             <div>
               <span className="text-muted-foreground">Planted:</span>{" "}
-              {plot.plantingDate
-                ? new Date(plot.plantingDate).toLocaleDateString()
-                : "-"}
+              {plot.plantingDate ? formatDateManila(plot.plantingDate) : "-"}
             </div>
             <div>
               <span className="text-muted-foreground">Harvest:</span>{" "}
-              {plot.expectedHarvest
-                ? new Date(plot.expectedHarvest).toLocaleDateString()
-                : "-"}
+              {plot.expectedHarvest ? formatDateManila(plot.expectedHarvest) : "-"}
             </div>
           </CardContent>
         </Card>
@@ -405,7 +401,7 @@ export default async function PlotDetailPage({
               {!deviceOnline && (
                 <p className="text-sm text-muted-foreground mb-3">
                   No data for {formatStaleDuration(staleDurationMs)}
-                  {" · "}Last reading {formatDateTime(latestReading.recordedAt)}
+                  {" · "}Last reading {formatDateTimeManila(latestReading.recordedAt)}
                 </p>
               )}
               <div className={!deviceOnline ? "opacity-60" : undefined}>
