@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
-import { formatDateTime } from "@/lib/format-date";
+import { formatDateManila, formatDateTimeManila } from "@/lib/format-date";
 import { isDeviceOnline } from "@/lib/utils/device-status";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
