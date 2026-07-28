@@ -21,12 +21,23 @@ export function getThresholdStatus(
 export type BarPosition = {
   percent: number;
   clamped: "low" | "high" | null;
+  // Where the ideal [min, max] band itself starts/ends on the 0-100 track.
+  // Only a fixed 33.3%/66.7% when the lower buffer zone doesn't need
+  // flooring (see domainMin below) — callers must position the tinted
+  // "ideal" zone using these, not a hard-coded middle third.
+  bandStartPercent: number;
+  bandEndPercent: number;
 };
 
-// Maps a value onto a 0-100 track where the ideal [min, max] band always
-// occupies the middle third (domainMin..min..max..domainMax, each segment
-// exactly one bandWidth wide) — so a consumer rendering the middle third as
-// the tinted "ideal" zone automatically lines up with this percent.
+// Maps a value onto a 0-100 track: a lower buffer zone, the ideal [min, max]
+// band, and an upper buffer zone, each nominally one bandWidth wide. No
+// sensor field can read below zero, so the lower buffer is floored at 0
+// instead of going negative — a wide band (e.g. light: 3000-8000, bandWidth
+// 5000) would otherwise get a domainMin of -2000, which made an extreme-low
+// reading like 0 lux land mid-track (~13%) instead of at the true bottom of
+// the physically possible range. Flooring makes the domain asymmetric, so
+// the band's own position on the track is no longer always 33.3%/66.7% —
+// callers must use bandStartPercent/bandEndPercent, not a fixed middle third.
 export function getBarPosition(
   value: number,
   min: number,
@@ -34,17 +45,25 @@ export function getBarPosition(
 ): BarPosition {
   const bandWidth = max - min;
   if (bandWidth === 0) {
-    return { percent: 50, clamped: null };
+    return { percent: 50, clamped: null, bandStartPercent: 50, bandEndPercent: 50 };
   }
 
-  const domainMin = min - bandWidth;
+  const domainMin = Math.max(0, min - bandWidth);
   const domainMax = max + bandWidth;
+  const domainSpan = domainMax - domainMin;
 
-  if (value < domainMin) return { percent: 0, clamped: "low" };
-  if (value > domainMax) return { percent: 100, clamped: "high" };
+  const bandStartPercent = ((min - domainMin) / domainSpan) * 100;
+  const bandEndPercent = ((max - domainMin) / domainSpan) * 100;
 
-  const percent = ((value - domainMin) / (domainMax - domainMin)) * 100;
-  return { percent, clamped: null };
+  if (value < domainMin) {
+    return { percent: 0, clamped: "low", bandStartPercent, bandEndPercent };
+  }
+  if (value > domainMax) {
+    return { percent: 100, clamped: "high", bandStartPercent, bandEndPercent };
+  }
+
+  const percent = ((value - domainMin) / domainSpan) * 100;
+  return { percent, clamped: null, bandStartPercent, bandEndPercent };
 }
 
 // The 7 raw sensor fields (SensorReading) and their corresponding min/max

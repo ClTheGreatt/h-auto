@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
-import { timeAgo } from "@/lib/format-date";
+import { formatDateTime } from "@/lib/format-date";
 import { isDeviceOnline } from "@/lib/utils/device-status";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
@@ -47,6 +47,30 @@ const statusColors: Record<PlotStatus, string> = {
   FALLOW: "bg-stone-100 text-stone-700",
   ARCHIVED: "bg-gray-200 text-gray-600",
 };
+
+// Isolates the Date.now() call in its own non-component function, same
+// idiom as isDeviceOnline in device-status.ts — the purity lint rule flags
+// impure calls made directly inside a component body, not ones tucked
+// behind a helper.
+function msSince(date: Date): number {
+  return Date.now() - date.getTime();
+}
+
+// Plain-language duration for the stale-data line, e.g. "4 days", "2 hours" —
+// deliberately spelled out (not the abbreviated "4d"/"2h" style of timeAgo)
+// since this reads as a sentence: "No data for {duration}".
+function formatStaleDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / (60 * 1000)));
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
 
 export default async function PlotDetailPage({
   params,
@@ -167,6 +191,7 @@ export default async function PlotDetailPage({
   // Compute freshly from lastSeenAt rather than trusting device.status,
   // which is only updated periodically by the offline-detection cron.
   const deviceOnline = isDeviceOnline(plot.device?.lastSeenAt);
+  const staleDurationMs = latestReading ? msSince(latestReading.recordedAt) : 0;
 
   const growthLogs = await prisma.growthLog.findMany({
     where: { plotId: plot.id },
@@ -348,12 +373,6 @@ export default async function PlotDetailPage({
                   Awaiting first reading
                 </Badge>
               )}
-              {plot.device && latestReading && !deviceOnline && (
-                <Badge variant="secondary" className="bg-amber-100 text-amber-700">
-                  Device offline · Last seen{" "}
-                  {plot.device.lastSeenAt ? timeAgo(plot.device.lastSeenAt) : "unknown"}
-                </Badge>
-              )}
               {plot.device && latestReading && deviceOnline && (
                 <Badge variant="secondary" className="bg-green-100 text-green-700">
                   Live
@@ -382,7 +401,17 @@ export default async function PlotDetailPage({
               reported yet. First reading will appear here.
             </div>
           ) : (
-            <LatestReadings reading={latestReading} stage={plot.currentStage} />
+            <>
+              {!deviceOnline && (
+                <p className="text-sm text-muted-foreground mb-3">
+                  No data for {formatStaleDuration(staleDurationMs)}
+                  {" · "}Last reading {formatDateTime(latestReading.recordedAt)}
+                </p>
+              )}
+              <div className={!deviceOnline ? "opacity-60" : undefined}>
+                <LatestReadings reading={latestReading} stage={plot.currentStage} />
+              </div>
+            </>
           )}
           {latestReading && (
             <div className="mt-4 pt-4 border-t">

@@ -46,7 +46,11 @@ export function ThresholdBar({ label, value, unit, min, max }: ThresholdBarProps
   }
 
   const status = getThresholdStatus(value, min, max);
-  const { percent, clamped } = getBarPosition(value, min, max);
+  const { percent, clamped, bandStartPercent, bandEndPercent } = getBarPosition(
+    value,
+    min,
+    max
+  );
 
   return (
     <div>
@@ -66,12 +70,20 @@ export function ThresholdBar({ label, value, unit, min, max }: ThresholdBarProps
       </div>
 
       <div
-        className="relative h-2 rounded-full bg-muted mt-2 overflow-visible"
+        className="relative h-2 rounded-full bg-background border border-border mt-2 overflow-visible"
         aria-hidden="true"
       >
-        {/* Ideal band — always the middle third, matching getBarPosition's
-            domain (domainMin..min..max..domainMax = 3 equal segments). */}
-        <div className="absolute inset-y-0 left-[33.3333%] right-[33.3333%] bg-success-bg rounded-full" />
+        {/* Ideal band — position comes from getBarPosition's
+            bandStartPercent/bandEndPercent, NOT a fixed middle third, since
+            the domain is floored at 0 and can be asymmetric (see
+            threshold-status.ts). */}
+        <div
+          className="absolute inset-y-0 bg-success-bg rounded-full"
+          style={{
+            left: `${bandStartPercent}%`,
+            width: `${bandEndPercent - bandStartPercent}%`,
+          }}
+        />
 
         {clamped === "low" ? (
           <ChevronLeft
