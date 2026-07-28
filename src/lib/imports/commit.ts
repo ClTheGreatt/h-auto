@@ -11,6 +11,7 @@ import {
   type ImportRowType,
 } from "@/lib/validations/import";
 import { normalizeImportRow, formatZodIssue } from "@/lib/imports/parse-rows";
+import { generateTempPassword } from "@/lib/auth/generate-password";
 
 // Shared by the web server action (src/actions/import.ts) and the mobile
 // API route (src/app/api/mobile/me/users/import/route.ts) — the same
@@ -22,6 +23,13 @@ type RawRow = Record<string, unknown>;
 
 export type ImportRowFailure = { email: string; reason: string };
 
+export type CreatedCredential = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  tempPassword: string;
+};
+
 export type CommitImportParams = {
   rows: RawRow[];
   importType: ImportRowType;
@@ -31,6 +39,11 @@ export type CommitImportParams = {
 
 export type CommitImportResult = {
   created: string[];
+  // Plaintext temp passwords for successfully-created rows, in the same
+  // request lifetime only — never persisted or logged. Additive alongside
+  // `created` so existing callers reading `created`/`failed`/`totalProcessed`
+  // keep compiling untouched.
+  credentials: CreatedCredential[];
   failed: ImportRowFailure[];
   totalProcessed: number;
   // null when the ImportBatch audit record itself failed to write — the
@@ -86,6 +99,7 @@ export async function commitImportRows({
   );
 
   const created: string[] = [];
+  const credentials: CreatedCredential[] = [];
   const failed: ImportRowFailure[] = [...validationFailed];
 
   for (const row of validated) {
@@ -99,7 +113,8 @@ export async function commitImportRows({
     }
 
     try {
-      const passwordHash = await bcrypt.hash(row.password, 10);
+      const tempPassword = generateTempPassword();
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
       const baseData = {
         email: row.email,
         firstName: row.firstName,
@@ -137,6 +152,12 @@ export async function commitImportRows({
       }
 
       created.push(row.email);
+      credentials.push({
+        email: createdUser.email,
+        firstName: createdUser.firstName,
+        lastName: createdUser.lastName,
+        tempPassword,
+      });
 
       // Welcome email — best-effort, per-row, in-loop. A failed send must
       // NOT fail the row and must NOT roll back the created user.
@@ -144,7 +165,7 @@ export async function commitImportRows({
         const { subject, html, text } = welcomeEmailTemplate({
           firstName: createdUser.firstName,
           email: createdUser.email,
-          tempPassword: row.password,
+          tempPassword,
           loginUrl:
             (process.env.AUTH_URL ?? "http://localhost:3000") + "/login",
           role: createdUser.role,
@@ -206,6 +227,7 @@ export async function commitImportRows({
 
   return {
     created,
+    credentials,
     failed,
     totalProcessed: rows.length,
     batchId,

@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  // Preserves the existing contract: the web preview (parseExcelFile in
-  // import-form.tsx) expects the raw rows array as the response body, not
-  // a { rows } envelope.
-  return NextResponse.json(result.rows);
+  return NextResponse.json({
+    rows: result.rows,
+    hasLegacyPasswordColumn: result.hasLegacyPasswordColumn,
+  });
 }

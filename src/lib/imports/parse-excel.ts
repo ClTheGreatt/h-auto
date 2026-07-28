@@ -7,7 +7,9 @@ import {
   importTypeMismatchMessage,
 } from "@/lib/constants/user-import";
 
-export type ParseExcelResult = { rows: ParsedRow[] } | { error: string };
+export type ParseExcelResult =
+  | { rows: ParsedRow[]; hasLegacyPasswordColumn: boolean }
+  | { error: string };
 
 // The one place that loads an uploaded .xlsx workbook, strips the
 // template's required-field header asterisk, checks the import-type
@@ -59,6 +61,15 @@ export async function parseExcelImportFile(
       return { error: importTypeMismatchMessage(importType, detectedType) };
     }
 
+    // Older templates included a "password" column (pre-auto-generated-
+    // password import). normalizeImportRow already drops any header not in
+    // FACULTY_IMPORT_COLUMNS/STUDENT_IMPORT_COLUMNS, so a legacy column's
+    // data is silently ignored either way — this just flags its presence so
+    // the preview can surface a one-time, non-blocking notice about it.
+    const hasLegacyPasswordColumn = headers.some(
+      (h) => h.toLowerCase() === "password"
+    );
+
     const data: Record<string, string>[] = [];
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return; // header row, already read above
@@ -76,7 +87,7 @@ export async function parseExcelImportFile(
     });
 
     const rows = buildParsedRows(data, importType);
-    return { rows };
+    return { rows, hasLegacyPasswordColumn };
   } catch (err) {
     return {
       error: `Failed to parse Excel file: ${err instanceof Error ? err.message : "Unknown error"}`,

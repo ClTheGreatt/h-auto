@@ -51,6 +51,7 @@ export function ImportForm() {
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [hasLegacyPasswordColumn, setHasLegacyPasswordColumn] = useState(false);
 
   function downloadTemplate() {
     const type = importType === "FACULTY" ? "faculty" : "student";
@@ -80,6 +81,12 @@ export function ImportForm() {
           return;
         }
 
+        // Reuses the same header-asterisk-strip convention already applied
+        // above via transformHeader — `headers` here is already stripped,
+        // so this is a direct string comparison, not a new strip variant.
+        setHasLegacyPasswordColumn(
+          headers.some((h) => h.toLowerCase() === "password")
+        );
         setRows(buildParsedRows(results.data, importType));
         setPhase("preview");
       },
@@ -107,7 +114,8 @@ export function ImportForm() {
         return;
       }
 
-      setRows(data as ParsedRow[]);
+      setHasLegacyPasswordColumn(Boolean(data.hasLegacyPasswordColumn));
+      setRows(data.rows as ParsedRow[]);
       setPhase("preview");
     } catch (err) {
       toast.error(
@@ -173,6 +181,7 @@ export function ImportForm() {
     setRows([]);
     setResult(null);
     setFileName("");
+    setHasLegacyPasswordColumn(false);
   }
 
   const validCount = rows.filter((r) => r.errors.length === 0).length;
@@ -188,7 +197,6 @@ export function ImportForm() {
           "idNumber",
           "department",
           "position",
-          "password",
         ]
       : [
           "firstName",
@@ -200,7 +208,6 @@ export function ImportForm() {
           "course",
           "yearLevel",
           "section",
-          "password",
         ];
   const requiredColumns: readonly string[] =
     importType === "FACULTY" ? FACULTY_REQUIRED_FIELDS : STUDENT_REQUIRED_FIELDS;
@@ -323,6 +330,17 @@ export function ImportForm() {
           </CardContent>
         </Card>
 
+        {hasLegacyPasswordColumn && (
+          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              This file contains a password column from an older template. It
+              will be ignored — the system now generates a temporary password
+              for each user automatically.
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground">
           <span className="text-red-500">*</span> Required field
         </p>
@@ -376,9 +394,7 @@ export function ImportForm() {
                     </TableCell>
                     {allColumns.map((col) => (
                       <TableCell key={col} className="text-xs text-muted-foreground max-w-[150px] truncate">
-                        {col === "password" && row.raw[col]
-                          ? "••••••"
-                          : row.raw[col] || "—"}
+                        {row.raw[col] || "—"}
                       </TableCell>
                     ))}
                     <TableCell className="text-xs text-red-600">

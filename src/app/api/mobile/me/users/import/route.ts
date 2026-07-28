@@ -44,15 +44,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No rows to import" }, { status: 400 });
   }
 
-  const { created, failed, totalProcessed } = await commitImportRows({
-    rows: rawRows,
-    importType: type,
-    actorId: actor.id,
-    fileName,
-  });
+  const { created, credentials, failed, totalProcessed } =
+    await commitImportRows({
+      rows: rawRows,
+      importType: type,
+      actorId: actor.id,
+      fileName,
+    });
 
   return NextResponse.json({
     success: created,
+    credentials,
     failed,
     totalProcessed,
   });

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { bpsuEmail } from "./email";
-import { passwordStrengthSchema } from "./password";
 import {
   DEPARTMENTS,
   FACULTY_POSITIONS,
@@ -29,7 +28,6 @@ const baseRow = {
   lastName: z.string().trim().min(1, "lastName is required"),
   email: bpsuEmail,
   phoneNumber: importPhone,
-  password: passwordStrengthSchema,
 };
 
 const { min: studentIdMin, max: studentIdMax } = studentIdPrefixRange();

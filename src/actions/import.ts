@@ -19,17 +19,19 @@ export async function commitImport(
   // that the UI's `if ("error" in res)` type-narrowing depends on.
   if (!session?.user) return { error: "Not authenticated" };
 
-  const { created, failed, totalProcessed } = await commitImportRows({
-    rows: rawRows,
-    importType: type,
-    actorId: session.user.id,
-    fileName,
-  });
+  const { created, credentials, failed, totalProcessed } =
+    await commitImportRows({
+      rows: rawRows,
+      importType: type,
+      actorId: session.user.id,
+      fileName,
+    });
 
   revalidatePath("/dashboard/users");
 
   return {
     success: created,
+    credentials,
     failed,
     totalProcessed,
   };

@@ -52,7 +52,7 @@ const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
 
 const COMMON_NOTES = [
   "All emails must end in @bpsu.edu.ph",
-  "Passwords must be at least 8 characters with at least one letter and one number",
+  "A temporary password is generated automatically for each account — do not include a password column",
   "Phone numbers, if provided, must be in format +639XXXXXXXXX (09XXXXXXXXX is NOT accepted for import)",
 ];
 
@@ -224,10 +224,10 @@ async function toBuffer(workbook: ExcelJS.Workbook): Promise<Buffer> {
 const FACULTY_COLUMNS: ColumnDef[] = makeColumns([...FACULTY_IMPORT_COLUMNS], FACULTY_REQUIRED_FIELDS);
 
 const FACULTY_EXAMPLE_ROWS: string[][] = [
-  ["Maria Elena", "Santos", "Cruz", "maria.cruz@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III", "TempPass123!"],
-  ["Roberto", "Reyes", "Bautista", "roberto.bautista@bpsu.edu.ph", "+639181112233", "201900-0045", "BS Agriculture - Crop Science", "Instructor I", "TempPass123!"],
-  ["Jennifer", "Aquino", "Villanueva", "jennifer.villanueva@bpsu.edu.ph", "+639172345678", "202100-0089", "BTVTEd - Animal Production", "Assistant Professor II", "TempPass123!"],
-  ["Michael", "Torres", "Delos Reyes", "michael.delosreyes@bpsu.edu.ph", "+639191122334", "201800-0102", "BS Agricultural and Biosystems Engineering", "Professor I", "TempPass123!"],
+  ["Maria Elena", "Santos", "Cruz", "maria.cruz@bpsu.edu.ph", "+639171234567", "202000-0001", "BS Agriculture - Animal Science", "Associate Professor III"],
+  ["Roberto", "Reyes", "Bautista", "roberto.bautista@bpsu.edu.ph", "+639181112233", "201900-0045", "BS Agriculture - Crop Science", "Instructor I"],
+  ["Jennifer", "Aquino", "Villanueva", "jennifer.villanueva@bpsu.edu.ph", "+639172345678", "202100-0089", "BTVTEd - Animal Production", "Assistant Professor II"],
+  ["Michael", "Torres", "Delos Reyes", "michael.delosreyes@bpsu.edu.ph", "+639191122334", "201800-0102", "BS Agricultural and Biosystems Engineering", "Professor I"],
 ];
 
 const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
@@ -239,16 +239,15 @@ const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "idNumber", required: FACULTY_REQUIRED_FIELDS.includes("idNumber"), description: "Format: 123456-1234 (6 digits, dash, 4 digits)" },
   { name: "department", required: FACULTY_REQUIRED_FIELDS.includes("department"), description: "Pick from the dropdown — one of 5 official department names (listed below)" },
   { name: "position", required: FACULTY_REQUIRED_FIELDS.includes("position"), description: "Pick from the dropdown — one of 18 official faculty ranks (listed below)" },
-  { name: "password", required: FACULTY_REQUIRED_FIELDS.includes("password"), description: "Initial password (user can change later)" },
 ];
 
 const STUDENT_COLUMNS: ColumnDef[] = makeColumns([...STUDENT_IMPORT_COLUMNS], STUDENT_REQUIRED_FIELDS);
 
 const STUDENT_EXAMPLE_ROWS: string[][] = [
-  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "2023-2024", "BS Agriculture - Animal Science", "4th Year", "BSA-4A", "TempPass123!"],
-  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "2024-2025", "BTVTEd - Animal Production", "3rd Year", "BTVTED-3B", "TempPass123!"],
-  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "2025-2026", "BS Agriculture - Crop Science", "2nd Year", "BSA-2C", "TempPass123!"],
-  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "2022-2023", "BS Agricultural and Biosystems Engineering", "4th Year", "BSABE-4D", "TempPass123!"],
+  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "2023-2024", "BS Agriculture - Animal Science", "4th Year", "BSA-4A"],
+  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "2024-2025", "BTVTEd - Animal Production", "3rd Year", "BTVTED-3B"],
+  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "2025-2026", "BS Agriculture - Crop Science", "2nd Year", "BSA-2C"],
+  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "2022-2023", "BS Agricultural and Biosystems Engineering", "4th Year", "BSABE-4D"],
 ];
 
 const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
@@ -262,7 +261,6 @@ const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "course", required: STUDENT_REQUIRED_FIELDS.includes("course"), description: "Pick from the dropdown — one of 5 official program names (listed below)" },
   { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Must be exactly: 1st Year, 2nd Year, 3rd Year, or 4th Year" },
   { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C" },
-  { name: "password", required: STUDENT_REQUIRED_FIELDS.includes("password"), description: "Initial password (user can change later)" },
 ];
 
 export async function generateFacultyTemplate(): Promise<Buffer> {

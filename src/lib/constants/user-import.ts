@@ -125,7 +125,6 @@ export const FACULTY_REQUIRED_FIELDS = [
   "idNumber",
   "department",
   "position",
-  "password",
 ] as const;
 
 export const STUDENT_REQUIRED_FIELDS = [
@@ -135,7 +134,6 @@ export const STUDENT_REQUIRED_FIELDS = [
   "idNumber",
   "course",
   "section",
-  "password",
 ] as const;
 
 // Case-insensitive prefix/substring match against a fixed list of valid
@@ -173,7 +171,6 @@ export const FACULTY_IMPORT_COLUMNS = [
   "idNumber",
   "department",
   "position",
-  "password",
 ] as const;
 
 export const STUDENT_IMPORT_COLUMNS = [
@@ -187,7 +184,6 @@ export const STUDENT_IMPORT_COLUMNS = [
   "course",
   "yearLevel",
   "section",
-  "password",
 ] as const;
 
 // Columns that only ever appear on ONE side — used to detect "wrong
