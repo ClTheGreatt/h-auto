@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireFaculty } from "@/lib/auth-helpers";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
+import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
 
 export async function assignStudent(
   plotId: string,
@@ -37,6 +38,19 @@ export async function assignStudent(
   }
   if (student.graduatedAt) {
     return { error: "Cannot assign a graduated student to a plot." };
+  }
+
+  // The real security boundary — the picker's own section filter
+  // (availableStudents in plots/[id]/page.tsx) is UI convenience only.
+  const canAssign = await assertFacultyCanAssignStudent(
+    session.user.role,
+    session.user.id,
+    student.section
+  );
+  if (!canAssign) {
+    return {
+      error: "You are not authorized to assign a student from this section.",
+    };
   }
 
   const existing = await prisma.plotAssignment.findFirst({

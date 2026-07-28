@@ -161,6 +161,7 @@ model User {
   facultyAssignments  PlotAssignment[]    @relation("FacultyAssignments")
   studentAssignments  PlotAssignment[]    @relation("StudentAssignments")
   advisedPlots        Plot[]              @relation("PlotAdviser")
+  advisories          FacultySectionAdvisory[] @relation("FacultyAdvisories")
   growthLogs          GrowthLog[]
   reports             Report[]
   importBatches       ImportBatch[]
@@ -170,6 +171,20 @@ notifications       AlertNotification[]
   @@index([role])
   @@index([status])
   @@index([academicYear, section])
+}
+
+// Many-to-many: a faculty member can advise multiple sections, and a
+// section may be co-advised by more than one faculty member.
+model FacultySectionAdvisory {
+  id        String   @id @default(cuid())
+  facultyId String
+  section   String
+  createdAt DateTime @default(now())
+
+  faculty   User     @relation("FacultyAdvisories", fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@unique([facultyId, section])
+  @@index([section])
 }
 
 // ============================================================

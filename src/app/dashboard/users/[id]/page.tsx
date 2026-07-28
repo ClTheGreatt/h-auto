@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { UserDetailActionsMenu } from "@/components/users/user-detail-actions-menu";
+import { FacultyAdvisories } from "@/components/users/faculty-advisories";
+import { getDistinctStudentSections } from "@/actions/advisories";
 import type { UserRole, UserStatus } from "@prisma/client";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -39,7 +41,10 @@ export default async function UserDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
+  const viewerRole = session.user.role;
+  const canManageAdvisories =
+    viewerRole === "SUPER_ADMIN" || viewerRole === "ADMIN";
   const { id } = await params;
 
   const user = await prisma.user.findUnique({
@@ -75,6 +80,18 @@ export default async function UserDetailPage({
     .join(" ");
   const initials =
     `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
+
+  const [advisories, allStudentSections] =
+    user.role === "FACULTY"
+      ? await Promise.all([
+          prisma.facultySectionAdvisory.findMany({
+            where: { facultyId: user.id },
+            select: { section: true },
+            orderBy: { section: "asc" },
+          }),
+          getDistinctStudentSections(),
+        ])
+      : [[], []];
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -273,6 +290,20 @@ export default async function UserDetailPage({
           </dl>
         </CardContent>
       </Card>
+
+      {/* Advised sections (faculty only) */}
+      {user.role === "FACULTY" && (
+        <Card>
+          <CardContent className="pt-6">
+            <FacultyAdvisories
+              facultyId={user.id}
+              initialSections={advisories.map((a) => a.section)}
+              allSections={allStudentSections}
+              canManageAdvisories={canManageAdvisories}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Account activity */}
       <Card>

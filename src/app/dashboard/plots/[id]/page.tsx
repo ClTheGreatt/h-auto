@@ -118,9 +118,34 @@ export default async function PlotDetailPage({
   const canLogGrowth = (canManageAssignments || isAssignedStudent) && !isArchived;
   const canManageAssignmentsNow = canManageAssignments && !isArchived;
 
+  // FACULTY is scoped to sections they actually advise; ADMIN/SUPER_ADMIN
+  // stay unscoped. Zero advisories means zero eligible students — the
+  // `in: advisedSections` filter is applied unconditionally below, never
+  // skipped for an empty array, so that stays true rather than silently
+  // falling back to an unscoped list.
+  const advisedSections =
+    canManageAssignmentsNow && role === "FACULTY"
+      ? (
+          await prisma.facultySectionAdvisory.findMany({
+            where: { facultyId: session.user.id },
+            select: { section: true },
+          })
+        ).map((a) => a.section)
+      : [];
+
+  const facultyHasNoAdvisories =
+    canManageAssignmentsNow && role === "FACULTY" && advisedSections.length === 0;
+
   const availableStudents = canManageAssignmentsNow
     ? await prisma.user.findMany({
-        where: { role: "STUDENT_FARMER", status: "ACTIVE" },
+        where: {
+          role: "STUDENT_FARMER",
+          status: "ACTIVE",
+          graduatedAt: null, // bug fix: previously graduated students were
+          // offered in the picker even though assignStudent always
+          // rejects them.
+          ...(role === "FACULTY" ? { section: { in: advisedSections } } : {}),
+        },
         select: {
           id: true,
           firstName: true,
@@ -383,6 +408,8 @@ export default async function PlotDetailPage({
             assignments={plot.assignments}
             availableStudents={availableStudents}
             canManage={canManageAssignmentsNow}
+            facultyHasNoAdvisories={facultyHasNoAdvisories}
+            viewerIsFaculty={role === "FACULTY"}
           />
         </CardContent>
       </Card>

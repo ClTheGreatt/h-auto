@@ -68,11 +68,15 @@ export function PlotAssignments({
   assignments,
   availableStudents,
   canManage,
+  facultyHasNoAdvisories,
+  viewerIsFaculty,
 }: {
   plotId: string;
   assignments: Assignment[];
   availableStudents: Student[];
   canManage: boolean;
+  facultyHasNoAdvisories: boolean;
+  viewerIsFaculty: boolean;
 }) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -150,7 +154,11 @@ export function PlotAssignments({
                     <SelectContent>
                       {unassigned.length === 0 ? (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No available students
+                          {facultyHasNoAdvisories
+                            ? "You have no advised sections assigned. Contact an administrator to set them up."
+                            : viewerIsFaculty
+                            ? "No eligible students in your advised sections."
+                            : "No available students"}
                         </div>
                       ) : (
                         unassigned.map((s) => {

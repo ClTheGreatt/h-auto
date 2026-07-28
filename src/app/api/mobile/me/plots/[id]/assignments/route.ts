@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
+import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
 
 const assignBodySchema = z.object({
   studentId: z.string().min(1, "studentId is required"),
@@ -162,6 +163,20 @@ export async function POST(
       return NextResponse.json(
         { error: "Only student farmers can be assigned to plots" },
         { status: 400 }
+      );
+    }
+
+    const canAssign = await assertFacultyCanAssignStudent(
+      user.role,
+      user.id,
+      student.section
+    );
+    if (!canAssign) {
+      return NextResponse.json(
+        {
+          error: "You are not authorized to assign a student from this section.",
+        },
+        { status: 403 }
       );
     }
 
