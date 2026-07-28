@@ -11,7 +11,14 @@ import { SeverityFilter } from "@/components/alerts/severity-filter";
 import { AlertTypeFilter } from "@/components/alerts/alert-type-filter";
 import { AlertPlotFilter } from "@/components/alerts/alert-plot-filter";
 
-const PAGE_SIZE = 25;
+// Raised from 25: the alerts list is now grouped into plot cards (UI-4), and
+// a plot's alerts must never split across a page boundary. Combined with the
+// orderBy below (plot name is now the PRIMARY sort key, not just severity),
+// a page boundary can only ever fall between two different plots' alerts —
+// never through the middle of one plot's own alerts — as long as no single
+// plot has more open alerts than this page size (in practice capped at the
+// 7 sensor-threshold types + DEVICE_OFFLINE = 8, far below 100).
+const PAGE_SIZE = 100;
 
 const VALID_SEVERITIES: AlertSeverity[] = ["INFO", "WARNING", "CRITICAL"];
 
@@ -125,7 +132,12 @@ export default async function AlertsPage({
     prisma.alert.count({ where }),
     prisma.alert.findMany({
       where,
-      orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+      // Plot name first so every one of a plot's alerts is contiguous in the
+      // full ordered result — required for grouped-by-plot pagination safety
+      // (see PAGE_SIZE comment above). Severity/createdAt remain as the
+      // within-plot tie-breakers; the UI re-sorts groups by worst severity
+      // for display priority independently of this fetch order.
+      orderBy: [{ plot: { name: "asc" } }, { severity: "desc" }, { createdAt: "desc" }],
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
