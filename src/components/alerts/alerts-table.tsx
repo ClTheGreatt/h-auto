@@ -57,16 +57,26 @@ const severityIcons: Record<AlertSeverity, React.ComponentType<{ className?: str
   CRITICAL: AlertCircle,
 };
 
-const severityColors: Record<AlertSeverity, string> = {
-  INFO: "bg-blue-100 text-blue-700",
-  WARNING: "bg-amber-100 text-amber-700",
-  CRITICAL: "bg-red-100 text-red-700",
+// Severity is carried by the row container (rail + subtle tint) rather than
+// a small colored pill — these map each severity to the token-based classes
+// for the rail (left border), the tint (row background), and the text/icon
+// color used for the severity label and the suggestion-box icon.
+const severityRailClass: Record<AlertSeverity, string> = {
+  INFO: "border-l-info-border",
+  WARNING: "border-l-warning-border",
+  CRITICAL: "border-l-danger-border",
 };
 
-const severityIconColors: Record<AlertSeverity, string> = {
-  INFO: "text-blue-500",
-  WARNING: "text-amber-500",
-  CRITICAL: "text-red-500",
+const severityTintClass: Record<AlertSeverity, string> = {
+  INFO: "bg-info-bg/40",
+  WARNING: "bg-warning-bg/40",
+  CRITICAL: "bg-danger-bg/40",
+};
+
+const severityTextClass: Record<AlertSeverity, string> = {
+  INFO: "text-info-text",
+  WARNING: "text-warning-text",
+  CRITICAL: "text-danger-text",
 };
 
 function formatResolvedDate(date: Date): string {
@@ -78,6 +88,30 @@ function formatResolvedDate(date: Date): string {
     minute: "2-digit",
     hour12: true,
   });
+}
+
+// Isolates the Date.now() call in its own non-component function — the
+// react-hooks/purity lint rule flags an impure call made directly inside a
+// component body, not one tucked behind a helper.
+function msSince(date: Date): number {
+  return Date.now() - new Date(date).getTime();
+}
+
+// Plain-language "how long has this been open" — deliberately a different
+// shape from timeAgo's abbreviated "5d ago" (single unit, no "open" prefix):
+// this is a distinct signal read next to it, not a replacement for it.
+function formatOpenDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / (60 * 1000)));
+  if (minutes < 60) {
+    return `open ${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `open ${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `open ${days}d ${remHours}h` : `open ${days}d`;
 }
 
 export function AlertsTable({
@@ -142,7 +176,14 @@ export function AlertsTable({
             return (
               <Fragment key={alert.id}>
                 <TableRow
-                  className={alert.resolved ? "opacity-60" : ""}
+                  className={[
+                    "border-l-4",
+                    severityRailClass[alert.severity],
+                    severityTintClass[alert.severity],
+                    alert.resolved ? "opacity-60" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
                   <TableCell>
                     <Button
@@ -159,16 +200,11 @@ export function AlertsTable({
                     </Button>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <SeverityIcon
-                        className={`w-4 h-4 ${severityIconColors[alert.severity]}`}
-                      />
-                      <Badge
-                        variant="secondary"
-                        className={severityColors[alert.severity]}
-                      >
-                        {alert.severity}
-                      </Badge>
+                    <div
+                      className={`flex items-center gap-1.5 text-xs font-semibold ${severityTextClass[alert.severity]}`}
+                    >
+                      <SeverityIcon className="w-4 h-4" />
+                      {alert.severity}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -182,16 +218,18 @@ export function AlertsTable({
                   <TableCell className="text-sm text-gray-700 max-w-md">
                     {alert.message}
                     {alert.suggestionTitle && (
-                      <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 p-3">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 uppercase tracking-wide">
+                      <div className="mt-3 rounded-md border border-border bg-muted p-3">
+                        <div
+                          className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${severityTextClass[alert.severity]}`}
+                        >
                           <Lightbulb className="h-3.5 w-3.5" />
                           Suggested action
                         </div>
-                        <div className="mt-1 text-sm font-semibold text-emerald-900">
+                        <div className="mt-1 text-sm font-semibold text-foreground">
                           {alert.suggestionTitle}
                         </div>
                         {alert.suggestionSteps.length > 0 && (
-                          <ol className="mt-1.5 list-decimal list-inside space-y-0.5 text-sm text-emerald-900/90">
+                          <ol className="mt-1.5 list-decimal list-inside space-y-0.5 text-sm text-muted-foreground">
                             {alert.suggestionSteps.map((s, i) => (
                               <li key={i}>{s}</li>
                             ))}
@@ -246,6 +284,11 @@ export function AlertsTable({
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {timeAgo(alert.createdAt)}
+                    {!alert.resolved && (
+                      <span className="ml-1.5 text-muted-foreground/70">
+                        · {formatOpenDuration(msSince(alert.createdAt))}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     {!alert.resolved && canResolve && (
