@@ -28,8 +28,10 @@ const baseUserSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
-// Used for ADMIN/SUPER_ADMIN creation and as the base for updates. Password
-// strength is unified across every creation path via passwordStrengthSchema.
+// Used for ADMIN/SUPER_ADMIN creation. Also consumed as-is by the mobile
+// create-user route (src/app/api/mobile/me/users/route.ts) — mobile still
+// collects an admin-typed password (out of scope for this batch; see the
+// *WebSchema variants below for the web form's generated-password flow).
 export const createUserSchema = baseUserSchema.extend({
   password: passwordStrengthSchema,
 });
@@ -120,7 +122,15 @@ export const createFacultySchema = baseUserSchema.extend({
   password: passwordStrengthSchema,
 });
 
-export type CreateUserInput = z.infer<typeof createUserSchema>;
+// Web create form (Batch 2F): the admin no longer types a password —
+// createUser() generates one server-side instead. Derived via .omit so
+// every other field's validation rule can never drift from the mobile
+// (still password-collecting) schemas above.
+export const createUserWebSchema = createUserSchema.omit({ password: true });
+export const createStudentWebSchema = createStudentSchema.omit({ password: true });
+export const createFacultyWebSchema = createFacultySchema.omit({ password: true });
+
+export type CreateUserInput = z.infer<typeof createUserWebSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-export type CreateStudentInput = z.infer<typeof createStudentSchema>;
-export type CreateFacultyInput = z.infer<typeof createFacultySchema>;
+export type CreateStudentInput = z.infer<typeof createStudentWebSchema>;
+export type CreateFacultyInput = z.infer<typeof createFacultyWebSchema>;

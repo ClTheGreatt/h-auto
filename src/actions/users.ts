@@ -7,10 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, canAssignRole, canManageUser } from "@/lib/auth-helpers";
 import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
+import { generateTempPassword } from "@/lib/auth/generate-password";
 import {
-  createUserSchema,
-  createStudentSchema,
-  createFacultySchema,
+  createUserWebSchema,
+  createStudentWebSchema,
+  createFacultyWebSchema,
   updateUserSchema,
   type CreateUserInput,
   type UpdateUserInput,
@@ -18,11 +19,14 @@ import {
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (adviser
-// request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema.
+// request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema. Web
+// only — createUser() generates the password, so these are the *WebSchema
+// variants (no password field). Mobile's create-user route uses its own
+// password-collecting schemas directly from @/lib/validations/user.
 function pickCreateSchema(role: unknown) {
-  if (role === "STUDENT_FARMER") return createStudentSchema;
-  if (role === "FACULTY") return createFacultySchema;
-  return createUserSchema;
+  if (role === "STUDENT_FARMER") return createStudentWebSchema;
+  if (role === "FACULTY") return createFacultyWebSchema;
+  return createUserWebSchema;
 }
 
 // Maps Prisma unique constraint field names to user-friendly messages
@@ -67,10 +71,9 @@ export async function createUser(input: CreateUserInput) {
     return { error: "Only a Super Admin can create Admin or Super Admin accounts." };
   }
 
-const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-
-  // Keep the plaintext password — we need it for the welcome email
-  const { password, ...rest } = parsed.data;
+  const tempPassword = generateTempPassword();
+  const passwordHash = await bcrypt.hash(tempPassword, 10);
+  const rest = parsed.data;
 
   let createdUser;
   try {
@@ -102,7 +105,7 @@ const passwordHash = await bcrypt.hash(parsed.data.password, 10);
     const { subject, html, text } = welcomeEmailTemplate({
       firstName: createdUser.firstName,
       email: createdUser.email,
-      tempPassword: password,
+      tempPassword,
       loginUrl: (process.env.AUTH_URL ?? "http://localhost:3000") + "/login",
       role: createdUser.role,
     });
@@ -125,7 +128,9 @@ const passwordHash = await bcrypt.hash(parsed.data.password, 10);
   }
 
   revalidatePath("/dashboard/users");
-  return { success: true, id: createdUser.id };
+  // tempPassword is additive, show-once: the caller displays it exactly
+  // once and must never persist or log it further.
+  return { success: true, id: createdUser.id, tempPassword };
 }
 
 export async function updateUser(id: string, input: UpdateUserInput) {

@@ -6,7 +6,7 @@ import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { z } from "zod";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, AlertCircle, Copy } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -37,9 +37,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  createUserSchema,
-  createStudentSchema,
-  createFacultySchema,
+  createUserWebSchema,
+  createStudentWebSchema,
+  createFacultyWebSchema,
   updateUserSchema,
   YEAR_LEVELS,
   type CreateUserInput,
@@ -101,6 +101,12 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     key: string;
     users: SimilarUser[];
   }>({ key: "", users: [] });
+  // Show-once: populated only after a successful create, cleared by
+  // navigating away (Done button) or reloading — never persisted anywhere.
+  const [createdUser, setCreatedUser] = useState<{
+    id: string;
+    tempPassword: string;
+  } | null>(null);
 
   // EDIT stays lenient (updateUserSchema) so existing incomplete users can
   // still be saved. CREATE picks the strict, role-specific schema so
@@ -109,10 +115,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     const schema =
       mode === "create"
         ? values.role === "STUDENT_FARMER"
-          ? createStudentSchema
+          ? createStudentWebSchema
           : values.role === "FACULTY"
-          ? createFacultySchema
-          : createUserSchema
+          ? createFacultyWebSchema
+          : createUserWebSchema
         : updateUserSchema;
     return zodResolver(schema as unknown as typeof updateUserSchema)(
       values,
@@ -233,10 +239,16 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
       }
 
       toast.success("User created");
-      if ("id" in result) {
-        router.push(`/dashboard/users/${result.id}`);
+      // typeof narrowing (not "in") — createUser's inferred return type
+      // pads every error branch with `id?: undefined`/`tempPassword?:
+      // undefined` siblings, which keeps "in" checks from ever excluding
+      // them; a typeof check on the value itself narrows cleanly instead.
+      if (
+        typeof result.id === "string" &&
+        typeof result.tempPassword === "string"
+      ) {
+        setCreatedUser({ id: result.id, tempPassword: result.tempPassword });
       }
-      router.refresh();
       return;
     }
 
@@ -267,6 +279,63 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     router.back();
     // Refresh so the page we return to shows the updated data
     router.refresh();
+  }
+
+  // Preserves the navigation createUser's success branch used to perform
+  // immediately (see Step 1a) — now deferred behind the show-once screen's
+  // "Done" button instead of firing right after creation.
+  function handleDoneAfterCreate() {
+    if (!createdUser) return;
+    router.push(`/dashboard/users/${createdUser.id}`);
+    router.refresh();
+  }
+
+  async function handleCopyPassword() {
+    if (!createdUser) return;
+    try {
+      await navigator.clipboard.writeText(createdUser.tempPassword);
+      toast.success("Password copied to clipboard");
+    } catch {
+      toast.error("Couldn't copy — select and copy the password manually");
+    }
+  }
+
+  // ============= SHOW-ONCE CREDENTIAL DISPLAY (after create) =============
+  if (createdUser) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>
+            This password is shown only once and cannot be recovered. It has
+            also been emailed to the user.
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Temporary password</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <code className="text-sm font-mono bg-muted px-3 py-2 rounded border">
+                {createdUser.tempPassword}
+              </code>
+              <Button type="button" variant="outline" onClick={handleCopyPassword}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button type="button" onClick={handleDoneAfterCreate}>
+            Done
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -512,33 +581,39 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                 <FormLabel>
-                    Password
-                    {mode === "create" ? (
-                      <RequiredMark />
-                    ) : (
+            {mode === "create" ? (
+              <div className="md:col-span-2">
+                <FormLabel>Password</FormLabel>
+                <p className="text-xs text-muted-foreground mt-1">
+                  A temporary password will be generated automatically and
+                  emailed to this user.
+                </p>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>
+                      Password
                       <span className="text-gray-400 text-xs ml-1 font-normal">
                         (leave blank to keep current)
                       </span>
-                    )}
-                  </FormLabel>
-             <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormDescription className="text-xs">
-                    Minimum 8 characters, with at least 1 uppercase letter, 1
-                    lowercase letter, 1 number, and 1 symbol
-                  </FormDescription>
-                  <PasswordStrengthIndicator password={field.value ?? ""} />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Minimum 8 characters, with at least 1 uppercase letter, 1
+                      lowercase letter, 1 number, and 1 symbol
+                    </FormDescription>
+                    <PasswordStrengthIndicator password={field.value ?? ""} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </CardContent>
         </Card>
 
