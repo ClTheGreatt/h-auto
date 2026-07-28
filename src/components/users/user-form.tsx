@@ -586,7 +586,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 <FormLabel>Password</FormLabel>
                 <p className="text-xs text-muted-foreground mt-1">
                   A temporary password will be generated automatically and
-                  emailed to this user.
+                  emailed to the user.
                 </p>
               </div>
             ) : (
