@@ -243,12 +243,12 @@ export function AlertsTable({
                       <span className="text-xs text-muted-foreground">No recipients</span>
                     ) : (
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="flex items-center gap-1 text-green-600">
+                        <span className="flex items-center gap-1 text-success-text">
                           <Mail className="w-3 h-3" />
                           {sent}
                         </span>
                         {failed > 0 && (
-                          <span className="flex items-center gap-1 text-red-600">
+                          <span className="flex items-center gap-1 text-danger-text">
                             <MailX className="w-3 h-3" />
                             {failed}
                           </span>
@@ -276,7 +276,7 @@ export function AlertsTable({
                     ) : (
                       <Badge
                         variant="secondary"
-                        className="bg-red-100 text-red-700"
+                        className="bg-muted text-muted-foreground w-fit"
                       >
                         Open
                       </Badge>
@@ -352,7 +352,7 @@ export function AlertsTable({
                                     {n.status === "FAILED" && (
                                       <Badge
                                         variant="secondary"
-                                        className="bg-red-100 text-red-700 text-xs"
+                                        className="bg-danger-bg text-danger-text text-xs"
                                       >
                                         Failed
                                       </Badge>
@@ -367,7 +367,7 @@ export function AlertsTable({
                                     )}
                                     {n.errorMessage && (
                                       <span
-                                        className="text-red-600 text-xs"
+                                        className="text-danger-text text-xs"
                                         title={n.errorMessage}
                                       >
                                         ({n.errorMessage.slice(0, 30)})
