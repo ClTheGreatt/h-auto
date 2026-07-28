@@ -165,6 +165,12 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (student.graduatedAt) {
+      return NextResponse.json(
+        { error: "Cannot assign a graduated student to a plot." },
+        { status: 400 }
+      );
+    }
 
     const canAssign = await assertFacultyCanAssignStudent(
       user.role,
