@@ -10,6 +10,7 @@ import {
   AlertCircle,
   CheckCircle2,
   WifiOff,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,18 @@ const ACTIVE_STATUSES: PlotStatus[] = [
   "READY_FOR_HARVEST",
 ];
 
+// A missing device/stage is expected setup state while PREPARING — it only
+// becomes a real "the system can't monitor this" problem once the crop is
+// actually in the ground. READY_FOR_HARVEST counts too: the crop is still
+// physically there until it's harvested. HARVESTED/FALLOW/ARCHIVED never
+// appear in `plots` at all (excluded by ACTIVE_STATUSES above), so they're
+// moot here.
+const CROP_IN_GROUND_STATUSES: PlotStatus[] = [
+  "PLANTED",
+  "GROWING",
+  "READY_FOR_HARVEST",
+];
+
 // Vegetative/Harvest deliberately avoid green/amber — this file's grep check
 // (Step 8) requires zero red/amber/yellow/green/emerald matches anywhere in
 // this file, since those 5 hues are reserved for severity tokens now.
@@ -59,13 +72,18 @@ const SEVERITY_RANK: Record<AlertSeverity, number> = {
   INFO: 2,
 };
 
-type PlotCondition = "CRITICAL" | "WARNING" | "NO_DATA" | "ALL_IN_RANGE";
+// PREPARING is its own state, not a NO_DATA variant — a plot still being
+// set up with no stage/device isn't "unmonitorable", it's expected, so it
+// gets a calm, distinct treatment rather than the same one as a planted
+// plot the system genuinely can't see.
+type PlotCondition = "CRITICAL" | "WARNING" | "NO_DATA" | "ALL_IN_RANGE" | "PREPARING";
 
 const CONDITION_LABEL: Record<PlotCondition, string> = {
   CRITICAL: "Critical",
   WARNING: "Warning",
   NO_DATA: "No data",
   ALL_IN_RANGE: "All in range",
+  PREPARING: "Preparing",
 };
 
 const CONDITION_TEXT_CLASS: Record<PlotCondition, string> = {
@@ -73,6 +91,7 @@ const CONDITION_TEXT_CLASS: Record<PlotCondition, string> = {
   WARNING: "text-warning-text",
   NO_DATA: "text-muted-foreground",
   ALL_IN_RANGE: "text-success-text",
+  PREPARING: "text-muted-foreground",
 };
 
 const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
@@ -80,6 +99,7 @@ const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
   WARNING: "border-l-warning-border",
   NO_DATA: "border-l-border",
   ALL_IN_RANGE: "border-l-success-border",
+  PREPARING: "border-l-border",
 };
 
 const CONDITION_ICON: Record<PlotCondition, React.ComponentType<{ className?: string }>> = {
@@ -87,6 +107,7 @@ const CONDITION_ICON: Record<PlotCondition, React.ComponentType<{ className?: st
   WARNING: AlertTriangle,
   NO_DATA: WifiOff,
   ALL_IN_RANGE: CheckCircle2,
+  PREPARING: Clock,
 };
 
 // Short plain-language verdict per alert type — drives the attention
@@ -287,23 +308,48 @@ export default async function DashboardPage() {
   // three agree. A plot the system can't currently monitor (no stage, no
   // device, or a device that's offline / has never reported) counts as
   // needing attention just as much as one with a real open alert — it isn't
-  // "in range", it's blind, and treating it as fine let it silently vanish
-  // from both the summary and the strip.
+  // "in range", it's blind — UNLESS it's still PREPARING, where that same
+  // gap is expected setup state, not a problem (see CROP_IN_GROUND_STATUSES
+  // above).
   const plotsWithCondition = plots.map((plot) => {
+    const hasConfigGap =
+      !plot.currentStage ||
+      !plot.device ||
+      plot.sensorReadings.length === 0 ||
+      !isDeviceOnline(plot.device.lastSeenAt);
+
     const condition: PlotCondition = plot.alerts.some((a) => a.severity === "CRITICAL")
       ? "CRITICAL"
       : plot.alerts.some((a) => a.severity === "WARNING")
       ? "WARNING"
-      : !plot.currentStage ||
-        !plot.device ||
-        plot.sensorReadings.length === 0 ||
-        !isDeviceOnline(plot.device.lastSeenAt)
-      ? "NO_DATA"
+      : hasConfigGap
+      ? CROP_IN_GROUND_STATUSES.includes(plot.status)
+        ? "NO_DATA"
+        : "PREPARING"
       : "ALL_IN_RANGE";
     return { ...plot, condition };
   });
 
-  const attentionPlots = plotsWithCondition.filter((p) => p.condition !== "ALL_IN_RANGE");
+  // "Needs attention" = CRITICAL, WARNING, or NO_DATA — PREPARING is
+  // deliberately excluded (see above) and ALL_IN_RANGE obviously doesn't
+  // qualify. Split further for the banner (Step 2): alert-driven problems
+  // are urgent; a NO_DATA plot with no alerts is just a configuration gap
+  // and isn't.
+  const attentionPlots = plotsWithCondition.filter((p) => p.condition !== "ALL_IN_RANGE" && p.condition !== "PREPARING");
+  const urgentPlots = attentionPlots.filter((p) => p.condition === "CRITICAL" || p.condition === "WARNING");
+  const configGapPlots = attentionPlots.filter((p) => p.condition === "NO_DATA");
+
+  function attentionVerdict(p: (typeof attentionPlots)[number]): string {
+    if (p.alerts.length > 0) {
+      const worst = [...p.alerts].sort(
+        (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+      )[0];
+      return `${p.name} ${ALERT_TYPE_VERDICT[worst.type]}`;
+    }
+    if (!p.currentStage) return `${p.name} has no growth stage set`;
+    if (!p.device) return `${p.name} has no device linked`;
+    return `${p.name} ${ALERT_TYPE_VERDICT.DEVICE_OFFLINE}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -388,47 +434,49 @@ export default async function DashboardPage() {
       <div
         className={cn(
           "border rounded-md bg-card border-l-4 p-4",
-          attentionPlots.length > 0
+          urgentPlots.length > 0
             ? CONDITION_BORDER_CLASS.CRITICAL
+            : configGapPlots.length > 0
+            ? CONDITION_BORDER_CLASS.WARNING
             : CONDITION_BORDER_CLASS.ALL_IN_RANGE
         )}
       >
-        {attentionPlots.length > 0 ? (
-          <>
-            <p className="text-sm font-semibold text-foreground">
-              {attentionPlots.length} plot{attentionPlots.length === 1 ? "" : "s"}{" "}
-              {attentionPlots.length === 1 ? "needs" : "need"} attention
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {attentionPlots
-                .map((p) => {
-                  if (p.alerts.length > 0) {
-                    const worst = [...p.alerts].sort(
-                      (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
-                    )[0];
-                    return `${p.name} ${ALERT_TYPE_VERDICT[worst.type]}`;
-                  }
-                  if (!p.currentStage) return `${p.name} has no growth stage set`;
-                  if (!p.device) return `${p.name} has no device linked`;
-                  return `${p.name} ${ALERT_TYPE_VERDICT.DEVICE_OFFLINE}`;
-                })
-                .join(" · ")}
-            </p>
-          </>
-        ) : (
+        {attentionPlots.length === 0 && (
           <p className="text-sm font-semibold text-success-text">All plots are in range</p>
         )}
-        {(criticalCount > 0 || warningCount > 0 || devicesOfflineCount > 0) && (
-          <p className="text-xs text-muted-foreground mt-2">
-            {[
-              criticalCount > 0 && `${criticalCount} critical`,
-              warningCount > 0 && `${warningCount} warning`,
-              devicesOfflineCount > 0 &&
-                `${devicesOfflineCount} device${devicesOfflineCount === 1 ? "" : "s"} offline`,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
+
+        {urgentPlots.length > 0 && (
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {urgentPlots.length} plot{urgentPlots.length === 1 ? "" : "s"}{" "}
+              {urgentPlots.length === 1 ? "needs" : "need"} attention
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {urgentPlots.map(attentionVerdict).join(" · ")}
+            </p>
+            {(criticalCount > 0 || warningCount > 0) && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {[
+                  criticalCount > 0 && `${criticalCount} critical`,
+                  warningCount > 0 && `${warningCount} warning`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
+        )}
+
+        {configGapPlots.length > 0 && (
+          <div className={urgentPlots.length > 0 ? "mt-3 pt-3 border-t" : ""}>
+            <p className="text-sm font-semibold text-warning-text">
+              {configGapPlots.length} plot{configGapPlots.length === 1 ? "" : "s"}{" "}
+              {configGapPlots.length === 1 ? "needs" : "need"} setup
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {configGapPlots.map(attentionVerdict).join(" · ")}
+            </p>
+          </div>
         )}
       </div>
 
@@ -484,10 +532,18 @@ export default async function DashboardPage() {
                 const daysSincePlanting = plot.plantingDate
                   ? Math.floor((nowMs - plot.plantingDate.getTime()) / DAY_MS)
                   : null;
+                // A future plantingDate makes this negative — the old
+                // Math.max(1, ...) clamp was meant for "planted today" (0
+                // -> "Day 1") but also silently clamped a genuinely future
+                // date up to "Day 1", which is wrong: nothing has been
+                // planted yet. Only show progress once planting has
+                // actually happened.
                 const dayLabel =
-                  daysSincePlanting != null && plot.crop?.daysToHarvest
+                  daysSincePlanting != null &&
+                  daysSincePlanting >= 0 &&
+                  plot.crop?.daysToHarvest
                     ? `Day ${Math.min(
-                        Math.max(1, daysSincePlanting + 1),
+                        daysSincePlanting + 1,
                         plot.crop.daysToHarvest
                       )} of ${plot.crop.daysToHarvest}`
                     : null;
