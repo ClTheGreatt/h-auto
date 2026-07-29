@@ -38,9 +38,13 @@ const FIELD_ICONS: Record<keyof SensorReadingValues, LucideIcon> = {
 export function LatestReadings({
   reading,
   stage,
+  isHistorical = false,
+  freshnessLabel,
 }: {
   reading: Reading | null;
   stage: Stage;
+  isHistorical?: boolean;
+  freshnessLabel?: string;
 }) {
   if (!reading) {
     return (
@@ -54,14 +58,23 @@ export function LatestReadings({
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Last updated {formatDateTime(reading.recordedAt)}
+        {freshnessLabel ?? `Last reading ${formatDateTime(reading.recordedAt)}`}
       </p>
+      {isHistorical && (
+        <p className="text-xs font-medium text-muted-foreground">
+          Last-known sensor values
+        </p>
+      )}
       {!stage && (
         <p className="text-xs text-muted-foreground italic">
           No stage set — thresholds unavailable.
         </p>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div
+        className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 ${
+          isHistorical ? "opacity-60" : ""
+        }`}
+      >
         {SENSOR_FIELDS.map((field) => {
           const Icon = FIELD_ICONS[field.key];
           const value = reading[field.key];
@@ -77,6 +90,7 @@ export function LatestReadings({
                   unit={field.unit}
                   min={stage[field.minField]}
                   max={stage[field.maxField]}
+                  isHistorical={isHistorical}
                 />
               ) : (
                 <>

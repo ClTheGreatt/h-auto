@@ -1,24 +1,54 @@
-/**
- * Threshold for considering a device offline.
- * A device is offline if its last sensor reading is older than this.
- *
- * Note: This threshold governs LIVE status display (Plot Detail, Devices page)
- * which is computed on every page load from lastSeenAt. The stored
- * Device.status column is only updated once per day by the cron job
- * (Vercel Hobby tier limitation). For end users, live status via this
- * utility is always accurate. The stored column matters mainly for
- * triggering DEVICE_OFFLINE alerts, which may be delayed up to 24 hours
- * on the Hobby tier.
- */
-export const OFFLINE_THRESHOLD_MS = 30 * 60 * 1000;
+export const EXPECTED_REPORTING_INTERVAL_MS = 5 * 60 * 1000;
+export const DEVICE_STALE_THRESHOLD_MS = 15 * 60 * 1000;
+export const DEVICE_OFFLINE_THRESHOLD_MS = 30 * 60 * 1000;
+
+export type DeviceFreshnessState =
+  | "FRESH"
+  | "STALE"
+  | "OFFLINE"
+  | "NEVER_REPORTED";
+
+export type DeviceFreshness = {
+  state: DeviceFreshnessState;
+  elapsedMs: number | null;
+};
 
 /**
- * Compute device online status live from lastSeenAt timestamp.
- * Prefer this over reading Device.status column, which is only updated
- * periodically by the offline-detection cron and can be stale.
+ * Derive runtime device freshness from lastSeenAt rather than stored status.
+ * Passing `now` makes boundary behavior deterministic for callers and tests.
+ */
+export function getDeviceFreshness(
+  lastSeenAt: Date | null | undefined,
+  now: Date | number = new Date()
+): DeviceFreshness {
+  if (!lastSeenAt) {
+    return { state: "NEVER_REPORTED", elapsedMs: null };
+  }
+
+  const lastSeenMs = lastSeenAt.getTime();
+  const nowMs = typeof now === "number" ? now : now.getTime();
+  if (!Number.isFinite(lastSeenMs) || !Number.isFinite(nowMs)) {
+    return { state: "NEVER_REPORTED", elapsedMs: null };
+  }
+
+  const elapsedMs = Math.max(0, nowMs - lastSeenMs);
+  if (elapsedMs >= DEVICE_OFFLINE_THRESHOLD_MS) {
+    return { state: "OFFLINE", elapsedMs };
+  }
+  if (elapsedMs >= DEVICE_STALE_THRESHOLD_MS) {
+    return { state: "STALE", elapsedMs };
+  }
+  return { state: "FRESH", elapsedMs };
+}
+
+/**
+ * Compatibility helper: stale devices remain online until the 30-minute
+ * offline boundary, matching the existing mobile `deviceOnline` contract.
  */
 export function isDeviceOnline(
-  lastSeenAt: Date | null | undefined
+  lastSeenAt: Date | null | undefined,
+  now?: Date | number
 ): boolean {
-  return !!lastSeenAt && Date.now() - lastSeenAt.getTime() < OFFLINE_THRESHOLD_MS;
+  const state = getDeviceFreshness(lastSeenAt, now).state;
+  return state === "FRESH" || state === "STALE";
 }

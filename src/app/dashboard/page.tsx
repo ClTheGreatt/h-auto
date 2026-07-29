@@ -21,7 +21,10 @@ import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { timeAgo, formatDate, formatDateTime } from "@/lib/format-date";
-import { isDeviceOnline } from "@/lib/utils/device-status";
+import {
+  getDeviceFreshness,
+  type DeviceFreshness,
+} from "@/lib/utils/device-status";
 import { getThresholdStatus, SENSOR_FIELDS } from "@/lib/sensors/threshold-status";
 import { NeedsActionList, type NeedsActionAlert } from "@/components/dashboard/needs-action-list";
 import { RestartTourButton } from "@/components/tour/restart-tour-button";
@@ -72,40 +75,63 @@ const SEVERITY_RANK: Record<AlertSeverity, number> = {
   INFO: 2,
 };
 
-// PREPARING is its own state, not a NO_DATA variant — a plot still being
-// set up with no stage/device isn't "unmonitorable", it's expected, so it
-// gets a calm, distinct treatment rather than the same one as a planted
-// plot the system genuinely can't see.
-type PlotCondition = "CRITICAL" | "WARNING" | "NO_DATA" | "ALL_IN_RANGE" | "PREPARING";
+// PREPARING is its own state: incomplete monitoring setup is expected until
+// the crop is in the ground, so it gets a calm treatment.
+type PlotCondition =
+  | "MISSING_DEVICE"
+  | "NEVER_REPORTED"
+  | "OFFLINE"
+  | "STALE"
+  | "MISSING_STAGE"
+  | "CRITICAL"
+  | "WARNING"
+  | "ALL_IN_RANGE"
+  | "PREPARING";
 
 const CONDITION_LABEL: Record<PlotCondition, string> = {
+  MISSING_DEVICE: "No device",
+  NEVER_REPORTED: "No readings",
+  OFFLINE: "Offline",
+  STALE: "Stale",
+  MISSING_STAGE: "Setup needed",
   CRITICAL: "Critical",
   WARNING: "Warning",
-  NO_DATA: "No data",
   ALL_IN_RANGE: "All in range",
   PREPARING: "Preparing",
 };
 
 const CONDITION_TEXT_CLASS: Record<PlotCondition, string> = {
+  MISSING_DEVICE: "text-muted-foreground",
+  NEVER_REPORTED: "text-muted-foreground",
+  OFFLINE: "text-danger-text",
+  STALE: "text-warning-text",
+  MISSING_STAGE: "text-warning-text",
   CRITICAL: "text-danger-text",
   WARNING: "text-warning-text",
-  NO_DATA: "text-muted-foreground",
   ALL_IN_RANGE: "text-success-text",
   PREPARING: "text-muted-foreground",
 };
 
 const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
+  MISSING_DEVICE: "border-l-border",
+  NEVER_REPORTED: "border-l-border",
+  OFFLINE: "border-l-danger-border",
+  STALE: "border-l-warning-border",
+  MISSING_STAGE: "border-l-warning-border",
   CRITICAL: "border-l-danger-border",
   WARNING: "border-l-warning-border",
-  NO_DATA: "border-l-border",
   ALL_IN_RANGE: "border-l-success-border",
   PREPARING: "border-l-border",
 };
 
 const CONDITION_ICON: Record<PlotCondition, React.ComponentType<{ className?: string }>> = {
+  MISSING_DEVICE: WifiOff,
+  NEVER_REPORTED: WifiOff,
+  OFFLINE: WifiOff,
+  STALE: Clock,
+  MISSING_STAGE: AlertTriangle,
   CRITICAL: AlertCircle,
   WARNING: AlertTriangle,
-  NO_DATA: WifiOff,
   ALL_IN_RANGE: CheckCircle2,
   PREPARING: Clock,
 };
@@ -161,6 +187,76 @@ function formatStaleDuration(ms: number): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"}`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function shouldTreatSensorEvidenceAsHistorical({
+  readingRecordedAt,
+  freshness,
+  condition,
+}: {
+  readingRecordedAt: Date | null;
+  freshness: DeviceFreshness;
+  condition: PlotCondition;
+}): boolean {
+  const freshnessIsHistorical =
+    freshness.state === "STALE" ||
+    freshness.state === "OFFLINE" ||
+    freshness.state === "NEVER_REPORTED";
+  const plotPresentsHistoricalEvidence =
+    condition === "STALE" ||
+    condition === "OFFLINE" ||
+    condition === "NEVER_REPORTED";
+
+  return (
+    readingRecordedAt !== null &&
+    freshnessIsHistorical &&
+    plotPresentsHistoricalEvidence
+  );
+}
+
+function formatFleetSummary({
+  monitoredPlotCount,
+  linkedDeviceCount,
+  freshDeviceCount,
+  staleDeviceCount,
+  offlineDeviceCount,
+  neverReportedCount,
+  missingDeviceCount,
+}: {
+  monitoredPlotCount: number;
+  linkedDeviceCount: number;
+  freshDeviceCount: number;
+  staleDeviceCount: number;
+  offlineDeviceCount: number;
+  neverReportedCount: number;
+  missingDeviceCount: number;
+}): string {
+  if (monitoredPlotCount === 0) {
+    return "No active monitoring expected yet";
+  }
+
+  if (freshDeviceCount === linkedDeviceCount && missingDeviceCount === 0) {
+    return freshDeviceCount === 1
+      ? "1 device reporting"
+      : `All ${freshDeviceCount} devices reporting`;
+  }
+
+  return [
+    missingDeviceCount > 0 &&
+      `${missingDeviceCount} active plot${
+        missingDeviceCount === 1 ? " has" : "s have"
+      } no device`,
+    offlineDeviceCount > 0 &&
+      `${offlineDeviceCount} device${offlineDeviceCount === 1 ? "" : "s"} offline`,
+    staleDeviceCount > 0 &&
+      `${staleDeviceCount} device${staleDeviceCount === 1 ? "" : "s"} stale`,
+    neverReportedCount > 0 &&
+      `${neverReportedCount} device${neverReportedCount === 1 ? " has" : "s have"} never reported`,
+    freshDeviceCount > 0 &&
+      `${freshDeviceCount} device${freshDeviceCount === 1 ? "" : "s"} reporting`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function StripItem({
@@ -260,9 +356,76 @@ export default async function DashboardPage() {
       }),
     ]);
 
-  const allOpenAlerts = plots
-    .flatMap((p) =>
-      p.alerts.map((a) => ({ ...a, plot: { id: p.id, name: p.name } }))
+  const moreLogsThisWeek = Math.max(0, recentLogCount - recentLogs.length);
+
+  // Single source of truth for "does this plot need attention" — shared by
+  // the card badge, the attention summary, and the counts strip so all
+  // three agree. A plot the system can't currently monitor (no stage, no
+  // device, or a device that's offline / has never reported) counts as
+  // needing attention just as much as one with a real open alert — it isn't
+  // "in range", it's blind — UNLESS it's still PREPARING, where that same
+  // gap is expected setup state, not a problem (see CROP_IN_GROUND_STATUSES
+  // above).
+  const plotsWithCondition = plots.map((plot) => {
+    const monitoringRequired = CROP_IN_GROUND_STATUSES.includes(plot.status);
+    const reading = plot.sensorReadings[0] ?? null;
+    const freshness: DeviceFreshness = getDeviceFreshness(
+      plot.device?.lastSeenAt,
+      now
+    );
+    const hasCritical = plot.alerts.some((a) => a.severity === "CRITICAL");
+    const hasWarning = plot.alerts.some((a) => a.severity === "WARNING");
+
+    let condition: PlotCondition;
+    if (!monitoringRequired) {
+      condition = "PREPARING";
+    } else if (!plot.device) {
+      condition = "MISSING_DEVICE";
+    } else if (!plot.device.lastSeenAt || !reading) {
+      condition = "NEVER_REPORTED";
+    } else if (freshness.state === "OFFLINE") {
+      condition = "OFFLINE";
+    } else if (freshness.state === "STALE") {
+      condition = "STALE";
+    } else if (!plot.currentStage) {
+      condition = "MISSING_STAGE";
+    } else if (hasCritical) {
+      condition = "CRITICAL";
+    } else if (hasWarning) {
+      condition = "WARNING";
+    } else {
+      condition = "ALL_IN_RANGE";
+    }
+
+    const sensorEvidenceIsHistorical = shouldTreatSensorEvidenceAsHistorical({
+      readingRecordedAt: reading?.recordedAt ?? null,
+      freshness,
+      condition,
+    });
+    const alertsForToday = monitoringRequired
+      ? plot.alerts.map((alert) => ({
+          ...alert,
+          isHistoricalEvidence:
+            alert.type !== "DEVICE_OFFLINE" && sensorEvidenceIsHistorical,
+        }))
+      : [];
+
+    return {
+      ...plot,
+      alerts: alertsForToday,
+      condition,
+      freshness,
+      sensorEvidenceIsHistorical,
+    };
+  });
+
+  const allOpenAlerts = plotsWithCondition
+    .flatMap((plot) =>
+      plot.alerts.map((alert) => ({
+        ...alert,
+        plot: { id: plot.id, name: plot.name },
+        isHistorical: alert.isHistoricalEvidence,
+      }))
     )
     .sort((a, b) => {
       const rankDiff = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
@@ -278,8 +441,8 @@ export default async function DashboardPage() {
   const criticalCount = allOpenAlerts.filter((a) => a.severity === "CRITICAL").length;
   const warningCount = allOpenAlerts.filter((a) => a.severity === "WARNING").length;
 
-  // Only queried when there truly are zero open alerts across every active
-  // plot — keeps the common (alerts present) path from paying for it.
+  // Only queried when there truly are zero open alerts across plots whose
+  // lifecycle expects active monitoring.
   const recentlyResolvedAlert =
     allOpenAlerts.length === 0
       ? await prisma.alert.findFirst({
@@ -289,66 +452,78 @@ export default async function DashboardPage() {
         })
       : null;
 
-  const moreLogsThisWeek = Math.max(0, recentLogCount - recentLogs.length);
-
-  const plotsWithDevice = plots.filter((p) => p.device);
-  const devicesOnlineCount = plotsWithDevice.filter((p) =>
-    isDeviceOnline(p.device!.lastSeenAt)
+  // Fleet counts use only plots whose lifecycle expects active monitoring.
+  // PREPARING remains visible on the page but does not inflate failure counts.
+  const monitoredPlots = plotsWithCondition.filter((p) =>
+    CROP_IN_GROUND_STATUSES.includes(p.status)
+  );
+  const linkedMonitoredPlots = monitoredPlots.filter((p) => p.device);
+  const freshDeviceCount = linkedMonitoredPlots.filter(
+    (p) => p.freshness.state === "FRESH"
   ).length;
-  const devicesOfflineCount = plotsWithDevice.length - devicesOnlineCount;
-  const mostRecentSeenAt = plotsWithDevice.reduce<Date | null>((latest, p) => {
-    const seen = p.device!.lastSeenAt;
-    if (!seen) return latest;
-    return !latest || seen > latest ? seen : latest;
-  }, null);
-  const allDevicesOnline = plotsWithDevice.length > 0 && devicesOfflineCount === 0;
+  const staleDeviceCount = linkedMonitoredPlots.filter(
+    (p) => p.freshness.state === "STALE"
+  ).length;
+  const offlineDeviceCount = linkedMonitoredPlots.filter(
+    (p) => p.freshness.state === "OFFLINE"
+  ).length;
+  const neverReportedCount = linkedMonitoredPlots.filter(
+    (p) => p.freshness.state === "NEVER_REPORTED"
+  ).length;
+  const missingDeviceCount = monitoredPlots.length - linkedMonitoredPlots.length;
 
-  // Single source of truth for "does this plot need attention" — shared by
-  // the card badge, the attention summary, and the counts strip so all
-  // three agree. A plot the system can't currently monitor (no stage, no
-  // device, or a device that's offline / has never reported) counts as
-  // needing attention just as much as one with a real open alert — it isn't
-  // "in range", it's blind — UNLESS it's still PREPARING, where that same
-  // gap is expected setup state, not a problem (see CROP_IN_GROUND_STATUSES
-  // above).
-  const plotsWithCondition = plots.map((plot) => {
-    const hasConfigGap =
-      !plot.currentStage ||
-      !plot.device ||
-      plot.sensorReadings.length === 0 ||
-      !isDeviceOnline(plot.device.lastSeenAt);
-
-    const condition: PlotCondition = plot.alerts.some((a) => a.severity === "CRITICAL")
-      ? "CRITICAL"
-      : plot.alerts.some((a) => a.severity === "WARNING")
-      ? "WARNING"
-      : hasConfigGap
-      ? CROP_IN_GROUND_STATUSES.includes(plot.status)
-        ? "NO_DATA"
-        : "PREPARING"
-      : "ALL_IN_RANGE";
-    return { ...plot, condition };
+  const fleetSummary = formatFleetSummary({
+    monitoredPlotCount: monitoredPlots.length,
+    linkedDeviceCount: linkedMonitoredPlots.length,
+    freshDeviceCount,
+    staleDeviceCount,
+    offlineDeviceCount,
+    neverReportedCount,
+    missingDeviceCount,
   });
 
-  // "Needs attention" = CRITICAL, WARNING, or NO_DATA — PREPARING is
-  // deliberately excluded (see above) and ALL_IN_RANGE obviously doesn't
-  // qualify. Split further for the banner (Step 2): alert-driven problems
-  // are urgent; a NO_DATA plot with no alerts is just a configuration gap
-  // and isn't.
-  const attentionPlots = plotsWithCondition.filter((p) => p.condition !== "ALL_IN_RANGE" && p.condition !== "PREPARING");
-  const urgentPlots = attentionPlots.filter((p) => p.condition === "CRITICAL" || p.condition === "WARNING");
-  const configGapPlots = attentionPlots.filter((p) => p.condition === "NO_DATA");
+  const attentionPlots = plotsWithCondition.filter(
+    (p) => p.condition !== "ALL_IN_RANGE" && p.condition !== "PREPARING"
+  );
+  const hasCriticalAttention = attentionPlots.some(
+    (p) => p.condition === "CRITICAL" || p.condition === "OFFLINE"
+  );
 
   function attentionVerdict(p: (typeof attentionPlots)[number]): string {
-    if (p.alerts.length > 0) {
-      const worst = [...p.alerts].sort(
-        (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
-      )[0];
-      return `${p.name} ${ALERT_TYPE_VERDICT[worst.type]}`;
+    const alertCount = p.alerts.length;
+    const historicalThresholdAlert = [...p.alerts]
+      .filter((alert) => alert.isHistoricalEvidence)
+      .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])[0];
+    const historicalEvidenceSuffix = historicalThresholdAlert
+      ? ` · Last known: ${historicalThresholdAlert.message}`
+      : "";
+    const alertSuffix =
+      alertCount > 0
+        ? ` · ${alertCount} open alert${alertCount === 1 ? "" : "s"}`
+        : "";
+
+    if (p.condition === "MISSING_DEVICE") {
+      return `${p.name} has no device linked${alertSuffix}`;
     }
-    if (!p.currentStage) return `${p.name} has no growth stage set`;
-    if (!p.device) return `${p.name} has no device linked`;
-    return `${p.name} ${ALERT_TYPE_VERDICT.DEVICE_OFFLINE}`;
+    if (p.condition === "NEVER_REPORTED") {
+      return `${p.name} has no readings yet${alertSuffix}`;
+    }
+    if (p.condition === "OFFLINE") {
+      return `${p.name} device offline for ${formatStaleDuration(
+        p.freshness.elapsedMs ?? 0
+      )}${historicalEvidenceSuffix}${alertSuffix}`;
+    }
+    if (p.condition === "STALE") {
+      return `${p.name} sensor data is stale${historicalEvidenceSuffix}${alertSuffix}`;
+    }
+    if (p.condition === "MISSING_STAGE") {
+      return `${p.name} has no growth stage set${alertSuffix}`;
+    }
+
+    const worst = [...p.alerts].sort(
+      (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+    )[0];
+    return worst ? `${p.name} ${ALERT_TYPE_VERDICT[worst.type]}` : p.name;
   }
 
   return (
@@ -358,16 +533,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Today</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {formatDate(now)}
-            {plotsWithDevice.length === 0
-              ? isAdmin
-                ? " · no devices registered"
-                : " · no sensor data yet"
-              : allDevicesOnline
-              ? " · all sensors reporting"
-              : mostRecentSeenAt
-              ? ` · sensors last reported ${timeAgo(mostRecentSeenAt)}`
-              : " · sensors have not reported yet"}
+            {formatDate(now)} · {fleetSummary}
           </p>
         </div>
         <Badge variant="secondary" className="bg-muted text-muted-foreground capitalize">
@@ -434,9 +600,9 @@ export default async function DashboardPage() {
       <div
         className={cn(
           "border rounded-md bg-card border-l-4 p-4",
-          urgentPlots.length > 0
+          hasCriticalAttention
             ? CONDITION_BORDER_CLASS.CRITICAL
-            : configGapPlots.length > 0
+            : attentionPlots.length > 0
             ? CONDITION_BORDER_CLASS.WARNING
             : CONDITION_BORDER_CLASS.ALL_IN_RANGE
         )}
@@ -445,14 +611,14 @@ export default async function DashboardPage() {
           <p className="text-sm font-semibold text-success-text">All plots are in range</p>
         )}
 
-        {urgentPlots.length > 0 && (
+        {attentionPlots.length > 0 && (
           <div>
             <p className="text-sm font-semibold text-foreground">
-              {urgentPlots.length} plot{urgentPlots.length === 1 ? "" : "s"}{" "}
-              {urgentPlots.length === 1 ? "needs" : "need"} attention
+              {attentionPlots.length} plot{attentionPlots.length === 1 ? "" : "s"}{" "}
+              {attentionPlots.length === 1 ? "needs" : "need"} attention
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {urgentPlots.map(attentionVerdict).join(" · ")}
+              {attentionPlots.map(attentionVerdict).join(" · ")}
             </p>
             {(criticalCount > 0 || warningCount > 0) && (
               <p className="text-xs text-muted-foreground mt-2">
@@ -464,18 +630,6 @@ export default async function DashboardPage() {
                   .join(" · ")}
               </p>
             )}
-          </div>
-        )}
-
-        {configGapPlots.length > 0 && (
-          <div className={urgentPlots.length > 0 ? "mt-3 pt-3 border-t" : ""}>
-            <p className="text-sm font-semibold text-warning-text">
-              {configGapPlots.length} plot{configGapPlots.length === 1 ? "" : "s"}{" "}
-              {configGapPlots.length === 1 ? "needs" : "need"} setup
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {configGapPlots.map(attentionVerdict).join(" · ")}
-            </p>
           </div>
         )}
       </div>
@@ -492,7 +646,7 @@ export default async function DashboardPage() {
         <StripItem
           href={isAdmin ? "/dashboard/devices" : undefined}
           label="Devices"
-          value={`${devicesOnlineCount} of ${plotsWithDevice.length} reporting`}
+          value={fleetSummary}
         />
         <StripItem
           href="/dashboard/alerts"
@@ -549,8 +703,12 @@ export default async function DashboardPage() {
                     : null;
 
                 const reading = plot.sensorReadings[0] ?? null;
-                const deviceOnline = plot.device ? isDeviceOnline(plot.device.lastSeenAt) : false;
-                const isStale = !!reading && !!plot.device && !deviceOnline;
+                const readingsAreHistorical = plot.sensorEvidenceIsHistorical;
+                const historicalThresholdAlert = [...plot.alerts]
+                  .filter((alert) => alert.isHistoricalEvidence)
+                  .sort(
+                    (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+                  )[0];
 
                 return (
                   <div
@@ -596,52 +754,94 @@ export default async function DashboardPage() {
                       </p>
                     )}
 
+                    {condition === "MISSING_DEVICE" && (
+                      <p className="text-xs font-medium text-muted-foreground mt-2">
+                        No device linked
+                      </p>
+                    )}
+                    {condition === "NEVER_REPORTED" && (
+                      <p className="text-xs font-medium text-muted-foreground mt-2">
+                        No readings received yet
+                      </p>
+                    )}
+                    {condition === "OFFLINE" && (
+                      <p className="text-xs font-medium text-danger-text mt-2">
+                        Device offline for{" "}
+                        {formatStaleDuration(plot.freshness.elapsedMs ?? 0)}
+                      </p>
+                    )}
+                    {condition === "STALE" && (
+                      <p className="text-xs font-medium text-warning-text mt-2">
+                        Sensor data is stale
+                      </p>
+                    )}
+
                     <div className="mt-2">
                       {!reading ? (
-                        <p className="text-xs text-muted-foreground">
-                          {!plot.device ? "No device linked" : "Awaiting first reading"}
-                        </p>
+                        condition === "MISSING_DEVICE" ||
+                        condition === "NEVER_REPORTED" ? null : (
+                          <p className="text-xs text-muted-foreground">
+                            {!plot.device ? "No device linked" : "Awaiting first reading"}
+                          </p>
+                        )
                       ) : (
-                        <div
-                          className={cn(
-                            "flex flex-wrap gap-x-3 gap-y-1 text-xs",
-                            isStale && "opacity-60"
+                        <>
+                          {readingsAreHistorical && (
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Last-known readings
+                            </p>
                           )}
-                        >
-                          {SENSOR_FIELDS.map((field) => {
-                            const value = reading[field.key];
-                            if (value == null) return null;
-                            const status = plot.currentStage
-                              ? getThresholdStatus(
-                                  value,
-                                  plot.currentStage[field.minField],
-                                  plot.currentStage[field.maxField]
-                                )
-                              : null;
-                            return (
-                              <span
-                                key={field.key}
-                                className={
-                                  status == null
-                                    ? "text-muted-foreground"
-                                    : status === "optimal"
-                                    ? "text-success-text"
-                                    : "text-danger-text"
-                                }
-                              >
-                                {SHORT_FIELD_LABEL[field.key]} {value}
-                                {field.unit}
-                              </span>
-                            );
-                          })}
-                        </div>
+                          <div
+                            className={cn(
+                              "flex flex-wrap gap-x-3 gap-y-1 text-xs",
+                              readingsAreHistorical && "opacity-60"
+                            )}
+                          >
+                            {SENSOR_FIELDS.map((field) => {
+                              const value = reading[field.key];
+                              if (value == null) return null;
+                              const status = plot.currentStage
+                                ? getThresholdStatus(
+                                    value,
+                                    plot.currentStage[field.minField],
+                                    plot.currentStage[field.maxField]
+                                  )
+                                : null;
+                              return (
+                                <span
+                                  key={field.key}
+                                  className={
+                                    readingsAreHistorical || status == null
+                                      ? "text-muted-foreground"
+                                      : status === "optimal"
+                                      ? "text-success-text"
+                                      : "text-danger-text"
+                                  }
+                                >
+                                  {SHORT_FIELD_LABEL[field.key]} {value}
+                                  {field.unit}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
 
-                    {isStale && reading && (
+                    {readingsAreHistorical && reading && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        No data for {formatStaleDuration(nowMs - reading.recordedAt.getTime())}
-                        {" · "}Last reading {formatDateTime(reading.recordedAt)}
+                        {historicalThresholdAlert &&
+                          `Last known: ${historicalThresholdAlert.message} · `}
+                        Last reading{" "}
+                        {formatStaleDuration(plot.freshness.elapsedMs ?? 0)} ago
+                        {" · "}
+                        {formatDateTime(reading.recordedAt)}
+                      </p>
+                    )}
+                    {plot.alerts.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {plot.alerts.length} open alert
+                        {plot.alerts.length === 1 ? "" : "s"}
                       </p>
                     )}
                   </div>

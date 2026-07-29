@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format-date";
-import { isDeviceOnline } from "@/lib/utils/device-status";
+import { getDeviceFreshness } from "@/lib/utils/device-status";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { RestorePlotDialog } from "@/components/plots/restore-plot-dialog";
@@ -48,17 +48,7 @@ const statusColors: Record<PlotStatus, string> = {
   ARCHIVED: "bg-gray-200 text-gray-600",
 };
 
-// Isolates the Date.now() call in its own non-component function, same
-// idiom as isDeviceOnline in device-status.ts — the purity lint rule flags
-// impure calls made directly inside a component body, not ones tucked
-// behind a helper.
-function msSince(date: Date): number {
-  return Date.now() - date.getTime();
-}
-
-// Plain-language duration for the stale-data line, e.g. "4 days", "2 hours" —
-// deliberately spelled out (not the abbreviated "4d"/"2h" style of timeAgo)
-// since this reads as a sentence: "No data for {duration}".
+// Plain-language elapsed duration for freshness copy, e.g. "4 days".
 function formatStaleDuration(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / (60 * 1000)));
   if (minutes < 60) {
@@ -189,10 +179,25 @@ export default async function PlotDetailPage({
     orderBy: { recordedAt: "desc" },
   });
 
-  // Compute freshly from lastSeenAt rather than trusting device.status,
-  // which is only updated periodically by the offline-detection cron.
-  const deviceOnline = isDeviceOnline(plot.device?.lastSeenAt);
-  const staleDurationMs = latestReading ? msSince(latestReading.recordedAt) : 0;
+  const now = new Date();
+  const deviceFreshness = getDeviceFreshness(plot.device?.lastSeenAt, now);
+  const readingsAreHistorical =
+    deviceFreshness.state !== "FRESH" && latestReading !== null;
+  const readingFreshnessLabel = latestReading
+    ? deviceFreshness.state === "FRESH"
+      ? `Last reading ${formatDateTime(latestReading.recordedAt)}`
+      : deviceFreshness.state === "STALE"
+      ? `Sensor data is stale · Last reading ${formatStaleDuration(
+          deviceFreshness.elapsedMs ?? 0
+        )} ago · ${formatDateTime(latestReading.recordedAt)}`
+      : deviceFreshness.state === "OFFLINE"
+      ? `Device offline for ${formatStaleDuration(
+          deviceFreshness.elapsedMs ?? 0
+        )} · Last reading ${formatDateTime(latestReading.recordedAt)}`
+      : `No device report timestamp · Last-known reading ${formatDateTime(
+          latestReading.recordedAt
+        )}`
+    : undefined;
 
   const growthLogs = await prisma.growthLog.findMany({
     where: { plotId: plot.id },
@@ -370,9 +375,24 @@ export default async function PlotDetailPage({
                   Awaiting first reading
                 </Badge>
               )}
-              {plot.device && latestReading && deviceOnline && (
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
-                  Live
+              {plot.device && latestReading && (
+                <Badge
+                  variant="secondary"
+                  className={
+                    deviceFreshness.state === "FRESH"
+                      ? "bg-green-100 text-green-700"
+                      : deviceFreshness.state === "STALE"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-red-100 text-red-700"
+                  }
+                >
+                  {deviceFreshness.state === "FRESH"
+                    ? "Fresh"
+                    : deviceFreshness.state === "STALE"
+                    ? "Stale"
+                    : deviceFreshness.state === "OFFLINE"
+                    ? "Offline"
+                    : "Never reported"}
                 </Badge>
               )}
             </div>
@@ -398,17 +418,12 @@ export default async function PlotDetailPage({
               reported yet. First reading will appear here.
             </div>
           ) : (
-            <>
-              {!deviceOnline && (
-                <p className="text-sm text-muted-foreground mb-3">
-                  No data for {formatStaleDuration(staleDurationMs)}
-                  {" · "}Last reading {formatDateTime(latestReading.recordedAt)}
-                </p>
-              )}
-              <div className={!deviceOnline ? "opacity-60" : undefined}>
-                <LatestReadings reading={latestReading} stage={plot.currentStage} />
-              </div>
-            </>
+            <LatestReadings
+              reading={latestReading}
+              stage={plot.currentStage}
+              isHistorical={readingsAreHistorical}
+              freshnessLabel={readingFreshnessLabel}
+            />
           )}
           {latestReading && (
             <div className="mt-4 pt-4 border-t">

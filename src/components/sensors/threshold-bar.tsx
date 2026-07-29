@@ -13,6 +13,7 @@ export type ThresholdBarProps = {
   unit: string;
   min: number;
   max: number;
+  isHistorical?: boolean;
 };
 
 const MARKER_DOT_CLASS: Record<ThresholdStatus, string> = {
@@ -35,7 +36,14 @@ const STATUS_LABEL: Record<ThresholdStatus, string> = {
   high: "High",
 };
 
-export function ThresholdBar({ label, value, unit, min, max }: ThresholdBarProps) {
+export function ThresholdBar({
+  label,
+  value,
+  unit,
+  min,
+  max,
+  isHistorical = false,
+}: ThresholdBarProps) {
   if (value == null) {
     return (
       <div>
@@ -56,7 +64,9 @@ export function ThresholdBar({ label, value, unit, min, max }: ThresholdBarProps
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div
-        className={`text-sm font-semibold mt-0.5 flex items-center gap-1.5 ${STATUS_TEXT_CLASS[status]}`}
+        className={`text-sm font-semibold mt-0.5 flex items-center gap-1.5 ${
+          isHistorical ? "text-muted-foreground" : STATUS_TEXT_CLASS[status]
+        }`}
       >
         <span>
           {value}
@@ -87,15 +97,21 @@ export function ThresholdBar({ label, value, unit, min, max }: ThresholdBarProps
 
         {clamped === "low" ? (
           <ChevronLeft
-            className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-danger-text"
+            className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${
+              isHistorical ? "text-muted-foreground" : "text-danger-text"
+            }`}
           />
         ) : clamped === "high" ? (
           <ChevronRight
-            className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-danger-text"
+            className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${
+              isHistorical ? "text-muted-foreground" : "text-danger-text"
+            }`}
           />
         ) : (
           <div
-            className={`absolute top-1/2 w-2.5 h-2.5 rounded-full border-2 border-card -translate-y-1/2 -translate-x-1/2 transition-[left] duration-300 ease-out ${MARKER_DOT_CLASS[status]}`}
+            className={`absolute top-1/2 w-2.5 h-2.5 rounded-full border-2 border-card -translate-y-1/2 -translate-x-1/2 transition-[left] duration-300 ease-out ${
+              isHistorical ? "bg-muted-foreground" : MARKER_DOT_CLASS[status]
+            }`}
             style={{ left: `${percent}%` }}
           />
         )}

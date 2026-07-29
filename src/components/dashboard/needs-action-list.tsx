@@ -50,6 +50,7 @@ export type NeedsActionAlert = {
   message: string;
   createdAt: Date;
   plot: { id: string; name: string };
+  isHistorical: boolean;
 };
 
 export function NeedsActionList({
@@ -111,6 +112,7 @@ export function NeedsActionList({
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {alert.isHistorical ? "Last known: " : ""}
                   {alert.message}
                 </p>
               </div>

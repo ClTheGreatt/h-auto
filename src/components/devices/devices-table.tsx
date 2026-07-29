@@ -49,7 +49,11 @@ import {
   regenerateApiKey,
 } from "@/actions/devices";
 import type { DeviceStatus } from "@prisma/client";
-import { isDeviceOnline } from "@/lib/utils/device-status";
+import {
+  getDeviceFreshness,
+  type DeviceFreshnessState,
+} from "@/lib/utils/device-status";
+import { formatDateTime } from "@/lib/format-date";
 
 type DeviceRow = {
   id: string;
@@ -70,10 +74,26 @@ const statusVariant: Record<DeviceStatus, StatusVariant> = {
   RETIRED: "neutral",
 };
 
+const freshnessVariant: Record<DeviceFreshnessState, StatusVariant> = {
+  FRESH: "success",
+  STALE: "warning",
+  OFFLINE: "danger",
+  NEVER_REPORTED: "neutral",
+};
+
+const freshnessLabel: Record<DeviceFreshnessState, string> = {
+  FRESH: "Fresh",
+  STALE: "Stale",
+  OFFLINE: "Offline",
+  NEVER_REPORTED: "Never reported",
+};
+
 export function DevicesTable({
   devices,
+  nowMs,
 }: {
   devices: DeviceRow[];
+  nowMs: number;
 }) {
   const router = useRouter();
   const [simulatingId, setSimulatingId] = useState<string | null>(null);
@@ -117,24 +137,6 @@ export function DevicesTable({
     setNewKey(result.apiKey!);
   }
 
-  // MAINTENANCE/RETIRED are intentional admin flags, not derived from
-  // timestamp — only ONLINE/OFFLINE get computed live from lastSeenAt.
-  function computedStatus(d: DeviceRow): DeviceStatus {
-    if (d.status === "MAINTENANCE" || d.status === "RETIRED") return d.status;
-    return isDeviceOnline(d.lastSeenAt) ? "ONLINE" : "OFFLINE";
-  }
-
-  function formatLastSeen(date: Date | null): string {
-    if (!date) return "Never";
-    return new Date(date).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-
   if (devices.length === 0) {
     return (
       <EmptyState
@@ -161,8 +163,15 @@ export function DevicesTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {devices.map((d) => (
-              <TableRow key={d.id}>
+            {devices.map((d) => {
+              const freshness = getDeviceFreshness(d.lastSeenAt, nowMs);
+              const administrativeStatus =
+                d.status === "MAINTENANCE" || d.status === "RETIRED"
+                  ? d.status
+                  : null;
+
+              return (
+                <TableRow key={d.id}>
                 <TableCell className="font-medium font-mono text-sm">
                   {d.deviceCode}
                 </TableCell>
@@ -178,12 +187,21 @@ export function DevicesTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <StatusBadge variant={statusVariant[computedStatus(d)]}>
-                    {computedStatus(d)}
-                  </StatusBadge>
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge variant={freshnessVariant[freshness.state]}>
+                      {freshnessLabel[freshness.state]}
+                    </StatusBadge>
+                    {administrativeStatus && (
+                      <StatusBadge variant={statusVariant[administrativeStatus]}>
+                        {administrativeStatus}
+                      </StatusBadge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {formatLastSeen(d.lastSeenAt)}
+                  {d.lastSeenAt
+                    ? formatDateTime(d.lastSeenAt)
+                    : "Never reported"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {d.firmwareVersion ?? "—"}
@@ -239,8 +257,9 @@ export function DevicesTable({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
-              </TableRow>
-            ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Card>

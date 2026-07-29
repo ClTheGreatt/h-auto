@@ -15,6 +15,7 @@ export default async function DevicesPage() {
       _count: { select: { readings: true } },
     },
   });
+  const nowMs = new Date().getTime();
 
   return (
     <div className="space-y-6">
@@ -46,7 +47,7 @@ export default async function DevicesPage() {
       )}
 
       <div data-tour="devices.list">
-        <DevicesTable devices={devices} />
+        <DevicesTable devices={devices} nowMs={nowMs} />
       </div>
     </div>
   );
