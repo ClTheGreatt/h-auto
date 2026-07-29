@@ -281,7 +281,28 @@ export default async function DashboardPage() {
   }, null);
   const allDevicesOnline = plotsWithDevice.length > 0 && devicesOfflineCount === 0;
 
-  const attentionPlots = plots.filter((p) => p.alerts.length > 0);
+  // Single source of truth for "does this plot need attention" — shared by
+  // the card badge, the attention summary, and the counts strip so all
+  // three agree. A plot the system can't currently monitor (no stage, no
+  // device, or a device that's offline / has never reported) counts as
+  // needing attention just as much as one with a real open alert — it isn't
+  // "in range", it's blind, and treating it as fine let it silently vanish
+  // from both the summary and the strip.
+  const plotsWithCondition = plots.map((plot) => {
+    const condition: PlotCondition = plot.alerts.some((a) => a.severity === "CRITICAL")
+      ? "CRITICAL"
+      : plot.alerts.some((a) => a.severity === "WARNING")
+      ? "WARNING"
+      : !plot.currentStage ||
+        !plot.device ||
+        plot.sensorReadings.length === 0 ||
+        !isDeviceOnline(plot.device.lastSeenAt)
+      ? "NO_DATA"
+      : "ALL_IN_RANGE";
+    return { ...plot, condition };
+  });
+
+  const attentionPlots = plotsWithCondition.filter((p) => p.condition !== "ALL_IN_RANGE");
 
   return (
     <div className="space-y-6">
@@ -317,16 +338,21 @@ export default async function DashboardPage() {
         {attentionPlots.length > 0 ? (
           <>
             <p className="text-sm font-semibold text-foreground">
-              {attentionPlots.length} plot{attentionPlots.length === 1 ? "" : "s"} need
-              attention
+              {attentionPlots.length} plot{attentionPlots.length === 1 ? "" : "s"}{" "}
+              {attentionPlots.length === 1 ? "needs" : "need"} attention
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               {attentionPlots
                 .map((p) => {
-                  const worst = [...p.alerts].sort(
-                    (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
-                  )[0];
-                  return `${p.name} ${ALERT_TYPE_VERDICT[worst.type]}`;
+                  if (p.alerts.length > 0) {
+                    const worst = [...p.alerts].sort(
+                      (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+                    )[0];
+                    return `${p.name} ${ALERT_TYPE_VERDICT[worst.type]}`;
+                  }
+                  if (!p.currentStage) return `${p.name} has no growth stage set`;
+                  if (!p.device) return `${p.name} has no device linked`;
+                  return `${p.name} ${ALERT_TYPE_VERDICT.DEVICE_OFFLINE}`;
                 })
                 .join(" · ")}
             </p>
@@ -353,7 +379,9 @@ export default async function DashboardPage() {
         <StripItem
           href="/dashboard/plots"
           label="Plots"
-          value={`${attentionPlots.length} of ${plots.length} need attention`}
+          value={`${attentionPlots.length} of ${plots.length} ${
+            attentionPlots.length === 1 ? "needs" : "need"
+          } attention`}
         />
         <StripItem
           href={isAdmin ? "/dashboard/devices" : undefined}
@@ -387,21 +415,12 @@ export default async function DashboardPage() {
           <CardTitle className="text-base">Plots</CardTitle>
         </CardHeader>
         <CardContent>
-          {plots.length === 0 ? (
+          {plotsWithCondition.length === 0 ? (
             <EmptyState icon={Sprout} title="No active plots" compact />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {plots.map((plot) => {
-                const condition: PlotCondition =
-                  plot.alerts.some((a) => a.severity === "CRITICAL")
-                    ? "CRITICAL"
-                    : plot.alerts.some((a) => a.severity === "WARNING")
-                    ? "WARNING"
-                    : !plot.device ||
-                      plot.sensorReadings.length === 0 ||
-                      !isDeviceOnline(plot.device.lastSeenAt)
-                    ? "NO_DATA"
-                    : "ALL_IN_RANGE";
+              {plotsWithCondition.map((plot) => {
+                const { condition } = plot;
                 const ConditionIcon = CONDITION_ICON[condition];
 
                 const daysSincePlanting = plot.plantingDate
