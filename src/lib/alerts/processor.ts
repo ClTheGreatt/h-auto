@@ -7,6 +7,7 @@ import {
   checkThresholds,
   getEvaluatedThresholdAlertTypes,
 } from "./threshold-checker";
+import { isWithinLightEvaluationWindow } from "./light-evaluation";
 import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
 import { createOpenAlertIfAbsent } from "./open-alert";
 
@@ -44,7 +45,14 @@ export async function processSensorReading(readingId: string) {
 
   if (!reading.plot.currentStage) return;
 
-  const violations = checkThresholds(reading, reading.plot.currentStage);
+  const thresholdEvaluationPolicy = {
+    evaluateLight: isWithinLightEvaluationWindow(reading.recordedAt),
+  };
+  const violations = checkThresholds(
+    reading,
+    reading.plot.currentStage,
+    thresholdEvaluationPolicy
+  );
 
   // === Process new violations ===
   for (const v of violations) {
@@ -93,7 +101,10 @@ export async function processSensorReading(readingId: string) {
   const activeAlerts = await prisma.alert.findMany({
     where: { plotId: reading.plotId, resolved: false },
   });
-  const evaluatedAlertTypes = getEvaluatedThresholdAlertTypes(reading);
+  const evaluatedAlertTypes = getEvaluatedThresholdAlertTypes(
+    reading,
+    thresholdEvaluationPolicy
+  );
   const stillViolatingTypes = new Set(violations.map((v) => v.type));
   for (const alert of activeAlerts) {
     if (

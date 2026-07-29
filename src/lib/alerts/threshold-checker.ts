@@ -35,12 +35,26 @@ type ThresholdReading = Pick<
   (typeof CHECKS)[number]["field"]
 >;
 
+export type ThresholdEvaluationPolicy = {
+  evaluateLight: boolean;
+};
+
+function shouldEvaluate(
+  check: Check,
+  policy: ThresholdEvaluationPolicy
+): boolean {
+  return check.field !== "lightIntensity" || policy.evaluateLight;
+}
+
 export function getEvaluatedThresholdAlertTypes(
-  reading: ThresholdReading
+  reading: ThresholdReading,
+  policy: ThresholdEvaluationPolicy
 ): Set<AlertType> {
   const evaluatedTypes = new Set<AlertType>();
 
   for (const check of CHECKS) {
+    if (!shouldEvaluate(check, policy)) continue;
+
     if (reading[check.field] !== null && reading[check.field] !== undefined) {
       evaluatedTypes.add(check.lowType);
       evaluatedTypes.add(check.highType);
@@ -57,11 +71,14 @@ function severityFor(deviation: number): AlertSeverity {
 
 export function checkThresholds(
   reading: SensorReading,
-  stage: CropStage
+  stage: CropStage,
+  policy: ThresholdEvaluationPolicy
 ): Violation[] {
   const violations: Violation[] = [];
 
   for (const check of CHECKS) {
+    if (!shouldEvaluate(check, policy)) continue;
+
     const value = reading[check.field] as number | null;
     if (value == null) continue;
 
