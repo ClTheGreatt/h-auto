@@ -313,7 +313,9 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {formatDate(now)}
             {plotsWithDevice.length === 0
-              ? " · no devices registered"
+              ? isAdmin
+                ? " · no devices registered"
+                : " · no sensor data yet"
               : allDevicesOnline
               ? " · all sensors reporting"
               : mostRecentSeenAt
@@ -326,6 +328,36 @@ export default async function DashboardPage() {
         </Badge>
       </div>
 
+      {plotsWithCondition.length === 0 ? (
+        /* Zero-plot state — nothing to assert health about, so this is the
+           ONLY thing rendered below the header: no attention summary, no
+           counts strip, no plot cards, and the Needs-action / Recent-
+           observations cards are hidden entirely rather than shown as three
+           more empty states (they can't have content without a plot). */
+        <div className={cn("border rounded-md bg-card border-l-4 p-4", CONDITION_BORDER_CLASS.NO_DATA)}>
+          <p className="text-sm font-medium text-foreground">
+            {isStudent
+              ? "No plots assigned yet."
+              : isFaculty
+              ? "No plots assigned to you yet."
+              : "No active plots yet."}
+          </p>
+          {isStudent && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Ask your faculty adviser to assign you a plot.
+            </p>
+          )}
+          {isAdmin && (
+            <Link
+              href="/dashboard/plots/new"
+              className="text-sm font-medium text-foreground hover:underline mt-2 inline-block"
+            >
+              Create a plot →
+            </Link>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Attention summary */}
       <div
         className={cn(
@@ -675,6 +707,8 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }
