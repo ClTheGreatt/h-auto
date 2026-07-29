@@ -23,6 +23,7 @@ import { timeAgo, formatDate, formatDateTime } from "@/lib/format-date";
 import { isDeviceOnline } from "@/lib/utils/device-status";
 import { getThresholdStatus, SENSOR_FIELDS } from "@/lib/sensors/threshold-status";
 import { NeedsActionList, type NeedsActionAlert } from "@/components/dashboard/needs-action-list";
+import { RestartTourButton } from "@/components/tour/restart-tour-button";
 import type { AlertSeverity, AlertType, PlotStatus } from "@prisma/client";
 
 const OBSERVATION_TRUNCATE_LENGTH = 100;
@@ -333,28 +334,53 @@ export default async function DashboardPage() {
            ONLY thing rendered below the header: no attention summary, no
            counts strip, no plot cards, and the Needs-action / Recent-
            observations cards are hidden entirely rather than shown as three
-           more empty states (they can't have content without a plot). */
-        <div className={cn("border rounded-md bg-card border-l-4 p-4", CONDITION_BORDER_CLASS.NO_DATA)}>
-          <p className="text-sm font-medium text-foreground">
-            {isStudent
-              ? "No plots assigned yet."
-              : isFaculty
-              ? "No plots assigned to you yet."
-              : "No active plots yet."}
-          </p>
-          {isStudent && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Ask your faculty adviser to assign you a plot.
-            </p>
-          )}
-          {isAdmin && (
-            <Link
-              href="/dashboard/plots/new"
-              className="text-sm font-medium text-foreground hover:underline mt-2 inline-block"
-            >
-              Create a plot →
-            </Link>
-          )}
+           more empty states (they can't have content without a plot). A
+           real EmptyState (dashed card, centered icon+title, generous
+           padding) instead of a bare line, vertically centered in a tall
+           wrapper so it doesn't read as a broken page. */
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <EmptyState
+            icon={Sprout}
+            title={
+              isStudent
+                ? "No plots assigned yet."
+                : isFaculty
+                ? "No plots assigned to you yet."
+                : "No active plots yet."
+            }
+            action={
+              <div className="space-y-3 max-w-sm mx-auto">
+                {isStudent && (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Ask your faculty adviser to assign you a plot.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Once assigned, you&apos;ll see live sensor readings and can log your
+                      observations here.
+                    </p>
+                  </>
+                )}
+                {isFaculty && (
+                  <p className="text-sm text-muted-foreground">
+                    Once you&apos;re advising a plot, you&apos;ll see its readings and your
+                    students&apos; observations here.
+                  </p>
+                )}
+                {isAdmin && (
+                  <Link
+                    href="/dashboard/plots/new"
+                    className="text-sm font-medium text-foreground hover:underline inline-block"
+                  >
+                    Create a plot →
+                  </Link>
+                )}
+                <div className="pt-1 flex justify-center">
+                  <RestartTourButton />
+                </div>
+              </div>
+            }
+          />
         </div>
       ) : (
         <>
