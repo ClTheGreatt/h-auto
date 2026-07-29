@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sensorReadingSchema } from "@/lib/validations/device";
 import { hashApiKey } from "@/lib/devices/hash-key";
@@ -86,12 +86,17 @@ export async function POST(request: NextRequest) {
     data: { status: "ONLINE", lastSeenAt: new Date() },
   });
 
-  // Fire-and-forget alert processing (don't block the ESP32 response)
-  import("@/lib/alerts/processor").then(({ processSensorReading }) =>
-    processSensorReading(reading.id).catch((err) =>
-      console.error("Alert processing failed:", err)
-    )
-  );
+  after(async () => {
+    try {
+      const { processSensorReading } = await import("@/lib/alerts/processor");
+      await processSensorReading(reading.id);
+    } catch (err) {
+      console.error(
+        "[sensor ingest] Alert processing failed:",
+        err instanceof Error ? err.message : "Unknown error"
+      );
+    }
+  });
 
   return NextResponse.json(
     { success: true, readingId: reading.id },

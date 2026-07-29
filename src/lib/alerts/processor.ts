@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/sms/semaphore";
 import { sendEmail } from "@/lib/email/send-email";
 import { sendExpoPush } from "@/lib/push/expo";
-import { checkThresholds } from "./threshold-checker";
+import {
+  checkThresholds,
+  getEvaluatedThresholdAlertTypes,
+} from "./threshold-checker";
 import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
 
 export type Recipient = {
@@ -94,9 +97,13 @@ export async function processSensorReading(readingId: string) {
   const activeAlerts = await prisma.alert.findMany({
     where: { plotId: reading.plotId, resolved: false },
   });
+  const evaluatedAlertTypes = getEvaluatedThresholdAlertTypes(reading);
   const stillViolatingTypes = new Set(violations.map((v) => v.type));
   for (const alert of activeAlerts) {
-    if (!stillViolatingTypes.has(alert.type)) {
+    if (
+      evaluatedAlertTypes.has(alert.type) &&
+      !stillViolatingTypes.has(alert.type)
+    ) {
       await prisma.alert.update({
         where: { id: alert.id },
         data: { resolved: true, resolvedAt: new Date() },

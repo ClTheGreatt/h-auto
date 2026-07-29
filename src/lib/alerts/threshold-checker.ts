@@ -20,7 +20,7 @@ type Check = {
   unit: string;
 };
 
-const CHECKS: Check[] = [
+const CHECKS = [
   { field: "soilMoisture", minField: "minSoilMoisture", maxField: "maxSoilMoisture", lowType: "LOW_SOIL_MOISTURE", highType: "HIGH_SOIL_MOISTURE", label: "soil moisture", unit: "%" },
   { field: "temperature", minField: "minTemperature", maxField: "maxTemperature", lowType: "LOW_TEMPERATURE", highType: "HIGH_TEMPERATURE", label: "temperature", unit: "°C" },
   { field: "humidity", minField: "minHumidity", maxField: "maxHumidity", lowType: "LOW_HUMIDITY", highType: "HIGH_HUMIDITY", label: "humidity", unit: "%" },
@@ -28,7 +28,27 @@ const CHECKS: Check[] = [
   { field: "nitrogen", minField: "minNitrogen", maxField: "maxNitrogen", lowType: "LOW_NITROGEN", highType: "HIGH_NITROGEN", label: "nitrogen", unit: "mg/kg" },
   { field: "phosphorus", minField: "minPhosphorus", maxField: "maxPhosphorus", lowType: "LOW_PHOSPHORUS", highType: "HIGH_PHOSPHORUS", label: "phosphorus", unit: "mg/kg" },
   { field: "potassium", minField: "minPotassium", maxField: "maxPotassium", lowType: "LOW_POTASSIUM", highType: "HIGH_POTASSIUM", label: "potassium", unit: "mg/kg" },
-];
+] as const satisfies readonly Check[];
+
+type ThresholdReading = Pick<
+  SensorReading,
+  (typeof CHECKS)[number]["field"]
+>;
+
+export function getEvaluatedThresholdAlertTypes(
+  reading: ThresholdReading
+): Set<AlertType> {
+  const evaluatedTypes = new Set<AlertType>();
+
+  for (const check of CHECKS) {
+    if (reading[check.field] !== null && reading[check.field] !== undefined) {
+      evaluatedTypes.add(check.lowType);
+      evaluatedTypes.add(check.highType);
+    }
+  }
+
+  return evaluatedTypes;
+}
 
 function severityFor(deviation: number): AlertSeverity {
   if (deviation > 0.2) return "CRITICAL";
