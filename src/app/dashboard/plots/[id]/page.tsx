@@ -108,7 +108,7 @@ export default async function PlotDetailPage({
               section: true,
             },
           },
-          faculty: { select: { firstName: true, lastName: true } },
+          faculty: { select: { firstName: true, lastName: true, position: true } },
         },
       },
     },

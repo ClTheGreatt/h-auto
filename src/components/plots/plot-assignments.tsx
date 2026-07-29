@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { assignStudent, removeAssignment } from "@/actions/assignments";
+import { formatDate } from "@/lib/format-date";
 
 type Student = {
   id: string;
@@ -60,7 +61,11 @@ type Assignment = {
   notes: string | null;
   assignedAt: Date;
   student: Student;
-  faculty: { firstName: string; lastName: string };
+  // The plot's supervising adviser (Plot.facultyId, copied onto every
+  // assignment row for this plot) — NOT who performed the assign action.
+  // PlotAssignment has no assignedById field, so this must never be labeled
+  // "Assigned by".
+  faculty: { firstName: string; lastName: string; position: string | null };
 };
 
 export function PlotAssignments({
@@ -233,8 +238,11 @@ export function PlotAssignments({
                     </div>
                   )}
                   <div className="text-xs text-gray-400 mt-1">
-                    Assigned by {a.faculty.firstName} {a.faculty.lastName} •{" "}
-                    {new Date(a.assignedAt).toLocaleDateString()}
+                    <div>
+                      Adviser: {a.faculty.firstName} {a.faculty.lastName}
+                    </div>
+                    {a.faculty.position && <div>{a.faculty.position}</div>}
+                    <div>Assigned {formatDate(a.assignedAt)}</div>
                   </div>
                 </div>
                 {canManage && (
