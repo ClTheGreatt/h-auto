@@ -8,6 +8,7 @@ import {
   getEvaluatedThresholdAlertTypes,
 } from "./threshold-checker";
 import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
+import { createOpenAlertIfAbsent } from "./open-alert";
 
 export type Recipient = {
   id: string;
@@ -47,12 +48,6 @@ export async function processSensorReading(readingId: string) {
 
   // === Process new violations ===
   for (const v of violations) {
-    // Skip if there's already an unresolved alert of the same type for this plot
-    const existing = await prisma.alert.findFirst({
-      where: { plotId: reading.plotId, type: v.type, resolved: false },
-    });
-    if (existing) continue;
-
     let suggestion: AlertSuggestion | null = null;
     try {
       suggestion = buildAlertSuggestion({
@@ -64,17 +59,18 @@ export async function processSensorReading(readingId: string) {
       console.warn("[processSensorReading] suggestion builder failed:", err);
     }
 
-    const alert = await prisma.alert.create({
+    const { alert, created } = await createOpenAlertIfAbsent({
+      plotId: reading.plotId,
+      type: v.type,
       data: {
-        plotId: reading.plotId,
         readingId: reading.id,
-        type: v.type,
         severity: v.severity,
         message: v.message,
         suggestionTitle: suggestion?.title ?? null,
         suggestionSteps: suggestion?.steps ?? [],
       },
     });
+    if (!created) continue;
 
     // Unique recipients (students + faculty from active assignments)
     const recipientMap = new Map<string, Recipient>();

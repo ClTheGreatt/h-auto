@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildAlertSuggestion, type AlertSuggestion } from "@/lib/alerts/suggestions";
 import { sendAlertNotifications } from "@/lib/alerts/processor";
+import { createOpenAlertIfAbsent } from "@/lib/alerts/open-alert";
 import { DEVICE_OFFLINE_THRESHOLD_MS } from "@/lib/utils/device-status";
 
 // Offline for longer than this bumps the alert from WARNING to CRITICAL
@@ -96,63 +97,60 @@ export async function GET(req: NextRequest) {
     });
     result.devicesMarkedOffline++;
 
-    const existing = await prisma.alert.findFirst({
-      where: { plotId: device.plotId, type: "DEVICE_OFFLINE", resolved: false },
+    let suggestion: AlertSuggestion | null = null;
+    try {
+      suggestion = buildAlertSuggestion({ type: "DEVICE_OFFLINE" });
+    } catch (err) {
+      console.warn("[cron/daily] suggestion builder failed:", err);
+    }
+
+    const staleDurationMs = device.lastSeenAt
+      ? now.getTime() - device.lastSeenAt.getTime()
+      : Infinity;
+    const severity =
+      staleDurationMs > CRITICAL_OFFLINE_MINUTES * 60 * 1000
+        ? "CRITICAL"
+        : "WARNING";
+    const elapsedPhrase = device.lastSeenAt
+      ? `for ${formatElapsed(staleDurationMs)}`
+      : "since it was registered";
+    const message = `Device ${device.deviceCode} has not reported readings ${elapsedPhrase}. Check that the device has power, is within WiFi range, and the WiFi network is 2.4GHz.`;
+
+    const { alert, created } = await createOpenAlertIfAbsent({
+      plotId: device.plotId,
+      type: "DEVICE_OFFLINE",
+      data: {
+        severity,
+        message,
+        suggestionTitle: suggestion?.title ?? null,
+        suggestionSteps: suggestion?.steps ?? [],
+      },
     });
-    if (!existing) {
-      let suggestion: AlertSuggestion | null = null;
-      try {
-        suggestion = buildAlertSuggestion({ type: "DEVICE_OFFLINE" });
-      } catch (err) {
-        console.warn("[cron/daily] suggestion builder failed:", err);
-      }
+    if (!created) continue;
 
-      const staleDurationMs = device.lastSeenAt
-        ? now.getTime() - device.lastSeenAt.getTime()
-        : Infinity;
-      const severity =
-        staleDurationMs > CRITICAL_OFFLINE_MINUTES * 60 * 1000
-          ? "CRITICAL"
-          : "WARNING";
-      const elapsedPhrase = device.lastSeenAt
-        ? `for ${formatElapsed(staleDurationMs)}`
-        : "since it was registered";
-      const message = `Device ${device.deviceCode} has not reported readings ${elapsedPhrase}. Check that the device has power, is within WiFi range, and the WiFi network is 2.4GHz.`;
+    result.offlineAlertsCreated++;
 
-      const alert = await prisma.alert.create({
-        data: {
-          plotId: device.plotId,
-          type: "DEVICE_OFFLINE",
-          severity,
-          message,
-          suggestionTitle: suggestion?.title ?? null,
-          suggestionSteps: suggestion?.steps ?? [],
-        },
+    try {
+      const assignments = await prisma.plotAssignment.findMany({
+        where: { plotId: device.plotId, status: "ACTIVE" },
+        include: { student: true, faculty: true },
       });
-      result.offlineAlertsCreated++;
-
-      try {
-        const assignments = await prisma.plotAssignment.findMany({
-          where: { plotId: device.plotId, status: "ACTIVE" },
-          include: { student: true, faculty: true },
-        });
-        const recipientMap = new Map<string, (typeof assignments)[number]["student"]>();
-        for (const a of assignments) {
-          recipientMap.set(a.student.id, a.student);
-          recipientMap.set(a.faculty.id, a.faculty);
-        }
-
-        await sendAlertNotifications(alert, Array.from(recipientMap.values()), {
-          plotId: device.plotId,
-          plotName: device.plot.name,
-          alertType: "DEVICE_OFFLINE",
-          severity,
-          message,
-          suggestion,
-        });
-      } catch (err) {
-        console.warn("[cron/daily] device-offline notification failed:", err);
+      const recipientMap = new Map<string, (typeof assignments)[number]["student"]>();
+      for (const a of assignments) {
+        recipientMap.set(a.student.id, a.student);
+        recipientMap.set(a.faculty.id, a.faculty);
       }
+
+      await sendAlertNotifications(alert, Array.from(recipientMap.values()), {
+        plotId: device.plotId,
+        plotName: device.plot.name,
+        alertType: "DEVICE_OFFLINE",
+        severity,
+        message,
+        suggestion,
+      });
+    } catch (err) {
+      console.warn("[cron/daily] device-offline notification failed:", err);
     }
   }
 
