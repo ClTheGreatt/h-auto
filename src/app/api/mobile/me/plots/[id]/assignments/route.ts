@@ -201,6 +201,7 @@ export async function POST(
         plotId,
         studentId,
         facultyId: plot.facultyId,
+        assignedById: user.id,
         notes: notes?.trim() || null,
         status: "ACTIVE",
       },

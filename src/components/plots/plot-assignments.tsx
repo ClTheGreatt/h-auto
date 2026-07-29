@@ -62,10 +62,13 @@ type Assignment = {
   assignedAt: Date;
   student: Student;
   // The plot's supervising adviser (Plot.facultyId, copied onto every
-  // assignment row for this plot) — NOT who performed the assign action.
-  // PlotAssignment has no assignedById field, so this must never be labeled
-  // "Assigned by".
+  // assignment row for this plot) — identical across every row, so it's
+  // rendered once in the card header, not per row.
   faculty: { firstName: string; lastName: string; position: string | null };
+  // Who actually clicked "Assign" — may be an admin, a super admin, or the
+  // adviser themselves. Null for rows created before this column existed;
+  // never fall back to `faculty` in that case, that was the original bug.
+  assignedBy: { firstName: string; lastName: string } | null;
 };
 
 export function PlotAssignments({
@@ -133,6 +136,12 @@ export function PlotAssignments({
               ? "No one is assigned yet."
               : `${assignments.length} student${assignments.length === 1 ? "" : "s"} monitoring this plot.`}
           </p>
+          {assignments.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Adviser: {assignments[0].faculty.firstName} {assignments[0].faculty.lastName}
+              {assignments[0].faculty.position && ` · ${assignments[0].faculty.position}`}
+            </p>
+          )}
         </div>
         {canManage && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -238,11 +247,9 @@ export function PlotAssignments({
                     </div>
                   )}
                   <div className="text-xs text-gray-400 mt-1">
-                    <div>
-                      Adviser: {a.faculty.firstName} {a.faculty.lastName}
-                    </div>
-                    {a.faculty.position && <div>{a.faculty.position}</div>}
-                    <div>Assigned {formatDate(a.assignedAt)}</div>
+                    {a.assignedBy
+                      ? `Assigned by ${a.assignedBy.firstName} ${a.assignedBy.lastName} · ${formatDate(a.assignedAt)}`
+                      : `Assigned ${formatDate(a.assignedAt)}`}
                   </div>
                 </div>
                 {canManage && (

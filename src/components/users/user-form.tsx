@@ -218,14 +218,19 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
       const result = await createUser(values as CreateUserInput);
       setSubmitting(false);
 
-      // Try server fieldErrors first (Zod validation that escaped client)
-      if (mapServerErrorsToForm(form, result)) {
-        toast.error(result.error ?? "Please fix the errors below");
-        return;
-      }
+      // "error" in result narrows first — mapServerErrorsToForm's
+      // ServerResult param has only optional properties, and TypeScript
+      // rejects passing the success branch (`{success,id,tempPassword}`,
+      // sharing zero property names with `{error?,fieldErrors?}`) as a
+      // "weak type" mismatch unless we've already excluded it here.
+      if ("error" in result) {
+        // Try server fieldErrors first (Zod validation that escaped client)
+        if (mapServerErrorsToForm(form, result)) {
+          toast.error(result.error ?? "Please fix the errors below");
+          return;
+        }
 
-      // Fall back to keyword mapping for friendly Prisma errors
-      if (result.error) {
+        // Fall back to keyword mapping for friendly Prisma errors
         const errorMsg = result.error.toLowerCase();
         if (errorMsg.includes("email")) {
           form.setError("email", { message: result.error });
@@ -239,14 +244,10 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
       }
 
       toast.success("User created");
-      // typeof narrowing (not "in") — createUser's inferred return type
-      // pads every error branch with `id?: undefined`/`tempPassword?:
-      // undefined` siblings, which keeps "in" checks from ever excluding
-      // them; a typeof check on the value itself narrows cleanly instead.
-      if (
-        typeof result.id === "string" &&
-        typeof result.tempPassword === "string"
-      ) {
+      // createUser() now has an explicit return type (CreateUserResult in
+      // src/actions/users.ts) instead of an inferred one, so a plain "in"
+      // check narrows cleanly — no typeof workaround needed anymore.
+      if ("success" in result) {
         setCreatedUser({ id: result.id, tempPassword: result.tempPassword });
       }
       return;

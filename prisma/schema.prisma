@@ -160,6 +160,7 @@ model User {
 
   facultyAssignments  PlotAssignment[]    @relation("FacultyAssignments")
   studentAssignments  PlotAssignment[]    @relation("StudentAssignments")
+  createdAssignments  PlotAssignment[]    @relation("AssignmentCreator")
   advisedPlots        Plot[]              @relation("PlotAdviser")
   advisories          FacultySectionAdvisory[] @relation("FacultyAdvisories")
   growthLogs          GrowthLog[]
@@ -282,18 +283,26 @@ model Plot {
 }
 
 model PlotAssignment {
-  id         String           @id @default(cuid())
-  plotId     String
-  facultyId  String
-  studentId  String
-  assignedAt DateTime         @default(now())
-  endedAt    DateTime?
-  status     AssignmentStatus @default(ACTIVE)
-  notes      String?
+  id           String           @id @default(cuid())
+  plotId       String
+  facultyId    String
+  studentId    String
+  assignedAt   DateTime         @default(now())
+  endedAt      DateTime?
+  status       AssignmentStatus @default(ACTIVE)
+  notes        String?
+  // Who clicked "Assign" — an admin, a super admin, or the adviser
+  // themselves. Distinct from facultyId, which is always the plot's
+  // adviser regardless of who performed the action. Nullable/SetNull on
+  // purpose: existing rows predate this column (never backfilled with a
+  // guess), and deleting a user must not block or cascade-delete
+  // historical assignments.
+  assignedById String?
 
-  plot    Plot @relation(fields: [plotId], references: [id], onDelete: Cascade)
-  faculty User @relation("FacultyAssignments", fields: [facultyId], references: [id])
-  student User @relation("StudentAssignments", fields: [studentId], references: [id])
+  plot       Plot  @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  faculty    User  @relation("FacultyAssignments", fields: [facultyId], references: [id])
+  student    User  @relation("StudentAssignments", fields: [studentId], references: [id])
+  assignedBy User? @relation("AssignmentCreator", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@index([plotId])
   @@index([facultyId])

@@ -65,6 +65,7 @@ export async function assignStudent(
       plotId,
       studentId,
       facultyId: plot.facultyId,
+      assignedById: session.user.id,
       notes: notes || null,
       status: "ACTIVE",
     },

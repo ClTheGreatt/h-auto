@@ -109,6 +109,7 @@ export default async function PlotDetailPage({
             },
           },
           faculty: { select: { firstName: true, lastName: true, position: true } },
+          assignedBy: { select: { firstName: true, lastName: true } },
         },
       },
     },

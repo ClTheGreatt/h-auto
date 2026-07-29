@@ -55,7 +55,18 @@ function handlePrismaError(error: unknown): { error: string } | null {
   return null;
 }
 
-export async function createUser(input: CreateUserInput) {
+// Explicit return type — without it, TS infers a union from this function's
+// many distinct `return {error:...}` object literals, and its "pad every
+// sibling member with `id?: undefined`/`tempPassword?: undefined`" behavior
+// turned out to be inconsistent across members (some got padded, some
+// didn't), breaking property access in every caller unpredictably. An
+// explicit, unpadded union makes "in"-based narrowing the correct and only
+// way to access these fields — see user-form.tsx.
+type CreateUserResult =
+  | { error: string; fieldErrors?: Record<string, string[] | undefined> }
+  | { success: true; id: string; tempPassword: string };
+
+export async function createUser(input: CreateUserInput): Promise<CreateUserResult> {
   const session = await requireAdmin();
 
   const schema = pickCreateSchema(input?.role);
