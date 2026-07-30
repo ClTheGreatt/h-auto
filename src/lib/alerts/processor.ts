@@ -1,4 +1,4 @@
-import type { AlertSeverity } from "@prisma/client";
+import type { AlertSeverity, AlertType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/sms/semaphore";
 import { sendEmail } from "@/lib/email/send-email";
@@ -9,7 +9,10 @@ import {
 } from "./threshold-checker";
 import { isWithinLightEvaluationWindow } from "./light-evaluation";
 import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
-import { createOpenAlertIfAbsent } from "./open-alert";
+import {
+  createOpenAlertIfAbsent,
+  refreshOpenThresholdAlert,
+} from "./open-alert";
 import {
   getEligibleAlertRecipients,
   type AlertNotificationRecipient,
@@ -70,7 +73,20 @@ export async function processSensorReading(readingId: string) {
         suggestionSteps: suggestion?.steps ?? [],
       },
     });
-    if (!created) continue;
+    if (!created) {
+      await refreshOpenThresholdAlert({
+        alertId: alert.id,
+        plotId: reading.plotId,
+        type: v.type,
+        incomingReadingId: reading.id,
+        incomingRecordedAt: reading.recordedAt,
+        severity: v.severity,
+        message: v.message,
+        suggestionTitle: suggestion?.title ?? null,
+        suggestionSteps: suggestion?.steps ?? [],
+      });
+      continue;
+    }
 
     const recipients = await getEligibleAlertRecipients(reading.plotId);
     await sendAlertNotifications(alert, recipients, {
@@ -91,7 +107,9 @@ export async function processSensorReading(readingId: string) {
     reading,
     thresholdEvaluationPolicy
   );
-  const stillViolatingTypes = new Set(violations.map((v) => v.type));
+  const stillViolatingTypes = new Set<AlertType>(
+    violations.map((v) => v.type)
+  );
   for (const alert of activeAlerts) {
     if (
       evaluatedAlertTypes.has(alert.type) &&

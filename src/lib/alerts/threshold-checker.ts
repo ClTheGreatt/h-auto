@@ -1,7 +1,9 @@
 import type { AlertSeverity, AlertType, CropStage, SensorReading } from "@prisma/client";
 
+export type ThresholdAlertType = Exclude<AlertType, "DEVICE_OFFLINE">;
+
 export type Violation = {
-  type: AlertType;
+  type: ThresholdAlertType;
   severity: AlertSeverity;
   message: string;
   field: string;
@@ -14,8 +16,8 @@ type Check = {
   field: keyof SensorReading;
   minField: keyof CropStage;
   maxField: keyof CropStage;
-  lowType: AlertType;
-  highType: AlertType;
+  lowType: ThresholdAlertType;
+  highType: ThresholdAlertType;
   label: string;
   unit: string;
 };
