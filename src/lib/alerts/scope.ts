@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PlotStatus, Prisma, UserRole } from "@prisma/client";
+import { ACTIVE_MONITORING_PLOT_STATUSES } from "@/lib/utils/device-status";
 
 export type AlertScopeActor = {
   role: UserRole;
@@ -8,9 +9,7 @@ export type AlertScopeActor = {
 };
 
 export const OPERATIONAL_PLOT_STATUSES: PlotStatus[] = [
-  "PLANTED",
-  "GROWING",
-  "READY_FOR_HARVEST",
+  ...ACTIVE_MONITORING_PLOT_STATUSES,
 ];
 
 function buildRolePlotWhere({

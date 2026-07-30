@@ -5,6 +5,7 @@ import {
   type Alert,
   type AlertSeverity,
   type AlertType,
+  type PrismaClient,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ThresholdAlertType } from "./threshold-checker";
@@ -29,16 +30,20 @@ export type RefreshOpenThresholdAlertResult = {
   updated: boolean;
 };
 
+export type OpenAlertPrismaClient = Pick<PrismaClient, "alert">;
+
 export async function createOpenAlertIfAbsent({
   plotId,
   type,
   data,
+  client = prisma,
 }: {
   plotId: string;
   type: AlertType;
   data: OpenAlertCreateData;
+  client?: OpenAlertPrismaClient;
 }): Promise<OpenAlertCreateResult> {
-  const existing = await prisma.alert.findFirst({
+  const existing = await client.alert.findFirst({
     where: { plotId, type, resolved: false },
   });
   if (existing) {
@@ -46,7 +51,7 @@ export async function createOpenAlertIfAbsent({
   }
 
   try {
-    const alert = await prisma.alert.create({
+    const alert = await client.alert.create({
       data: {
         ...data,
         plotId,
@@ -63,7 +68,7 @@ export async function createOpenAlertIfAbsent({
       throw error;
     }
 
-    const winner = await prisma.alert.findFirst({
+    const winner = await client.alert.findFirst({
       where: { plotId, type, resolved: false },
     });
     if (!winner) {

@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { buildAlertSuggestion, type AlertSuggestion } from "@/lib/alerts/suggestions";
-import { sendAlertNotifications } from "@/lib/alerts/processor";
-import { createOpenAlertIfAbsent } from "@/lib/alerts/open-alert";
-import { getEligibleAlertRecipients } from "@/lib/alerts/recipients";
-import { DEVICE_OFFLINE_THRESHOLD_MS } from "@/lib/utils/device-status";
-
-// Offline for longer than this bumps the alert from WARNING to CRITICAL
-const CRITICAL_OFFLINE_MINUTES = 120;
-
-function formatElapsed(ms: number): string {
-  const minutes = Math.round(ms / (60 * 1000));
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-  const hours = Math.round(minutes / 60);
-  return `${hours} hour${hours === 1 ? "" : "s"}`;
-}
 
 export async function GET(req: NextRequest) {
   // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" on scheduled invocations.
@@ -28,8 +13,6 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const result = {
     stagesAdvanced: 0,
-    devicesMarkedOffline: 0,
-    offlineAlertsCreated: 0,
   };
 
   // ===== #5 Auto growth-stage progression =====
@@ -72,77 +55,6 @@ export async function GET(req: NextRequest) {
     if (Object.keys(data).length > 0) {
       await prisma.plot.update({ where: { id: plot.id }, data });
       if (data.currentStageId) result.stagesAdvanced++;
-    }
-  }
-
-  // ===== #6 Device offline detection =====
-  const cutoff = new Date(now.getTime() - DEVICE_OFFLINE_THRESHOLD_MS);
-  const staleDevices = await prisma.device.findMany({
-    where: {
-      status: "ONLINE",
-      OR: [{ lastSeenAt: null }, { lastSeenAt: { lte: cutoff } }],
-    },
-    select: {
-      id: true,
-      deviceCode: true,
-      plotId: true,
-      lastSeenAt: true,
-      plot: { select: { name: true } },
-    },
-  });
-
-  for (const device of staleDevices) {
-    await prisma.device.update({
-      where: { id: device.id },
-      data: { status: "OFFLINE" },
-    });
-    result.devicesMarkedOffline++;
-
-    let suggestion: AlertSuggestion | null = null;
-    try {
-      suggestion = buildAlertSuggestion({ type: "DEVICE_OFFLINE" });
-    } catch (err) {
-      console.warn("[cron/daily] suggestion builder failed:", err);
-    }
-
-    const staleDurationMs = device.lastSeenAt
-      ? now.getTime() - device.lastSeenAt.getTime()
-      : Infinity;
-    const severity =
-      staleDurationMs > CRITICAL_OFFLINE_MINUTES * 60 * 1000
-        ? "CRITICAL"
-        : "WARNING";
-    const elapsedPhrase = device.lastSeenAt
-      ? `for ${formatElapsed(staleDurationMs)}`
-      : "since it was registered";
-    const message = `Device ${device.deviceCode} has not reported readings ${elapsedPhrase}. Check that the device has power, is within WiFi range, and the WiFi network is 2.4GHz.`;
-
-    const { alert, created } = await createOpenAlertIfAbsent({
-      plotId: device.plotId,
-      type: "DEVICE_OFFLINE",
-      data: {
-        severity,
-        message,
-        suggestionTitle: suggestion?.title ?? null,
-        suggestionSteps: suggestion?.steps ?? [],
-      },
-    });
-    if (!created) continue;
-
-    result.offlineAlertsCreated++;
-
-    try {
-      const recipients = await getEligibleAlertRecipients(device.plotId);
-      await sendAlertNotifications(alert, recipients, {
-        plotId: device.plotId,
-        plotName: device.plot.name,
-        alertType: "DEVICE_OFFLINE",
-        severity,
-        message,
-        suggestion,
-      });
-    } catch (err) {
-      console.warn("[cron/daily] device-offline notification failed:", err);
     }
   }
 

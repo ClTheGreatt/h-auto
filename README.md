@@ -104,6 +104,26 @@ Required in `.env`:
 
 See `.env.example` for the full template.
 
+### Production Scheduling
+
+The Vercel Hobby plan keeps the existing daily cron for growth-stage
+progression, but it cannot run the frequent device-offline schedule. A GitHub
+Actions workflow calls the focused offline-device endpoint at minutes 7, 22,
+37, and 52 of each hour. Scheduled workflow execution is best effort and may
+start late.
+
+Required configuration:
+
+- Vercel environment variable `CRON_SECRET` must remain configured.
+- GitHub Actions repository variable `H_AUTO_PRODUCTION_URL` must be the
+  production HTTPS base URL without a trailing slash.
+- GitHub Actions repository secret `H_AUTO_CRON_SECRET` must contain the same
+  value as Vercel `CRON_SECRET`.
+
+The workflow's `workflow_dispatch` trigger is available for controlled manual
+verification. Never put the production URL or cron secret directly in the
+workflow file.
+
 ### Seed Data
 
 The seed creates these test accounts:

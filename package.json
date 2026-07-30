@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:device-offline": "tsx --test src/lib/alerts/device-offline.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

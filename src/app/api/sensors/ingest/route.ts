@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sensorReadingSchema } from "@/lib/validations/device";
 import { hashApiKey } from "@/lib/devices/hash-key";
+import { resolveDeviceOfflineForHeartbeat } from "@/lib/alerts/device-offline";
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get("x-api-key");
@@ -67,29 +68,43 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const reading = await prisma.sensorReading.create({
-    data: {
-      deviceId: device.id,
-      plotId: device.plotId,
-      soilMoisture: parsed.data.soilMoisture ?? null,
-      temperature: parsed.data.temperature ?? null,
-      humidity: parsed.data.humidity ?? null,
-      lightIntensity: parsed.data.lightIntensity ?? null,
-      nitrogen: parsed.data.nitrogen ?? null,
-      phosphorus: parsed.data.phosphorus ?? null,
-      potassium: parsed.data.potassium ?? null,
-    },
-  });
+  const acceptedAt = new Date();
+  const reading = await prisma.$transaction(async (tx) => {
+    const created = await tx.sensorReading.create({
+      data: {
+        deviceId: device.id,
+        plotId: device.plotId,
+        recordedAt: acceptedAt,
+        soilMoisture: parsed.data.soilMoisture ?? null,
+        temperature: parsed.data.temperature ?? null,
+        humidity: parsed.data.humidity ?? null,
+        lightIntensity: parsed.data.lightIntensity ?? null,
+        nitrogen: parsed.data.nitrogen ?? null,
+        phosphorus: parsed.data.phosphorus ?? null,
+        potassium: parsed.data.potassium ?? null,
+      },
+    });
 
-  await prisma.device.update({
-    where: { id: device.id },
-    data: { status: "ONLINE", lastSeenAt: new Date() },
+    await tx.device.update({
+      where: { id: device.id },
+      data: { status: "ONLINE", lastSeenAt: acceptedAt },
+    });
+
+    await resolveDeviceOfflineForHeartbeat({
+      plotId: device.plotId,
+      resolvedAt: acceptedAt,
+      updateMany: (update) => tx.alert.updateMany(update),
+    });
+
+    return created;
   });
 
   after(async () => {
     try {
       const { processSensorReading } = await import("@/lib/alerts/processor");
-      await processSensorReading(reading.id);
+      await processSensorReading(reading.id, {
+        offlineRecoveryHandled: true,
+      });
     } catch (err) {
       console.error(
         "[sensor ingest] Alert processing failed:",

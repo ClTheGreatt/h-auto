@@ -1,6 +1,11 @@
 export const EXPECTED_REPORTING_INTERVAL_MS = 5 * 60 * 1000;
 export const DEVICE_STALE_THRESHOLD_MS = 15 * 60 * 1000;
 export const DEVICE_OFFLINE_THRESHOLD_MS = 30 * 60 * 1000;
+export const ACTIVE_MONITORING_PLOT_STATUSES = [
+  "PLANTED",
+  "GROWING",
+  "READY_FOR_HARVEST",
+] as const;
 
 export type DeviceFreshnessState =
   | "FRESH"

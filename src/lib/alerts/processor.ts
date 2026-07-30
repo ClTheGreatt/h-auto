@@ -18,7 +18,14 @@ import {
   type AlertNotificationRecipient,
 } from "./recipients";
 
-export async function processSensorReading(readingId: string) {
+export async function processSensorReading(
+  readingId: string,
+  {
+    offlineRecoveryHandled = false,
+  }: {
+    offlineRecoveryHandled?: boolean;
+  } = {}
+) {
   const reading = await prisma.sensorReading.findUnique({
     where: { id: readingId },
     include: {
@@ -32,11 +39,18 @@ export async function processSensorReading(readingId: string) {
 
   if (!reading) return;
 
-  // A reading arrived → the device is alive, so clear any open offline alert
-  await prisma.alert.updateMany({
-    where: { plotId: reading.plotId, type: "DEVICE_OFFLINE", resolved: false },
-    data: { resolved: true, resolvedAt: new Date() },
-  });
+  // Normal sensor ingestion resolves this synchronously before responding.
+  // Keep this idempotent fallback for other reading producers.
+  if (!offlineRecoveryHandled) {
+    await prisma.alert.updateMany({
+      where: {
+        plotId: reading.plotId,
+        type: "DEVICE_OFFLINE",
+        resolved: false,
+      },
+      data: { resolved: true, resolvedAt: new Date() },
+    });
+  }
 
   if (!reading.plot.currentStage) return;
 
@@ -125,7 +139,7 @@ export async function processSensorReading(readingId: string) {
 
 // Sends the 4-channel notification set (IN_APP, SMS, EMAIL, PUSH) for one
 // alert to a list of recipients. Shared by processSensorReading (threshold
-// violations) and the daily cron's device-offline detection.
+// violations) and the focused device-offline scan.
 export async function sendAlertNotifications(
   alert: { id: string },
   recipients: AlertNotificationRecipient[],
