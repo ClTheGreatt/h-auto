@@ -1,3 +1,5 @@
+import { getRollingRange } from "@/lib/analytics/manila-dates";
+
 export type TimeRange = "24h" | "7d" | "30d" | "all";
 
 export const TIME_RANGES: { value: TimeRange; label: string }[] = [
@@ -7,18 +9,11 @@ export const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: "all", label: "All time" },
 ];
 
-export function getDateFromRange(range: TimeRange): Date | null {
-  const now = new Date();
-  switch (range) {
-    case "24h":
-      return new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    case "7d":
-      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    case "30d":
-      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    case "all":
-      return null;
-  }
+export function getDateFromRange(
+  range: TimeRange,
+  now: Date = new Date()
+): Date | null {
+  return getRollingRange(range, now)?.gte ?? null;
 }
 
 export function parseRange(raw: string | undefined): TimeRange {

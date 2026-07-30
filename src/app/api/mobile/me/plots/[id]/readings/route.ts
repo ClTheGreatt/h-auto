@@ -5,9 +5,12 @@ import {
   buildDirectPlotAccessWhere,
   isValidPlotId,
 } from "@/lib/auth/plot-access";
+import {
+  getAnalyticsDateFilter,
+  parseApiMonthValues,
+} from "@/lib/analytics/manila-dates";
 
 const LIMIT = 50;
-const DAY = 24 * 60 * 60 * 1000;
 
 export async function GET(
   req: NextRequest,
@@ -26,8 +29,13 @@ export async function GET(
   const sp = req.nextUrl.searchParams;
   const cursor = sp.get("cursor");
   const order: "asc" | "desc" = sp.get("order") === "asc" ? "asc" : "desc";
-  const monthParam = sp.get("month");
-  const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null;
+  const monthValues = sp.getAll("month");
+  const monthResult = parseApiMonthValues(monthValues);
+  if (monthResult.kind === "invalid") {
+    return NextResponse.json({ error: "Invalid month" }, { status: 400 });
+  }
+  const parsedMonth =
+    monthResult.kind === "valid" ? monthResult.month : null;
   const range = sp.get("range");
 
   const plot = await prisma.plot.findFirst({
@@ -38,19 +46,11 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let gte: Date | undefined;
-  let lt: Date | undefined;
-  if (month) {
-    const [y, m] = month.split("-").map(Number);
-    gte = new Date(Date.UTC(y, m - 1, 1));
-    lt = new Date(Date.UTC(y, m, 1));
-  } else if (range === "7d") {
-    gte = new Date(Date.now() - 7 * DAY);
-  } else if (range === "30d") {
-    gte = new Date(Date.now() - 30 * DAY);
-  }
   const recordedAt =
-    gte || lt ? { ...(gte && { gte }), ...(lt && { lt }) } : undefined;
+    parsedMonth || range === "7d" || range === "30d"
+      ? getAnalyticsDateFilter(parsedMonth, range === "30d" ? "30d" : "7d") ??
+        undefined
+      : undefined;
 
   const rows = await prisma.sensorReading.findMany({
     where: { plotId: id, ...(recordedAt && { recordedAt }) },

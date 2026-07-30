@@ -13,6 +13,7 @@ import {
   fetchStudentActivityData,
   buildReportPlotWhere,
 } from "@/lib/reports/data-fetchers";
+import { getManilaDateKey } from "@/lib/analytics/manila-dates";
 import {
   renderSensorReadingsPDF,
   renderPlotPerformancePDF,
@@ -116,7 +117,7 @@ export async function GET(
     let buffer: Buffer;
     let mimeType: string;
     let filename: string;
-    const timestamp = new Date().toISOString().split("T")[0];
+    const timestamp = getManilaDateKey(new Date());
 
     switch (type) {
       case "sensor-readings": {

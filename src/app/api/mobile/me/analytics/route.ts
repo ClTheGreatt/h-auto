@@ -3,11 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 import { resolveMobilePlotSelection } from "@/lib/analytics/mobile-plot-selection";
+import {
+  DAY_MS,
+  HOUR_MS,
+  MANILA_TIME_ZONE,
+  getAnalyticsDateFilter,
+  getAnalyticsBucketStart,
+  listAvailableManilaMonths,
+  parseApiMonthValues,
+} from "@/lib/analytics/manila-dates";
 
 type Range = "24h" | "7d" | "30d" | "all";
-
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -21,8 +27,14 @@ export async function GET(req: NextRequest) {
     const range: Range =
       rp === "24h" || rp === "30d" || rp === "all" ? rp : "7d";
     const plotIdValues = sp.getAll("plotId");
-    const monthParam = sp.get("month");
-    const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null;
+    const monthValues = sp.getAll("month");
+    const monthResult = parseApiMonthValues(monthValues);
+    if (monthResult.kind === "invalid") {
+      return NextResponse.json({ error: "Invalid month" }, { status: 400 });
+    }
+    const parsedMonth =
+      monthResult.kind === "valid" ? monthResult.month : null;
+    const month = parsedMonth?.value ?? null;
 
     const selection = await resolveMobilePlotSelection(
       plotIdValues,
@@ -64,20 +76,17 @@ export async function GET(req: NextRequest) {
     // Time window + bucket size
     let since: Date | null = null;
     let until: Date | null = null;
-    let bucketMs = DAY;
+    let bucketMs = DAY_MS;
 
-    if (month) {
-      const [y, m] = month.split("-").map(Number);
-      since = new Date(Date.UTC(y, m - 1, 1));
-      until = new Date(Date.UTC(y, m, 1));
-      bucketMs = DAY; // daily within the month
+    const dateFilter = getAnalyticsDateFilter(parsedMonth, range);
+    if (dateFilter) {
+      since = dateFilter.gte;
+      until = "lt" in dateFilter ? dateFilter.lt : null;
+    }
+    if (parsedMonth) {
+      bucketMs = DAY_MS; // daily within the month
     } else if (range === "24h") {
-      since = new Date(Date.now() - DAY);
-      bucketMs = HOUR; // hourly — shows the time of day
-    } else if (range === "7d") {
-      since = new Date(Date.now() - 7 * DAY);
-    } else if (range === "30d") {
-      since = new Date(Date.now() - 30 * DAY);
+      bucketMs = HOUR_MS; // hourly — shows the time of day
     } // all -> since null, daily
 
     const win = (() => {
@@ -177,15 +186,15 @@ export async function GET(req: NextRequest) {
 
 function labelFor(time: number, bucketMs: number) {
   const d = new Date(time);
-  return bucketMs < DAY
+  return bucketMs < DAY_MS
     ? d.toLocaleTimeString("en-US", {
         hour: "numeric",
-        timeZone: "Asia/Manila",
+        timeZone: MANILA_TIME_ZONE,
       }) // "5 PM" (Manila)
     : d.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
-        timeZone: "Asia/Manila",
+        timeZone: MANILA_TIME_ZONE,
       }); // "May 16"
 }
 
@@ -213,18 +222,7 @@ async function getAvailableMonths(plotIds: string[]): Promise<string[]> {
     .map((d) => d.getTime());
   if (times.length === 0) return [];
 
-  const earliest = new Date(Math.min(...times));
-  const now = new Date();
-  const cur = new Date(Date.UTC(earliest.getUTCFullYear(), earliest.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const months: string[] = [];
-  while (cur <= end) {
-    months.push(
-      `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, "0")}`
-    );
-    cur.setUTCMonth(cur.getUTCMonth() + 1);
-  }
-  return months.reverse(); // newest first
+  return listAvailableManilaMonths(new Date(Math.min(...times)));
 }
 
 function aggregateReadings(
@@ -247,7 +245,7 @@ function aggregateReadings(
   };
   const buckets = new Map<number, B>();
   for (const r of readings) {
-    const key = Math.floor(new Date(r.recordedAt).getTime() / bucketMs) * bucketMs;
+    const key = getAnalyticsBucketStart(r.recordedAt, bucketMs);
     if (!buckets.has(key)) {
       buckets.set(key, {
         time: key, mS: 0, mC: 0, tS: 0, tC: 0, hS: 0, hC: 0,
@@ -281,7 +279,7 @@ function aggregateReadings(
 function aggregateCounts(dates: Date[], bucketMs: number) {
   const buckets = new Map<number, number>();
   for (const d of dates) {
-    const key = Math.floor(new Date(d).getTime() / bucketMs) * bucketMs;
+    const key = getAnalyticsBucketStart(d, bucketMs);
     buckets.set(key, (buckets.get(key) ?? 0) + 1);
   }
   return Array.from(buckets.entries())
@@ -296,7 +294,7 @@ function aggregateCounts(dates: Date[], bucketMs: number) {
 function aggregateAlerts(alerts: { createdAt: Date; severity: string }[], bucketMs: number) {
   const buckets = new Map<number, { critical: number; warning: number; info: number }>();
   for (const a of alerts) {
-    const key = Math.floor(new Date(a.createdAt).getTime() / bucketMs) * bucketMs;
+    const key = getAnalyticsBucketStart(a.createdAt, bucketMs);
     if (!buckets.has(key)) buckets.set(key, { critical: 0, warning: 0, info: 0 });
     const b = buckets.get(key)!;
     if (a.severity === "CRITICAL") b.critical++;

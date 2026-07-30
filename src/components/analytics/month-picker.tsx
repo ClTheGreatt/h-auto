@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { getManilaMonthKey } from "@/lib/analytics/manila-dates";
 
 const MONTH_LABELS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -11,7 +12,7 @@ const MONTH_LABELS = [
 
 // Module-level (labas sa render) para iwas React Compiler purity rule.
 // Fallback lang ito kapag wala pang anumang datos.
-const THIS_YEAR = new Date().getUTCFullYear();
+const THIS_YEAR = Number(getManilaMonthKey(new Date()).slice(0, 4));
 
 function formatMonth(ym: string) {
   const [y, m] = ym.split("-").map(Number);

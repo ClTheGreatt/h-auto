@@ -5,6 +5,7 @@ import {
   buildAccessiblePlotWhere,
   buildOperationalAlertWhere,
 } from "@/lib/alerts/scope";
+import { getCurrentManilaDayRange } from "@/lib/analytics/manila-dates";
 
 const SEVERITY_ORDER: Record<string, number> = {
   CRITICAL: 0,
@@ -31,8 +32,7 @@ export async function GET(req: NextRequest) {
     });
     const plotIds = accessiblePlots.map((p) => p.id);
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const today = getCurrentManilaDayRange();
 
     const [openAlertsCount, myObservationsCount, todaysObservationsCount, allUrgentAlerts, recentActivity] =
       await Promise.all([
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
         prisma.growthLog.count({
           where: {
             plotId: { in: plotIds },
-            createdAt: { gte: todayStart },
+            createdAt: today,
           },
         }),
         prisma.alert.findMany({

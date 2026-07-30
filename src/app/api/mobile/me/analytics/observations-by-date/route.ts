@@ -3,8 +3,10 @@ import { getMobileUser } from "@/lib/mobile-auth";
 import { findGrowthLogsInBucket } from "@/lib/analytics/observations-by-date";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import { parseOptionalPlotIdSearchParams } from "@/lib/auth/plot-id";
-
-const DAY = 24 * 60 * 60 * 1000;
+import {
+  DAY_MS,
+  MANILA_TIME_ZONE,
+} from "@/lib/analytics/manila-dates";
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -81,17 +83,17 @@ export async function GET(req: NextRequest) {
 
 function formatDayLabel(bucketStart: number, bucketMs: number) {
   const d = new Date(bucketStart);
-  if (bucketMs < DAY) {
+  if (bucketMs < DAY_MS) {
     return d.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       hour: "numeric",
-      timeZone: "Asia/Manila",
+      timeZone: MANILA_TIME_ZONE,
     }); // "Jul 6, 3 PM"
   }
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    timeZone: "Asia/Manila",
+    timeZone: MANILA_TIME_ZONE,
   }); // "Jul 6"
 }

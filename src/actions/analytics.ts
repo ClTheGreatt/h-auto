@@ -2,6 +2,7 @@
 
 import { requireAuth } from "@/lib/auth-helpers";
 import { findGrowthLogsInBucket } from "@/lib/analytics/observations-by-date";
+import { getManilaDateKey } from "@/lib/analytics/manila-dates";
 
 export async function getObservationsForDate(
   bucketStart: number,
@@ -19,13 +20,7 @@ export async function getObservationsForDate(
     plotId,
   });
 
-  // day string sa Asia/Manila para sa Monitoring drill-down link
-  const dayStr = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(bucketStart));
+  const dayStr = getManilaDateKey(bucketStart);
 
   return logs.map((l) => ({
     id: l.id,

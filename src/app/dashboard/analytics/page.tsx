@@ -19,16 +19,22 @@ import { AlertsOverTimeChart } from "@/components/analytics/alerts-over-time-cha
 import { SensorLineChart } from "@/components/analytics/sensor-line-chart";
 import { ObservationsChart } from "@/components/analytics/observations-chart";
 import { PlotFilter } from "@/components/analytics/plot-filter";
-import { getDateFromRange, parseRange } from "@/lib/analytics/time-range";
+import { parseRange } from "@/lib/analytics/time-range";
 import {
   calculateOptimalPercent,
   ALERT_TYPE_LABELS,
 } from "@/lib/analytics/aggregator";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
-
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * 60 * 60 * 1000;
+import {
+  DAY_MS,
+  HOUR_MS,
+  MANILA_TIME_ZONE,
+  getAnalyticsDateFilter,
+  getAnalyticsBucketStart,
+  listAvailableManilaMonths,
+  parseWebMonthParam,
+} from "@/lib/analytics/manila-dates";
 
 type RawReading = {
   recordedAt: Date;
@@ -51,45 +57,24 @@ type RawAlert = {
 function labelFor(time: number, bucketMs: number) {
   return new Date(time).toLocaleString(
     "en-US",
-    bucketMs < DAY
-      ? { hour: "numeric", hour12: true, timeZone: "Asia/Manila" }
-      : { month: "short", day: "numeric", timeZone: "Asia/Manila" }
+    bucketMs < DAY_MS
+      ? { hour: "numeric", hour12: true, timeZone: MANILA_TIME_ZONE }
+      : { month: "short", day: "numeric", timeZone: MANILA_TIME_ZONE }
   );
 }
 
 // Module-level (labas sa render) para hindi tumama ang React Compiler purity rule
 function pickBucketMs(month: string | null, since: Date | null): number {
-  if (month) return DAY;
+  if (month) return DAY_MS;
   if (since) {
-    const days = (Date.now() - since.getTime()) / DAY;
-    if (days < 2) return HOUR; // 24h view → hourly (hindi na maaapektuhan ng drift)
+    const days = (Date.now() - since.getTime()) / DAY_MS;
+    if (days < 2) return HOUR_MS; // 24h view → hourly (hindi na maaapektuhan ng drift)
   }
-  return DAY;
-}
-
-function listAvailableMonths(earliest: Date | null): string[] {
-  const months: string[] = [];
-  if (!earliest) return months;
-  const now = new Date();
-  let y = now.getUTCFullYear();
-  let m = now.getUTCMonth();
-  const sy = earliest.getUTCFullYear();
-  const sm = earliest.getUTCMonth();
-  while (y > sy || (y === sy && m >= sm)) {
-    months.push(`${y}-${String(m + 1).padStart(2, "0")}`);
-    m--;
-    if (m < 0) {
-      m = 11;
-      y--;
-    }
-  }
-  return months;
+  return DAY_MS;
 }
 
 function aggregateSensorReadings(readings: RawReading[], bucketSize: number) {
   if (readings.length === 0) return [];
-
-  const dayMs = 24 * 60 * 60 * 1000;
 
   type Bucket = {
     time: number;
@@ -106,7 +91,7 @@ function aggregateSensorReadings(readings: RawReading[], bucketSize: number) {
 
   for (const r of readings) {
     const time = new Date(r.recordedAt).getTime();
-    const bucket = Math.floor(time / bucketSize) * bucketSize;
+    const bucket = getAnalyticsBucketStart(time, bucketSize);
 
     if (!buckets.has(bucket)) {
       buckets.set(bucket, {
@@ -140,9 +125,9 @@ function aggregateSensorReadings(readings: RawReading[], bucketSize: number) {
       time: b.time,
       label: new Date(b.time).toLocaleString(
         "en-US",
-        bucketSize < dayMs
-          ? { hour: "numeric", hour12: true, timeZone: "Asia/Manila" }
-          : { month: "short", day: "numeric", timeZone: "Asia/Manila" }
+        bucketSize < DAY_MS
+          ? { hour: "numeric", hour12: true, timeZone: MANILA_TIME_ZONE }
+          : { month: "short", day: "numeric", timeZone: MANILA_TIME_ZONE }
       ),
       moisture: avg(b.moistureSum, b.moistureCount),
       temperature: avg(b.tempSum, b.tempCount),
@@ -163,7 +148,7 @@ function aggregateAlertsByDate(alerts: RawAlert[], bucketMs: number) {
   >();
 
   for (const a of alerts) {
-    const key = Math.floor(new Date(a.createdAt).getTime() / bucketMs) * bucketMs;
+    const key = getAnalyticsBucketStart(a.createdAt, bucketMs);
     if (!buckets.has(key)) {
       buckets.set(key, { date: key, critical: 0, warning: 0, info: 0 });
     }
@@ -191,7 +176,7 @@ function aggregateObservationsByDate(
 
   const buckets = new Map<number, { date: number; count: number }>();
   for (const l of logs) {
-    const key = Math.floor(new Date(l.createdAt).getTime() / bucketMs) * bucketMs;
+    const key = getAnalyticsBucketStart(l.createdAt, bucketMs);
     if (!buckets.has(key)) buckets.set(key, { date: key, count: 0 });
     buckets.get(key)!.count++;
   }
@@ -211,7 +196,7 @@ export default async function AnalyticsPage({
   searchParams: Promise<{
     range?: string;
     plotId?: string | string[];
-    month?: string;
+    month?: string | string[];
   }>;
 }) {
   const session = await requireAuth();
@@ -222,19 +207,16 @@ export default async function AnalyticsPage({
   if (parsedPlotId.kind === "invalid") notFound();
   const selectedPlotId =
     parsedPlotId.kind === "valid" ? parsedPlotId.plotId : undefined;
-  const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : null;
+  const monthResult = parseWebMonthParam(sp.month);
+  if (monthResult.kind === "invalid") notFound();
+  const parsedMonth =
+    monthResult.kind === "valid" ? monthResult.month : null;
+  const month = parsedMonth?.value ?? null;
 
   // Date window: month overrides range
-  let since: Date | null;
-  let until: Date | null;
-  if (month) {
-    const [y, m] = month.split("-").map(Number);
-    since = new Date(Date.UTC(y, m - 1, 1));
-    until = new Date(Date.UTC(y, m, 1));
-  } else {
-    since = getDateFromRange(range);
-    until = null;
-  }
+  const dateFilter = getAnalyticsDateFilter(parsedMonth, range);
+  const since = dateFilter?.gte ?? null;
+  const until = dateFilter && "lt" in dateFilter ? dateFilter.lt : null;
 
   const readingWindow =
     since && until
@@ -357,7 +339,7 @@ export default async function AnalyticsPage({
   const earliest = earliestDates.length
     ? new Date(Math.min(...earliestDates.map((d) => d.getTime())))
     : null;
-  const availableMonths = listAvailableMonths(earliest);
+  const availableMonths = listAvailableManilaMonths(earliest);
 
   const openAlerts = alerts.filter((a) => !a.resolved).length;
   const criticalAlerts = alerts.filter(

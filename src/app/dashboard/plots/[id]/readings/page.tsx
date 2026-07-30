@@ -8,12 +8,23 @@ import { requireAuth } from "@/lib/auth-helpers";
 import { ReadingsFilters } from "@/components/plots/readings-filters";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { findReadingHistoryPlot } from "@/lib/auth/plot-access";
+import {
+  MANILA_TIME_ZONE,
+  getAnalyticsDateFilter,
+  getManilaDateKey,
+  listAvailableManilaMonths,
+  parseWebMonthParam,
+  type ParsedYearMonth,
+} from "@/lib/analytics/manila-dates";
 
 const PAGE_SIZE = 50;
-const DAY = 24 * 60 * 60 * 1000;
-const TZ = "Asia/Manila";
 
-type SP = { range?: string; month?: string; order?: string; page?: string };
+type SP = {
+  range?: string;
+  month?: string | string[];
+  order?: string;
+  page?: string;
+};
 
 function fmt(v: number | null, suffix: string, digits = 0) {
   return v === null || v === undefined ? "—" : `${v.toFixed(digits)}${suffix}`;
@@ -32,7 +43,11 @@ export default async function PlotReadingsPage({
 
   const role = session.user.role;
   const order: "asc" | "desc" = sp.order === "asc" ? "asc" : "desc";
-  const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : null;
+  const monthResult = parseWebMonthParam(sp.month);
+  if (monthResult.kind === "invalid") notFound();
+  const parsedMonth =
+    monthResult.kind === "valid" ? monthResult.month : null;
+  const month = parsedMonth?.value ?? null;
   const range = sp.range === "7d" || sp.range === "30d" ? sp.range : null;
   const page = Math.max(1, Number(sp.page) || 1);
 
@@ -52,8 +67,8 @@ export default async function PlotReadingsPage({
   );
   if (!plot) notFound();
 
-// date window
-  const recordedAt = resolveWindow(month, range);
+  // date window
+  const recordedAt = resolveWindow(parsedMonth, range);
 
   const rows = await prisma.sensorReading.findMany({
     where: { plotId: id, ...(recordedAt && { recordedAt }) },
@@ -81,14 +96,16 @@ export default async function PlotReadingsPage({
     orderBy: { recordedAt: "asc" },
     select: { recordedAt: true },
   });
-const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
+  const availableMonths = listAvailableManilaMonths(
+    earliest?.recordedAt ?? null
+  );
 
   // group by day (Asia/Manila para tugma sa mobile)
   type Item = (typeof items)[number];
   const groups: { key: string; title: string; items: Item[] }[] = [];
   const byKey = new Map<string, { key: string; title: string; items: Item[] }>();
   for (const r of items) {
-    const key = r.recordedAt.toLocaleDateString("en-CA", { timeZone: TZ });
+    const key = getManilaDateKey(r.recordedAt);
     let g = byKey.get(key);
     if (!g) {
       g = {
@@ -98,7 +115,7 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
           year: "numeric",
           month: "short",
           day: "numeric",
-          timeZone: TZ,
+          timeZone: MANILA_TIME_ZONE,
         }),
         items: [],
       };
@@ -177,7 +194,7 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
                             {r.recordedAt.toLocaleTimeString("en-US", {
                               hour: "numeric",
                               minute: "2-digit",
-                              timeZone: TZ,
+                              timeZone: MANILA_TIME_ZONE,
                             })}
                           </td>
                           <td className="px-4 py-2">{fmt(r.soilMoisture, "%")}</td>
@@ -221,36 +238,15 @@ const availableMonths = listAvailableMonths(earliest?.recordedAt ?? null);
   );
 }
 
-function resolveWindow(month: string | null, range: string | null) {
-  let gte: Date | undefined;
-  let lt: Date | undefined;
+function resolveWindow(
+  month: ParsedYearMonth | null,
+  range: "7d" | "30d" | null
+) {
   if (month) {
-    const [y, m] = month.split("-").map(Number);
-    gte = new Date(Date.UTC(y, m - 1, 1));
-    lt = new Date(Date.UTC(y, m, 1));
-  } else if (range === "7d") {
-    gte = new Date(Date.now() - 7 * DAY);
-  } else if (range === "30d") {
-    gte = new Date(Date.now() - 30 * DAY);
+    return getAnalyticsDateFilter(month, "all") ?? undefined;
   }
-  return gte || lt ? { ...(gte && { gte }), ...(lt && { lt }) } : undefined;
-}
-
-function listAvailableMonths(earliest: Date | null): string[] {
-  const months: string[] = [];
-  if (!earliest) return months;
-  const now = new Date();
-  let y = now.getUTCFullYear();
-  let m = now.getUTCMonth();
-  const sy = earliest.getUTCFullYear();
-  const sm = earliest.getUTCMonth();
-  while (y > sy || (y === sy && m >= sm)) {
-    months.push(`${y}-${String(m + 1).padStart(2, "0")}`);
-    m--;
-    if (m < 0) {
-      m = 11;
-      y--;
-    }
+  if (range) {
+    return getAnalyticsDateFilter(null, range) ?? undefined;
   }
-  return months;
+  return undefined;
 }

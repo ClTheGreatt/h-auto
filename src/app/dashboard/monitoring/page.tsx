@@ -10,6 +10,11 @@ import { LogFeedItem } from "@/components/monitoring/log-feed-item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
+import {
+  MANILA_TIME_ZONE,
+  getManilaDayRange,
+  parseStrictManilaDateKey,
+} from "@/lib/analytics/manila-dates";
 
 const PAGE_SIZE = 10;
 
@@ -20,7 +25,7 @@ export default async function MonitoringPage({
     plotId?: string | string[];
     authorId?: string;
     page?: string;
-    date?: string;
+    date?: string | string[];
   }>;
 }) {
   const session = await requireAuth();
@@ -34,15 +39,14 @@ export default async function MonitoringPage({
   const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
 
   const selectedDate =
-    sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : undefined;
+    typeof sp.date === "string"
+      ? parseStrictManilaDateKey(sp.date) ?? undefined
+      : undefined;
+  if (sp.date !== undefined && selectedDate === undefined) notFound();
 
-  // Day window sa Asia/Manila (+08:00), converted to UTC boundaries
-  let dateWindow: { gte: Date; lt: Date } | undefined;
-  if (selectedDate) {
-    const start = new Date(`${selectedDate}T00:00:00+08:00`);
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    dateWindow = { gte: start, lt: end };
-  }
+  const dateWindow = selectedDate
+    ? getManilaDayRange(selectedDate) ?? undefined
+    : undefined;
 
   // Role-aware base filter. Archived plots (and their logs) are excluded
   // from this active-activity view.
@@ -181,8 +185,8 @@ export default async function MonitoringPage({
           )}
           {selectedDate && (
             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-              {new Date(`${selectedDate}T00:00:00+08:00`).toLocaleDateString("en-PH", {
-                timeZone: "Asia/Manila",
+              {dateWindow?.gte.toLocaleDateString("en-PH", {
+                timeZone: MANILA_TIME_ZONE,
                 month: "short",
                 day: "numeric",
                 year: "numeric",

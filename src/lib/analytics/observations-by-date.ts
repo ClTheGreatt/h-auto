@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { UserRole } from "@prisma/client";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
+import { getAnalyticsBucketRange } from "@/lib/analytics/manila-dates";
 
 export function plotScopeFilter(
   role: UserRole,
@@ -27,13 +28,11 @@ export async function findGrowthLogsInBucket(params: {
   plotId?: string;
 }) {
   const { role, userId, bucketStart, bucketMs, plotId } = params;
+  const bucketRange = getAnalyticsBucketRange(bucketStart, bucketMs);
 
   return prisma.growthLog.findMany({
     where: {
-      createdAt: {
-        gte: new Date(bucketStart),
-        lt: new Date(bucketStart + bucketMs),
-      },
+      createdAt: bucketRange,
       plot: plotScopeFilter(role, userId, plotId),
     },
     orderBy: { createdAt: "desc" },
