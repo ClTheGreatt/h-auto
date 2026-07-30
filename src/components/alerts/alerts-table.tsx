@@ -20,7 +20,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { resolveAlert } from "@/actions/alerts";
 import { timeAgo } from "@/lib/format-date";
-import type { AlertSeverity, AlertType, NotificationStatus } from "@prisma/client";
+import { formatNotificationSummary } from "@/lib/alerts/notification-summary";
+import type {
+  AlertSeverity,
+  AlertType,
+  NotificationChannel,
+  NotificationStatus,
+} from "@prisma/client";
 
 type AlertRow = {
   id: string;
@@ -35,6 +41,8 @@ type AlertRow = {
   plot: { id: string; name: string };
   notifications: {
     id: string;
+    userId: string;
+    channel: NotificationChannel;
     status: NotificationStatus;
     errorMessage: string | null;
     user: { firstName: string; lastName: string; phoneNumber: string | null };
@@ -116,15 +124,6 @@ function formatOpenDuration(ms: number): string {
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
   return remHours > 0 ? `open ${days}d ${remHours}h` : `open ${days}d`;
-}
-
-// Reuses the same aggregate sent/failed/total counts the old icon+number
-// display used (channel-agnostic — notifications include IN_APP/EMAIL/PUSH
-// alongside SMS) — this is a wording change only, not a recomputation.
-function notificationSummary(sent: number, failed: number, total: number): string {
-  if (total === 0) return "No recipients";
-  const base = `SMS delivered to ${sent} of ${total}`;
-  return failed > 0 ? `${base} · ${failed} failed` : base;
 }
 
 type AlertGroup = {
@@ -260,9 +259,6 @@ export function AlertsTable({
             <div className="divide-y">
               {group.alerts.map((alert) => {
                 const SeverityIcon = severityIcons[alert.severity];
-                const sent = alert.notifications.filter((n) => n.status === "SENT").length;
-                const failed = alert.notifications.filter((n) => n.status === "FAILED").length;
-                const total = alert.notifications.length;
                 const isExpanded = expanded === alert.id;
 
                 return (
@@ -342,7 +338,7 @@ export function AlertsTable({
                           )}
 
                           <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{notificationSummary(sent, failed, total)}</span>
+                            <span>{formatNotificationSummary(alert.notifications)}</span>
                             <button
                               type="button"
                               onClick={() => setExpanded(isExpanded ? null : alert.id)}
@@ -389,7 +385,7 @@ export function AlertsTable({
                             </div>
                             {alert.notifications.length === 0 ? (
                               <p className="text-xs text-muted-foreground">
-                                No recipients (no active assignments for this plot)
+                                No notification records were created
                               </p>
                             ) : (
                               <div className="space-y-1">
@@ -407,12 +403,23 @@ export function AlertsTable({
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs">
+                                        {n.channel.replace("_", " ")}
+                                      </Badge>
                                       {n.status === "SENT" && (
                                         <Badge
                                           variant="secondary"
                                           className="bg-success-bg text-success-text text-xs"
                                         >
                                           Sent
+                                        </Badge>
+                                      )}
+                                      {n.status === "DELIVERED" && (
+                                        <Badge
+                                          variant="secondary"
+                                          className="bg-success-bg text-success-text text-xs"
+                                        >
+                                          Delivered
                                         </Badge>
                                       )}
                                       {n.status === "FAILED" && (

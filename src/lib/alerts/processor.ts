@@ -10,14 +10,10 @@ import {
 import { isWithinLightEvaluationWindow } from "./light-evaluation";
 import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
 import { createOpenAlertIfAbsent } from "./open-alert";
-
-export type Recipient = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string | null;
-};
+import {
+  getEligibleAlertRecipients,
+  type AlertNotificationRecipient,
+} from "./recipients";
 
 export async function processSensorReading(readingId: string) {
   const reading = await prisma.sensorReading.findUnique({
@@ -26,10 +22,6 @@ export async function processSensorReading(readingId: string) {
       plot: {
         include: {
           currentStage: true,
-          assignments: {
-            where: { status: "ACTIVE" },
-            include: { student: true, faculty: true },
-          },
         },
       },
     },
@@ -80,14 +72,8 @@ export async function processSensorReading(readingId: string) {
     });
     if (!created) continue;
 
-    // Unique recipients (students + faculty from active assignments)
-    const recipientMap = new Map<string, Recipient>();
-    for (const a of reading.plot.assignments) {
-      recipientMap.set(a.student.id, a.student);
-      recipientMap.set(a.faculty.id, a.faculty);
-    }
-
-    await sendAlertNotifications(alert, Array.from(recipientMap.values()), {
+    const recipients = await getEligibleAlertRecipients(reading.plotId);
+    await sendAlertNotifications(alert, recipients, {
       plotId: reading.plotId,
       plotName: reading.plot.name,
       alertType: v.type,
@@ -124,7 +110,7 @@ export async function processSensorReading(readingId: string) {
 // violations) and the daily cron's device-offline detection.
 export async function sendAlertNotifications(
   alert: { id: string },
-  recipients: Recipient[],
+  recipients: AlertNotificationRecipient[],
   content: {
     plotId: string;
     plotName: string;
@@ -216,7 +202,7 @@ export async function sendAlertNotifications(
 
 // Simple alert email (best-effort)
 async function sendAlertEmail(
-  user: Recipient,
+  user: AlertNotificationRecipient,
   plotName: string,
   severity: string,
   message: string

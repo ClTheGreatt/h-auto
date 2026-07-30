@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { buildAlertSuggestion, type AlertSuggestion } from "@/lib/alerts/suggestions";
 import { sendAlertNotifications } from "@/lib/alerts/processor";
 import { createOpenAlertIfAbsent } from "@/lib/alerts/open-alert";
+import { getEligibleAlertRecipients } from "@/lib/alerts/recipients";
 import { DEVICE_OFFLINE_THRESHOLD_MS } from "@/lib/utils/device-status";
 
 // Offline for longer than this bumps the alert from WARNING to CRITICAL
@@ -131,17 +132,8 @@ export async function GET(req: NextRequest) {
     result.offlineAlertsCreated++;
 
     try {
-      const assignments = await prisma.plotAssignment.findMany({
-        where: { plotId: device.plotId, status: "ACTIVE" },
-        include: { student: true, faculty: true },
-      });
-      const recipientMap = new Map<string, (typeof assignments)[number]["student"]>();
-      for (const a of assignments) {
-        recipientMap.set(a.student.id, a.student);
-        recipientMap.set(a.faculty.id, a.faculty);
-      }
-
-      await sendAlertNotifications(alert, Array.from(recipientMap.values()), {
+      const recipients = await getEligibleAlertRecipients(device.plotId);
+      await sendAlertNotifications(alert, recipients, {
         plotId: device.plotId,
         plotName: device.plot.name,
         alertType: "DEVICE_OFFLINE",

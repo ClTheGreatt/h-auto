@@ -143,7 +143,12 @@ export default async function AlertsPage({
       include: {
         plot: { select: { id: true, name: true } },
         notifications: {
-          include: {
+          select: {
+            id: true,
+            userId: true,
+            channel: true,
+            status: true,
+            errorMessage: true,
             user: {
               select: {
                 firstName: true,
