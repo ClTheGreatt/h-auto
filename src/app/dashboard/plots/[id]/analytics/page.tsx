@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import {
   Droplets,
   Thermometer,
@@ -28,6 +28,7 @@ import {
   downsample,
   ALERT_TYPE_LABELS,
 } from "@/lib/analytics/aggregator";
+import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 
 export default async function PlotAnalyticsPage({
   params,
@@ -43,6 +44,9 @@ export default async function PlotAnalyticsPage({
   const since = getDateFromRange(range);
   const role = session.user.role;
 
+  const hasAccess = await assertCanAccessPlot(role, session.user.id, id);
+  if (!hasAccess) notFound();
+
   const plot = await prisma.plot.findUnique({
     where: { id },
     include: {
@@ -56,14 +60,6 @@ export default async function PlotAnalyticsPage({
   });
 
   if (!plot) notFound();
-
-  // Access control
-  if (role === "STUDENT_FARMER") {
-    const isAssigned = plot.assignments.some(
-      (a) => a.studentId === session.user.id
-    );
-    if (!isAssigned) redirect("/dashboard/plots");
-  }
 
   const readingsWhere = since
     ? { plotId: plot.id, recordedAt: { gte: since } }

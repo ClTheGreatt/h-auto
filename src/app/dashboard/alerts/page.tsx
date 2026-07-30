@@ -10,6 +10,12 @@ import { PaginationControls } from "@/components/ui/pagination-controls";
 import { SeverityFilter } from "@/components/alerts/severity-filter";
 import { AlertTypeFilter } from "@/components/alerts/alert-type-filter";
 import { AlertPlotFilter } from "@/components/alerts/alert-plot-filter";
+import {
+  buildAccessiblePlotWhere,
+  buildHistoricalAlertWhere,
+  buildOperationalAlertWhere,
+  OPERATIONAL_PLOT_STATUSES,
+} from "@/lib/alerts/scope";
 
 // Raised from 25: the alerts list is now grouped into plot cards (UI-4), and
 // a plot's alerts must never split across a page boundary. Combined with the
@@ -55,8 +61,10 @@ export default async function AlertsPage({
   const session = await requireAuth();
   const params = await searchParams;
   const role = session.user.role;
+  const actor = { role, userId: session.user.id };
+  const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
   const canResolve =
-    role === "SUPER_ADMIN" || role === "ADMIN" || role === "FACULTY";
+    isAdmin || role === "FACULTY";
 
   const showResolved = params.status === "resolved";
   const search = params.search?.trim() ?? "";
@@ -71,24 +79,7 @@ export default async function AlertsPage({
   const plotId = params.plotId;
   const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  // Role-based plot visibility
-  const roleFilter: Prisma.AlertWhereInput =
-    role === "STUDENT_FARMER"
-      ? {
-          plot: {
-            assignments: {
-              some: { studentId: session.user.id, status: "ACTIVE" as const },
-            },
-          },
-        }
-      : role === "FACULTY"
-      ? { plot: { facultyId: session.user.id } }
-      : {};
-
-  // Build filter
-  const where: Prisma.AlertWhereInput = {
-    ...roleFilter,
-    resolved: showResolved,
+  const additionalWhere: Prisma.AlertWhereInput = {
     ...(severity && { severity }),
     ...(type && { type }),
     ...(plotId && { plotId }),
@@ -100,25 +91,36 @@ export default async function AlertsPage({
     }),
   };
 
-  // Get plot list for filter dropdown (role-aware)
-  const plotWhere =
-    role === "STUDENT_FARMER"
-      ? {
-          assignments: {
-            some: { studentId: session.user.id, status: "ACTIVE" as const },
-          },
-        }
-      : role === "FACULTY"
-      ? { facultyId: session.user.id }
-      : {};
+  const where = showResolved
+    ? buildHistoricalAlertWhere(actor, {
+        includeArchivedForAdmins: true,
+        additionalWhere,
+      })
+    : buildOperationalAlertWhere(actor, additionalWhere);
 
-  // Counts for tabs (Open/Resolved) — use role filter only, not other filters
+  const openWhere = buildOperationalAlertWhere(actor);
+  const resolvedWhere = buildHistoricalAlertWhere(actor, {
+    includeArchivedForAdmins: true,
+  });
+
+  // Keep the plot dropdown within the same lifecycle and role scope as the
+  // selected tab.
+  const plotWhere = buildAccessiblePlotWhere(
+    actor,
+    showResolved
+      ? isAdmin
+        ? {}
+        : { status: { not: "ARCHIVED" } }
+      : { status: { in: OPERATIONAL_PLOT_STATUSES } }
+  );
+
+  // Tab counts use canonical role/lifecycle scope, not the optional filters.
   const [openCount, resolvedCount, plotsForFilter] = await Promise.all([
     prisma.alert.count({
-      where: { resolved: false, ...roleFilter },
+      where: openWhere,
     }),
     prisma.alert.count({
-      where: { resolved: true, ...roleFilter },
+      where: resolvedWhere,
     }),
     prisma.plot.findMany({
       where: plotWhere,

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import {
+  buildAccessiblePlotWhere,
+  buildOperationalAlertWhere,
+} from "@/lib/alerts/scope";
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -10,24 +14,10 @@ export async function GET(req: NextRequest) {
 
   try {
     // Role-based plot access. Archived plots are always excluded.
-    let whereClause: Record<string, unknown> = { status: { not: "ARCHIVED" } };
-
-    if (user.role === "STUDENT_FARMER") {
-      whereClause = {
-        ...whereClause,
-        assignments: {
-          some: {
-            studentId: user.id,
-            status: "ACTIVE",
-          },
-        },
-      };
-    } else if (user.role === "FACULTY") {
-      whereClause = {
-        ...whereClause,
-        facultyId: user.id,
-      };
-    }
+    const actor = { role: user.role, userId: user.id };
+    const whereClause = buildAccessiblePlotWhere(actor, {
+      status: { not: "ARCHIVED" },
+    });
     // ADMIN and SUPER_ADMIN: see all non-archived plots (no extra filter)
 
     const plots = await prisma.plot.findMany({
@@ -45,7 +35,7 @@ export async function GET(req: NextRequest) {
         },
         _count: {
           select: {
-            alerts: { where: { resolved: false } },
+            alerts: { where: buildOperationalAlertWhere(actor) },
           },
         },
       },

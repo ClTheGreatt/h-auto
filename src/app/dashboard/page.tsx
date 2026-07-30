@@ -33,32 +33,29 @@ import {
 import { NeedsActionList, type NeedsActionAlert } from "@/components/dashboard/needs-action-list";
 import { RestartTourButton } from "@/components/tour/restart-tour-button";
 import type { AlertSeverity, AlertType, PlotStatus } from "@prisma/client";
+import {
+  buildAccessiblePlotWhere,
+  buildHistoricalAlertWhere,
+  buildOperationalAlertWhere,
+  OPERATIONAL_PLOT_STATUSES,
+} from "@/lib/alerts/scope";
 
 const OBSERVATION_TRUNCATE_LENGTH = 100;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Mirrors the identical list in src/app/dashboard/plots/page.tsx — not
-// exported from there (page files shouldn't grow arbitrary named exports),
-// so duplicated here rather than refactoring that unrelated page.
-const ACTIVE_STATUSES: PlotStatus[] = [
+// PREPARING remains visible for setup/readiness cards; live alert rows use
+// only the shared operational statuses.
+const DASHBOARD_PLOT_STATUSES = [
   "PREPARING",
-  "PLANTED",
-  "GROWING",
-  "READY_FOR_HARVEST",
-];
+  ...OPERATIONAL_PLOT_STATUSES,
+] satisfies PlotStatus[];
 
 // A missing device/stage is expected setup state while PREPARING — it only
 // becomes a real "the system can't monitor this" problem once the crop is
 // actually in the ground. READY_FOR_HARVEST counts too: the crop is still
 // physically there until it's harvested. HARVESTED/FALLOW/ARCHIVED never
-// appear in `plots` at all (excluded by ACTIVE_STATUSES above), so they're
+// appear in `plots` at all (excluded by DASHBOARD_PLOT_STATUSES above), so they're
 // moot here.
-const CROP_IN_GROUND_STATUSES: PlotStatus[] = [
-  "PLANTED",
-  "GROWING",
-  "READY_FOR_HARVEST",
-];
-
 // Vegetative/Harvest deliberately avoid green/amber — this file's grep check
 // (Step 8) requires zero red/amber/yellow/green/emerald matches anywhere in
 // this file, since those 5 hues are reserved for severity tokens now.
@@ -299,6 +296,7 @@ export default async function DashboardPage() {
   const isFaculty = role === "FACULTY";
   const isStudent = role === "STUDENT_FARMER";
   const canResolve = isAdmin || isFaculty;
+  const actor = { role, userId };
 
   // Capture "now" once after connection() marker
   const now = new Date();
@@ -306,15 +304,7 @@ export default async function DashboardPage() {
   const oneWeekAgo = new Date(nowMs - 7 * DAY_MS);
 
   // Role-aware plot filter
-  const plotFilter = isStudent
-    ? {
-        assignments: {
-          some: { studentId: userId, status: "ACTIVE" as const },
-        },
-      }
-    : isFaculty
-    ? { facultyId: userId }
-    : {};
+  const plotFilter = buildAccessiblePlotWhere(actor);
 
   const [userCount, activeAssignmentCount, recentLogCount, recentLogs, plots] =
     await Promise.all([
@@ -345,14 +335,16 @@ export default async function DashboardPage() {
       // Step 1(d)/(e) findings: none of this was queried before, so it's
       // added here once rather than issuing a query per card.
       prisma.plot.findMany({
-        where: { ...plotFilter, status: { in: ACTIVE_STATUSES } },
+        where: buildAccessiblePlotWhere(actor, {
+          status: { in: DASHBOARD_PLOT_STATUSES },
+        }),
         orderBy: { name: "asc" },
         include: {
           crop: { select: { name: true, variety: true, daysToHarvest: true } },
           currentStage: true,
           device: { select: { id: true, deviceCode: true, lastSeenAt: true } },
           alerts: {
-            where: { resolved: false },
+            where: buildOperationalAlertWhere(actor),
             select: { id: true, severity: true, type: true, message: true, createdAt: true },
           },
           sensorReadings: { orderBy: { recordedAt: "desc" }, take: 1 },
@@ -368,10 +360,10 @@ export default async function DashboardPage() {
   // device, or a device that's offline / has never reported) counts as
   // needing attention just as much as one with a real open alert — it isn't
   // "in range", it's blind — UNLESS it's still PREPARING, where that same
-  // gap is expected setup state, not a problem (see CROP_IN_GROUND_STATUSES
+  // gap is expected setup state, not a problem (see OPERATIONAL_PLOT_STATUSES
   // above).
   const plotsWithCondition = plots.map((plot) => {
-    const monitoringRequired = CROP_IN_GROUND_STATUSES.includes(plot.status);
+    const monitoringRequired = OPERATIONAL_PLOT_STATUSES.includes(plot.status);
     const reading = plot.sensorReadings[0] ?? null;
     const freshness: DeviceFreshness = getDeviceFreshness(
       plot.device?.lastSeenAt,
@@ -450,7 +442,12 @@ export default async function DashboardPage() {
   const recentlyResolvedAlert =
     allOpenAlerts.length === 0
       ? await prisma.alert.findFirst({
-          where: { resolved: true, resolvedAt: { gte: oneWeekAgo }, plot: plotFilter },
+          where: buildHistoricalAlertWhere(actor, {
+            additionalWhere: {
+              resolvedAt: { gte: oneWeekAgo },
+              plot: { status: { in: OPERATIONAL_PLOT_STATUSES } },
+            },
+          }),
           orderBy: { resolvedAt: "desc" },
           select: { resolvedAt: true },
         })
@@ -459,7 +456,7 @@ export default async function DashboardPage() {
   // Fleet counts use only plots whose lifecycle expects active monitoring.
   // PREPARING remains visible on the page but does not inflate failure counts.
   const monitoredPlots = plotsWithCondition.filter((p) =>
-    CROP_IN_GROUND_STATUSES.includes(p.status)
+    OPERATIONAL_PLOT_STATUSES.includes(p.status)
   );
   const linkedMonitoredPlots = monitoredPlots.filter((p) => p.device);
   const freshDeviceCount = linkedMonitoredPlots.filter(

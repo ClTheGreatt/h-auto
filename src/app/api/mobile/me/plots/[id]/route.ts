@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import { getDeviceFreshness, isDeviceOnline } from "@/lib/utils/device-status";
+import { buildOperationalAlertWhere } from "@/lib/alerts/scope";
 
 export async function GET(
   req: NextRequest,
@@ -14,6 +15,7 @@ export async function GET(
   }
 
   const { id } = await context.params;
+  const actor = { role: user.role, userId: user.id };
 
   try {
     // Role-based access check
@@ -68,7 +70,7 @@ export async function GET(
         },
         _count: {
           select: {
-            alerts: { where: { resolved: false } },
+            alerts: { where: buildOperationalAlertWhere(actor) },
           },
         },
       },

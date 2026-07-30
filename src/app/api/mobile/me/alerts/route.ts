@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import {
+  buildHistoricalAlertWhere,
+  buildOperationalAlertWhere,
+} from "@/lib/alerts/scope";
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -9,27 +13,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let plotFilter: Record<string, unknown> = { status: { not: "ARCHIVED" } };
-    if (user.role === "STUDENT_FARMER") {
-      plotFilter = {
-        ...plotFilter,
-        assignments: { some: { studentId: user.id, status: "ACTIVE" } },
-      };
-    } else if (user.role === "FACULTY") {
-      plotFilter = {
-        ...plotFilter,
-        facultyId: user.id,
-      };
-    }
-
-    const accessiblePlots = await prisma.plot.findMany({
-      where: plotFilter,
-      select: { id: true },
-    });
-    const plotIds = accessiblePlots.map((p) => p.id);
+    const actor = { role: user.role, userId: user.id };
+    const showResolved = req.nextUrl.searchParams.get("status") === "resolved";
+    const where = showResolved
+      ? buildHistoricalAlertWhere(actor)
+      : buildOperationalAlertWhere(actor);
 
     const alerts = await prisma.alert.findMany({
-      where: { plotId: { in: plotIds } },
+      where,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

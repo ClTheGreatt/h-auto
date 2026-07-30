@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import {
+  buildAccessiblePlotWhere,
+  buildOperationalAlertWhere,
+} from "@/lib/alerts/scope";
 
 const SEVERITY_ORDER: Record<string, number> = {
   CRITICAL: 0,
@@ -15,18 +19,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let plotFilter: Record<string, unknown> = { status: { not: "ARCHIVED" } };
-    if (user.role === "STUDENT_FARMER") {
-      plotFilter = {
-        ...plotFilter,
-        assignments: { some: { studentId: user.id, status: "ACTIVE" } },
-      };
-    } else if (user.role === "FACULTY") {
-      plotFilter = {
-        ...plotFilter,
-        facultyId: user.id,
-      };
-    }
+    const actor = { role: user.role, userId: user.id };
+    const plotFilter = buildAccessiblePlotWhere(actor, {
+      status: { not: "ARCHIVED" },
+    });
+    const operationalAlertsWhere = buildOperationalAlertWhere(actor);
 
     const accessiblePlots = await prisma.plot.findMany({
       where: plotFilter,
@@ -40,7 +37,7 @@ export async function GET(req: NextRequest) {
     const [openAlertsCount, myObservationsCount, todaysObservationsCount, allUrgentAlerts, recentActivity] =
       await Promise.all([
         prisma.alert.count({
-          where: { plotId: { in: plotIds }, resolved: false },
+          where: operationalAlertsWhere,
         }),
         prisma.growthLog.count({
           where: { userId: user.id },
@@ -52,7 +49,7 @@ export async function GET(req: NextRequest) {
           },
         }),
         prisma.alert.findMany({
-          where: { plotId: { in: plotIds }, resolved: false },
+          where: operationalAlertsWhere,
           orderBy: { createdAt: "desc" },
           select: {
             id: true,
