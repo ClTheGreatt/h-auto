@@ -2,8 +2,6 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import {
   AlertTriangle,
   AlertCircle,
@@ -15,12 +13,15 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
-import { resolveAlert } from "@/actions/alerts";
-import { timeAgo } from "@/lib/format-date";
+import {
+  formatDate,
+  formatDateTime,
+  formatOpenAlertAge,
+} from "@/lib/format-date";
 import { formatNotificationSummary } from "@/lib/alerts/notification-summary";
+import { ResolveAlertButton } from "@/components/alerts/resolve-alert-button";
 import type {
   AlertSeverity,
   AlertType,
@@ -91,39 +92,11 @@ const SEVERITY_RANK: Record<AlertSeverity, number> = {
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-function formatResolvedDate(date: Date): string {
-  return new Date(date).toLocaleString("en-PH", {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
 // Isolates the Date.now() call in its own non-component function — the
 // react-hooks/purity lint rule flags an impure call made directly inside a
 // component body, not one tucked behind a helper.
 function msSince(date: Date): number {
   return Date.now() - new Date(date).getTime();
-}
-
-// Plain-language "how long has this been open" — deliberately a different
-// shape from timeAgo's abbreviated "5d ago" (single unit, no "open" prefix):
-// this is a distinct signal read next to it, not a replacement for it.
-function formatOpenDuration(ms: number): string {
-  const minutes = Math.max(0, Math.floor(ms / (60 * 1000)));
-  if (minutes < 60) {
-    return `open ${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `open ${hours}h`;
-  }
-  const days = Math.floor(hours / 24);
-  const remHours = hours % 24;
-  return remHours > 0 ? `open ${days}d ${remHours}h` : `open ${days}d`;
 }
 
 type AlertGroup = {
@@ -179,9 +152,7 @@ export function AlertsTable({
   canResolve: boolean;
   emptyMessage?: string;
 }) {
-  const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
   // Separate from `expanded` (notification-recipient Details toggle) on
   // purpose — two independent disclosures per alert, and unlike Details
   // (single global toggle), multiple suggestion boxes can be open at once.
@@ -199,19 +170,6 @@ export function AlertsTable({
       }
       return next;
     });
-  }
-
-  async function handleResolve(id: string) {
-    setResolvingId(id);
-    const result = await resolveAlert(id);
-    setResolvingId(null);
-
-    if (!result?.success) {
-      toast.error("Failed to resolve alert");
-      return;
-    }
-    toast.success("Alert resolved");
-    router.refresh();
   }
 
   if (alerts.length === 0) {
@@ -281,12 +239,9 @@ export function AlertsTable({
                               {alert.severity}
                             </div>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {timeAgo(alert.createdAt)}
-                              {!alert.resolved && (
-                                <span className="ml-1 text-muted-foreground/70">
-                                  · {formatOpenDuration(msSince(alert.createdAt))}
-                                </span>
-                              )}
+                              {alert.resolved
+                                ? `Opened ${formatDate(alert.createdAt)}`
+                                : formatOpenAlertAge(alert.createdAt)}
                             </span>
                             {alert.resolved && (
                               <Badge
@@ -296,7 +251,7 @@ export function AlertsTable({
                                 <CheckCircle2 className="w-3 h-3 mr-1" />
                                 Resolved
                                 {alert.resolvedAt &&
-                                  ` · ${formatResolvedDate(alert.resolvedAt)}`}
+                                  ` · ${formatDateTime(alert.resolvedAt)}`}
                               </Badge>
                             )}
                           </div>
@@ -356,14 +311,7 @@ export function AlertsTable({
 
                         <div className="shrink-0">
                           {!alert.resolved && canResolve && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleResolve(alert.id)}
-                              disabled={resolvingId === alert.id}
-                            >
-                              {resolvingId === alert.id ? "Resolving..." : "Resolve"}
-                            </Button>
+                            <ResolveAlertButton alertId={alert.id} />
                           )}
                         </div>
                       </div>
@@ -372,7 +320,7 @@ export function AlertsTable({
                         <div className="mt-3 pt-3 border-t space-y-3">
                           <div>
                             <div className="text-xs font-medium text-muted-foreground mb-1">
-                              ALERT TYPE
+                              Alert type
                             </div>
                             <code className="text-xs bg-card px-2 py-0.5 rounded border">
                               {alert.type}
@@ -381,7 +329,7 @@ export function AlertsTable({
 
                           <div>
                             <div className="text-xs font-medium text-muted-foreground mb-1">
-                              NOTIFICATION DELIVERY
+                              Notification delivery
                             </div>
                             {alert.notifications.length === 0 ? (
                               <p className="text-xs text-muted-foreground">

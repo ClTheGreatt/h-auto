@@ -22,6 +22,33 @@ export function timeAgo(date: Date | string | null | undefined): string {
 }
 
 /**
+ * Human-readable age for an open alert, using one unit to avoid duplicate
+ * relative-time copy such as "1d ago · open 1d".
+ */
+export function formatOpenAlertAge(
+  date: Date | string | null | undefined,
+  nowMs = Date.now()
+): string {
+  if (!date) return "—";
+  const openedAtMs = new Date(date).getTime();
+  if (Number.isNaN(openedAtMs)) return "—";
+
+  const minutes = Math.max(0, Math.floor((nowMs - openedAtMs) / (60 * 1000)));
+  if (minutes < 1) return "Opened just now";
+  if (minutes < 60) {
+    return `Open for ${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `Open for ${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+
+  const days = Math.floor(hours / 24);
+  return `Open for ${days} day${days === 1 ? "" : "s"}`;
+}
+
+/**
  * Short date: "Nov 17, 2025"
  *
  * Use for: lists, table cells, anywhere a compact date is needed.
