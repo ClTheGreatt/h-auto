@@ -2,15 +2,18 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
+  formatSensorRange,
+  formatSensorValue,
   getThresholdStatus,
   getBarPosition,
+  type SensorType,
   type ThresholdStatus,
 } from "@/lib/sensors/threshold-status";
 
 export type ThresholdBarProps = {
   label: string;
   value: number | null;
-  unit: string;
+  sensorType: SensorType;
   min: number;
   max: number;
   isHistorical?: boolean;
@@ -39,7 +42,7 @@ const STATUS_LABEL: Record<ThresholdStatus, string> = {
 export function ThresholdBar({
   label,
   value,
-  unit,
+  sensorType,
   min,
   max,
   isHistorical = false,
@@ -53,12 +56,31 @@ export function ThresholdBar({
     );
   }
 
+  const formattedValue = formatSensorValue(value, sensorType);
   const status = getThresholdStatus(value, min, max);
-  const { percent, clamped, bandStartPercent, bandEndPercent } = getBarPosition(
-    value,
-    min,
-    max
-  );
+  const position = getBarPosition(value, min, max, sensorType);
+
+  if (
+    status === "invalid-range" ||
+    status === "invalid-reading" ||
+    position == null
+  ) {
+    return (
+      <div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="text-sm font-semibold text-muted-foreground mt-0.5">
+          {formattedValue}
+        </div>
+        <div className="text-[11px] text-muted-foreground mt-1">
+          {status === "invalid-reading"
+            ? `ideal ${formatSensorRange(min, max, sensorType)}`
+            : "Invalid ideal range"}
+        </div>
+      </div>
+    );
+  }
+
+  const { percent, clamped, bandStartPercent, bandEndPercent } = position;
 
   return (
     <div>
@@ -68,10 +90,7 @@ export function ThresholdBar({
           isHistorical ? "text-muted-foreground" : STATUS_TEXT_CLASS[status]
         }`}
       >
-        <span>
-          {value}
-          {unit}
-        </span>
+        <span>{formattedValue}</span>
         {status !== "optimal" && (
           <span className="text-[10px] font-bold uppercase tracking-wide">
             {STATUS_LABEL[status]}
@@ -118,8 +137,7 @@ export function ThresholdBar({
       </div>
 
       <div className="text-[11px] text-muted-foreground mt-1">
-        ideal {min}–{max}
-        {unit}
+        ideal {formatSensorRange(min, max, sensorType)}
       </div>
     </div>
   );

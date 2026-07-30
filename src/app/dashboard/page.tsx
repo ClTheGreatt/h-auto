@@ -25,7 +25,11 @@ import {
   getDeviceFreshness,
   type DeviceFreshness,
 } from "@/lib/utils/device-status";
-import { getThresholdStatus, SENSOR_FIELDS } from "@/lib/sensors/threshold-status";
+import {
+  formatSensorValue,
+  getThresholdStatus,
+  SENSOR_FIELDS,
+} from "@/lib/sensors/threshold-status";
 import { NeedsActionList, type NeedsActionAlert } from "@/components/dashboard/needs-action-list";
 import { RestartTourButton } from "@/components/tour/restart-tour-button";
 import type { AlertSeverity, AlertType, PlotStatus } from "@prisma/client";
@@ -811,15 +815,20 @@ export default async function DashboardPage() {
                                 <span
                                   key={field.key}
                                   className={
-                                    readingsAreHistorical || status == null
+                                    readingsAreHistorical ||
+                                    status == null ||
+                                    status === "invalid-range" ||
+                                    status === "invalid-reading"
                                       ? "text-muted-foreground"
                                       : status === "optimal"
                                       ? "text-success-text"
                                       : "text-danger-text"
                                   }
                                 >
-                                  {SHORT_FIELD_LABEL[field.key]} {value}
-                                  {field.unit}
+                                  {SHORT_FIELD_LABEL[field.key]}{" "}
+                                  {formatSensorValue(value, field.type)}
+                                  {status === "invalid-range" &&
+                                    " · Invalid ideal range"}
                                 </span>
                               );
                             })}

@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { isValidThresholdRange } from "@/lib/sensors/threshold-status";
 
-const stageSchema = z.object({
+const stageFields = z.object({
   name: z.string().min(1, "Stage name is required"),
   orderIndex: z.number().int().min(0),
   durationDays: z.number().int().positive("Duration must be at least 1 day"),
@@ -19,6 +20,30 @@ const stageSchema = z.object({
   maxPhosphorus: z.number().min(0),
   minPotassium: z.number().min(0),
   maxPotassium: z.number().min(0),
+});
+
+const THRESHOLD_RANGE_PAIRS = [
+  ["minSoilMoisture", "maxSoilMoisture"],
+  ["minTemperature", "maxTemperature"],
+  ["minHumidity", "maxHumidity"],
+  ["minLightIntensity", "maxLightIntensity"],
+  ["minNitrogen", "maxNitrogen"],
+  ["minPhosphorus", "maxPhosphorus"],
+  ["minPotassium", "maxPotassium"],
+] as const satisfies ReadonlyArray<
+  readonly [keyof z.infer<typeof stageFields>, keyof z.infer<typeof stageFields>]
+>;
+
+const stageSchema = stageFields.superRefine((stage, context) => {
+  for (const [minField, maxField] of THRESHOLD_RANGE_PAIRS) {
+    if (!isValidThresholdRange(stage[minField], stage[maxField])) {
+      context.addIssue({
+        code: "custom",
+        path: [maxField],
+        message: "Minimum must be lower than maximum.",
+      });
+    }
+  }
 });
 
 export const cropSchema = z.object({

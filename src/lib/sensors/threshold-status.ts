@@ -6,13 +6,32 @@
 // consumers so a fourth/fifth copy of the same field list never needs to
 // exist).
 
+export type SensorType =
+  | "SOIL_MOISTURE"
+  | "TEMPERATURE"
+  | "HUMIDITY"
+  | "LIGHT"
+  | "NITROGEN"
+  | "PHOSPHORUS"
+  | "POTASSIUM";
+
 export type ThresholdStatus = "low" | "optimal" | "high";
+export type ThresholdEvaluation =
+  | ThresholdStatus
+  | "invalid-range"
+  | "invalid-reading";
+
+export function isValidThresholdRange(min: number, max: number): boolean {
+  return Number.isFinite(min) && Number.isFinite(max) && min < max;
+}
 
 export function getThresholdStatus(
   value: number,
   min: number,
   max: number
-): ThresholdStatus {
+): ThresholdEvaluation {
+  if (!isValidThresholdRange(min, max)) return "invalid-range";
+  if (!Number.isFinite(value)) return "invalid-reading";
   if (value < min) return "low";
   if (value > max) return "high";
   return "optimal";
@@ -29,41 +48,87 @@ export type BarPosition = {
   bandEndPercent: number;
 };
 
-// Maps a value onto a 0-100 track: a lower buffer zone, the ideal [min, max]
-// band, and an upper buffer zone, each nominally one bandWidth wide. No
-// sensor field can read below zero, so the lower buffer is floored at 0
-// instead of going negative — a wide band (e.g. light: 3000-8000, bandWidth
-// 5000) would otherwise get a domainMin of -2000, which made an extreme-low
-// reading like 0 lux land mid-track (~13%) instead of at the true bottom of
-// the physically possible range. Flooring makes the domain asymmetric, so
-// the band's own position on the track is no longer always 33.3%/66.7% —
-// callers must use bandStartPercent/bandEndPercent, not a fixed middle third.
+// Maps a value onto a 0-100 track with one ideal-band width of visual buffer
+// on either side. Temperature may extend below zero. Every other sensor has
+// a non-negative physical domain, so its lower visual buffer is floored at 0.
+// That flooring can make the domain asymmetric, so callers must use the
+// returned band positions rather than assuming a fixed middle third.
 export function getBarPosition(
   value: number,
   min: number,
-  max: number
-): BarPosition {
-  const bandWidth = max - min;
-  if (bandWidth === 0) {
-    return { percent: 50, clamped: null, bandStartPercent: 50, bandEndPercent: 50 };
-  }
+  max: number,
+  sensorType: SensorType
+): BarPosition | null {
+  if (!isValidThresholdRange(min, max) || !Number.isFinite(value)) return null;
 
-  const domainMin = Math.max(0, min - bandWidth);
-  const domainMax = max + bandWidth;
+  // Normalize before calculating the buffered domain. This keeps arithmetic
+  // finite even for unusually large but finite stored thresholds.
+  const scale = Math.max(1, Math.abs(min), Math.abs(max));
+  const normalizedValue = value / scale;
+  const normalizedMin = min / scale;
+  const normalizedMax = max / scale;
+  const bandWidth = normalizedMax - normalizedMin;
+  const allowNegativeDomain = sensorType === "TEMPERATURE";
+  const domainMin = allowNegativeDomain
+    ? normalizedMin - bandWidth
+    : Math.max(0, normalizedMin - bandWidth);
+  const domainMax = normalizedMax + bandWidth;
   const domainSpan = domainMax - domainMin;
 
-  const bandStartPercent = ((min - domainMin) / domainSpan) * 100;
-  const bandEndPercent = ((max - domainMin) / domainSpan) * 100;
+  if (
+    !Number.isFinite(domainSpan) ||
+    domainSpan <= 0 ||
+    !Number.isFinite(normalizedValue)
+  ) {
+    return null;
+  }
 
-  if (value < domainMin) {
+  const clampPercent = (percent: number) =>
+    Math.min(100, Math.max(0, percent));
+  const bandStartPercent = clampPercent(
+    ((normalizedMin - domainMin) / domainSpan) * 100
+  );
+  const bandEndPercent = clampPercent(
+    ((normalizedMax - domainMin) / domainSpan) * 100
+  );
+
+  if (normalizedValue < domainMin) {
     return { percent: 0, clamped: "low", bandStartPercent, bandEndPercent };
   }
-  if (value > domainMax) {
+  if (normalizedValue > domainMax) {
     return { percent: 100, clamped: "high", bandStartPercent, bandEndPercent };
   }
 
-  const percent = ((value - domainMin) / domainSpan) * 100;
+  const percent = clampPercent(
+    ((normalizedValue - domainMin) / domainSpan) * 100
+  );
   return { percent, clamped: null, bandStartPercent, bandEndPercent };
+}
+
+const SENSOR_UNIT_SUFFIX: Record<SensorType, string> = {
+  SOIL_MOISTURE: "%",
+  TEMPERATURE: "°C",
+  HUMIDITY: "%",
+  LIGHT: " lux",
+  NITROGEN: " mg/kg",
+  PHOSPHORUS: " mg/kg",
+  POTASSIUM: " mg/kg",
+};
+
+export function formatSensorValue(
+  value: number,
+  sensorType: SensorType
+): string {
+  if (!Number.isFinite(value)) return "Invalid reading";
+  return `${value}${SENSOR_UNIT_SUFFIX[sensorType]}`;
+}
+
+export function formatSensorRange(
+  min: number,
+  max: number,
+  sensorType: SensorType
+): string {
+  return `${min}–${max}${SENSOR_UNIT_SUFFIX[sensorType]}`;
 }
 
 // The 7 raw sensor fields (SensorReading) and their corresponding min/max
@@ -99,17 +164,17 @@ export type StageThresholds = {
 export type SensorFieldDef = {
   key: keyof SensorReadingValues;
   label: string;
-  unit: string;
+  type: SensorType;
   minField: keyof StageThresholds;
   maxField: keyof StageThresholds;
 };
 
 export const SENSOR_FIELDS: SensorFieldDef[] = [
-  { key: "soilMoisture", label: "Soil moisture", unit: "%", minField: "minSoilMoisture", maxField: "maxSoilMoisture" },
-  { key: "temperature", label: "Temperature", unit: "°C", minField: "minTemperature", maxField: "maxTemperature" },
-  { key: "humidity", label: "Humidity", unit: "%", minField: "minHumidity", maxField: "maxHumidity" },
-  { key: "lightIntensity", label: "Light intensity", unit: "lux", minField: "minLightIntensity", maxField: "maxLightIntensity" },
-  { key: "nitrogen", label: "Nitrogen", unit: "mg/kg", minField: "minNitrogen", maxField: "maxNitrogen" },
-  { key: "phosphorus", label: "Phosphorus", unit: "mg/kg", minField: "minPhosphorus", maxField: "maxPhosphorus" },
-  { key: "potassium", label: "Potassium", unit: "mg/kg", minField: "minPotassium", maxField: "maxPotassium" },
+  { key: "soilMoisture", label: "Soil moisture", type: "SOIL_MOISTURE", minField: "minSoilMoisture", maxField: "maxSoilMoisture" },
+  { key: "temperature", label: "Temperature", type: "TEMPERATURE", minField: "minTemperature", maxField: "maxTemperature" },
+  { key: "humidity", label: "Humidity", type: "HUMIDITY", minField: "minHumidity", maxField: "maxHumidity" },
+  { key: "lightIntensity", label: "Light intensity", type: "LIGHT", minField: "minLightIntensity", maxField: "maxLightIntensity" },
+  { key: "nitrogen", label: "Nitrogen", type: "NITROGEN", minField: "minNitrogen", maxField: "maxNitrogen" },
+  { key: "phosphorus", label: "Phosphorus", type: "PHOSPHORUS", minField: "minPhosphorus", maxField: "maxPhosphorus" },
+  { key: "potassium", label: "Potassium", type: "POTASSIUM", minField: "minPotassium", maxField: "maxPotassium" },
 ];

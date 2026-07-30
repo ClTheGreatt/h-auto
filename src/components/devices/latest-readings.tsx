@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  formatSensorValue,
   SENSOR_FIELDS,
   type SensorReadingValues,
   type StageThresholds,
@@ -87,7 +88,7 @@ export function LatestReadings({
                 <ThresholdBar
                   label={field.label}
                   value={value}
-                  unit={field.unit}
+                  sensorType={field.type}
                   min={stage[field.minField]}
                   max={stage[field.maxField]}
                   isHistorical={isHistorical}
@@ -96,7 +97,9 @@ export function LatestReadings({
                 <>
                   <div className="text-xs text-muted-foreground">{field.label}</div>
                   <div className="font-semibold">
-                    {value != null ? `${value} ${field.unit}` : "—"}
+                    {value != null
+                      ? formatSensorValue(value, field.type)
+                      : "No reading"}
                   </div>
                 </>
               )}
