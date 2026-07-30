@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { PlotStatus, Prisma, UserRole } from "@prisma/client";
 import { ACTIVE_MONITORING_PLOT_STATUSES } from "@/lib/utils/device-status";
 
@@ -16,29 +14,31 @@ function buildRolePlotWhere({
   role,
   userId,
 }: AlertScopeActor): Prisma.PlotWhereInput {
-  if (role === "FACULTY") {
-    return { facultyId: userId };
-  }
-
-  if (role === "STUDENT_FARMER") {
-    return {
-      assignments: {
-        some: {
-          studentId: userId,
-          status: "ACTIVE",
-          endedAt: null,
-          student: {
-            is: {
-              status: "ACTIVE",
-              graduatedAt: null,
+  switch (role) {
+    case "ADMIN":
+    case "SUPER_ADMIN":
+      return {};
+    case "FACULTY":
+      return { facultyId: userId };
+    case "STUDENT_FARMER":
+      return {
+        assignments: {
+          some: {
+            studentId: userId,
+            status: "ACTIVE",
+            endedAt: null,
+            student: {
+              is: {
+                status: "ACTIVE",
+                graduatedAt: null,
+              },
             },
           },
         },
-      },
-    };
+      };
+    default:
+      return { id: { in: [] } };
   }
-
-  return {};
 }
 
 export function buildAccessiblePlotWhere(

@@ -9,6 +9,7 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { CropFilter } from "@/components/plots/crop-filter";
 import { PlotStatusFilter } from "@/components/plots/plot-status-filter";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 
 const PAGE_SIZE = 20;
 
@@ -54,18 +55,6 @@ export default async function PlotsPage({
   const view = sp.view === "completed" ? "completed" : "active";
   const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
 
-  // Role-based base filter
-  const roleFilter: Prisma.PlotWhereInput =
-    role === "STUDENT_FARMER"
-      ? {
-          assignments: {
-            some: { studentId: session.user.id, status: "ACTIVE" as const },
-          },
-        }
-      : role === "FACULTY"
-      ? { facultyId: session.user.id }
-      : {};
-
   // Status scope: an explicit ?status= pick wins outright (unchanged
   // dropdown behavior); otherwise fall back to the current tab's status
   // bucket. Both buckets exclude ARCHIVED by construction, so archived
@@ -75,22 +64,24 @@ export default async function PlotsPage({
     : { status: { in: view === "completed" ? [...COMPLETED_STATUSES] : [...ACTIVE_STATUSES] } };
 
   // Combined where clause.
-  const where: Prisma.PlotWhereInput = {
-    ...roleFilter,
-    ...statusWhere,
-    ...(cropId && { cropId }),
-    ...(search && {
-      OR: [
-        { name: { contains: search, mode: "insensitive" } },
-        { location: { contains: search, mode: "insensitive" } },
-        {
-          crop: {
-            name: { contains: search, mode: "insensitive" },
+  const where = buildAccessiblePlotWhere(
+    { role, userId: session.user.id },
+    {
+      ...statusWhere,
+      ...(cropId && { cropId }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { location: { contains: search, mode: "insensitive" } },
+          {
+            crop: {
+              name: { contains: search, mode: "insensitive" },
+            },
           },
-        },
-      ],
-    }),
-  };
+        ],
+      }),
+    }
+  );
 
   // Fetch in parallel: crops (for filter), count, and page data
   const [crops, totalPlots, plots] = await Promise.all([

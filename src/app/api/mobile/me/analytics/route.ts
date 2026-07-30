@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { resolveMobilePlotSelection } from "@/lib/analytics/mobile-plot-selection";
 
 type Range = "24h" | "7d" | "30d" | "all";
 
@@ -18,25 +20,37 @@ export async function GET(req: NextRequest) {
     const rp = sp.get("range");
     const range: Range =
       rp === "24h" || rp === "30d" || rp === "all" ? rp : "7d";
-    const plotIdParam = sp.get("plotId");
+    const plotIdValues = sp.getAll("plotId");
     const monthParam = sp.get("month");
     const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null;
 
-    let plotFilter: Record<string, unknown> = { status: { not: "ARCHIVED" } };
-    if (user.role === "STUDENT_FARMER") {
-      plotFilter = { ...plotFilter, assignments: { some: { studentId: user.id, status: "ACTIVE" } } };
-    } else if (user.role === "FACULTY") {
-      plotFilter = { ...plotFilter, facultyId: user.id };
+    const selection = await resolveMobilePlotSelection(
+      plotIdValues,
+      (requestedPlotId) =>
+        prisma.plot.findMany({
+          where: buildAccessiblePlotWhere(
+            { role: user.role, userId: user.id },
+            {
+              status: { not: "ARCHIVED" },
+              ...(requestedPlotId !== undefined
+                ? { id: requestedPlotId }
+                : {}),
+            }
+          ),
+          select: { id: true, status: true },
+        })
+    );
+    if (selection.kind === "error") {
+      return NextResponse.json(
+        {
+          error:
+            selection.status === 400 ? "Invalid plotId" : "Plot not found",
+        },
+        { status: selection.status }
+      );
     }
 
-    const accessiblePlots = await prisma.plot.findMany({
-      where: plotFilter,
-      select: { id: true, status: true },
-    });
-    const targetPlots =
-      plotIdParam && accessiblePlots.some((p) => p.id === plotIdParam)
-        ? accessiblePlots.filter((p) => p.id === plotIdParam)
-        : accessiblePlots;
+    const targetPlots = selection.plots;
     const plotIds = targetPlots.map((p) => p.id);
 
     const statusDistribution: Record<string, number> = {};

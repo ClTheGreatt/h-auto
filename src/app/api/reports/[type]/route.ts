@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { parseRange, TIME_RANGES } from "@/lib/analytics/time-range";
 import { prisma } from "@/lib/prisma";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
+import { parseOptionalPlotIdSearchParams } from "@/lib/auth/plot-id";
 import {
   fetchSensorReadingsData,
   fetchPlotPerformanceData,
@@ -10,6 +11,7 @@ import {
   fetchAlertsData,
   fetchActivityData,
   fetchStudentActivityData,
+  buildReportPlotWhere,
 } from "@/lib/reports/data-fetchers";
 import {
   renderSensorReadingsPDF,
@@ -77,28 +79,37 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const format = searchParams.get("format") === "excel" ? "excel" : "pdf";
   const range = parseRange(searchParams.get("range") ?? undefined);
-  const plotId = searchParams.get("plotId") ?? undefined;
+  const parsedPlotId = parseOptionalPlotIdSearchParams(searchParams);
+  if (parsedPlotId.kind === "invalid") {
+    return NextResponse.json({ error: "Invalid plotId" }, { status: 400 });
+  }
+  const plotId =
+    parsedPlotId.kind === "valid" ? parsedPlotId.plotId : undefined;
 
   if (
-    plotId &&
+    plotId !== undefined &&
     !(await assertCanAccessPlot(session.user.role, session.user.id, plotId))
   ) {
-    return NextResponse.json(
-      { error: "You don't have access to this plot." },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "Plot not found" }, { status: 404 });
   }
 
   const rangeLabel =
     TIME_RANGES.find((r) => r.value === range)?.label ?? "7 days";
 
   let plotName: string | undefined;
-  if (plotId) {
-    const plot = await prisma.plot.findUnique({
-      where: { id: plotId },
+  if (plotId !== undefined) {
+    const plot = await prisma.plot.findFirst({
+      where: buildReportPlotWhere(
+        session.user.role,
+        session.user.id,
+        { id: plotId }
+      ),
       select: { name: true },
     });
-    plotName = plot?.name;
+    if (!plot) {
+      return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+    }
+    plotName = plot.name;
   }
 
   try {

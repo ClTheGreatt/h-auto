@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -9,21 +10,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let plotsAssigned = 0;
-    if (user.role === "STUDENT_FARMER") {
-      plotsAssigned = await prisma.plotAssignment.count({
-        where: { studentId: user.id, status: "ACTIVE" },
-      });
-    } else if (user.role === "FACULTY") {
-      plotsAssigned = await prisma.plot.count({
-        where: { facultyId: user.id },
-      });
-    } else {
-      plotsAssigned = await prisma.plot.count();
-    }
+    const accessiblePlotWhere = buildAccessiblePlotWhere({
+      role: user.role,
+      userId: user.id,
+    });
+    const plotsAssigned = await prisma.plot.count({
+      where: accessiblePlotWhere,
+    });
 
     const observationsCount = await prisma.growthLog.count({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        plot: accessiblePlotWhere,
+      },
     });
 
     const fullUser = await prisma.user.findUnique({

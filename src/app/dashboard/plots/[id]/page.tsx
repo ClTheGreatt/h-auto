@@ -18,7 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 import { getDeviceFreshness } from "@/lib/utils/device-status";
-import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
+import { buildDirectPlotAccessWhere } from "@/lib/auth/plot-access";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { RestorePlotDialog } from "@/components/plots/restore-plot-dialog";
 import { HarvestPlotDialog } from "@/components/plots/harvest-plot-dialog";
@@ -75,8 +75,8 @@ export default async function PlotDetailPage({
   const canEditPlot = role === "SUPER_ADMIN" || role === "ADMIN";
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
 
-  const plot = await prisma.plot.findUnique({
-    where: { id },
+  const plot = await prisma.plot.findFirst({
+    where: buildDirectPlotAccessWhere(role, session.user.id, id),
     include: {
       crop: true,
       currentStage: true,
@@ -84,7 +84,16 @@ export default async function PlotDetailPage({
         select: { id: true, deviceCode: true, lastSeenAt: true },
       },
       assignments: {
-        where: { status: "ACTIVE" },
+        where: {
+          status: "ACTIVE",
+          endedAt: null,
+          student: {
+            is: {
+              status: "ACTIVE",
+              graduatedAt: null,
+            },
+          },
+        },
         orderBy: { assignedAt: "desc" },
         include: {
           student: {
@@ -114,18 +123,6 @@ export default async function PlotDetailPage({
   // but every mutating action on it is disabled — restore it first.
   const isArchived = plot.status === "ARCHIVED";
   const isHarvested = plot.status === "HARVESTED";
-
-  if (role === "STUDENT_FARMER") {
-    const isAssigned = plot.assignments.some(
-      (a) => a.student.id === session.user.id
-    );
-    if (!isAssigned) redirect("/dashboard/plots");
-  }
-
-  if (role === "FACULTY") {
-    const hasAccess = await canFacultyAccessPlot(session.user.id, plot.id);
-    if (!hasAccess) redirect("/dashboard/plots");
-  }
 
   const isAssignedStudent = plot.assignments.some(
     (a) => a.student.id === session.user.id

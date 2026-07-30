@@ -1,6 +1,32 @@
 import { prisma } from "@/lib/prisma";
-import type { UserRole } from "@prisma/client";
+import type { Prisma, UserRole } from "@prisma/client";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+export { isValidPlotId } from "@/lib/auth/plot-id";
+
+type FindAccessiblePlot = (
+  where: Prisma.PlotWhereInput
+) => Promise<{ id: string } | null>;
+
+type FindReadingHistoryPlot<T> = (
+  where: Prisma.PlotWhereInput
+) => Promise<T | null>;
+
+export function buildDirectPlotAccessWhere(
+  role: UserRole,
+  userId: string,
+  plotId: string
+): Prisma.PlotWhereInput {
+  return buildAccessiblePlotWhere({ role, userId }, { id: plotId });
+}
+
+export async function findReadingHistoryPlot<T>(
+  role: UserRole,
+  userId: string,
+  plotId: string,
+  findPlot: FindReadingHistoryPlot<T>
+): Promise<T | null> {
+  return findPlot(buildDirectPlotAccessWhere(role, userId, plotId));
+}
 
 // Faculty access is based on being the plot's assigned adviser
 // (Plot.facultyId), unlike ADMIN/SUPER_ADMIN which have unrestricted access.
@@ -21,16 +47,15 @@ export async function canFacultyAccessPlot(
 export async function assertCanAccessPlot(
   role: UserRole,
   userId: string,
-  plotId: string
+  plotId: string,
+  findAccessiblePlot: FindAccessiblePlot = async (where) =>
+    prisma.plot.findFirst({
+      where,
+      select: { id: true },
+    })
 ): Promise<boolean> {
-  if (role === "SUPER_ADMIN" || role === "ADMIN") return true;
-
-  const plot = await prisma.plot.findFirst({
-    where: buildAccessiblePlotWhere(
-      { role, userId },
-      { id: plotId }
-    ),
-    select: { id: true },
-  });
+  const plot = await findAccessiblePlot(
+    buildDirectPlotAccessWhere(role, userId, plotId)
+  );
   return !!plot;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   Activity,
   BellRing,
@@ -23,6 +24,8 @@ import {
   calculateOptimalPercent,
   ALERT_TYPE_LABELS,
 } from "@/lib/analytics/aggregator";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * 60 * 60 * 1000;
@@ -205,13 +208,20 @@ function aggregateObservationsByDate(
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; plotId?: string; month?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    plotId?: string | string[];
+    month?: string;
+  }>;
 }) {
   const session = await requireAuth();
   const sp = await searchParams;
   const range = parseRange(sp.range);
   const role = session.user.role;
-  const selectedPlotId = sp.plotId;
+  const parsedPlotId = parseOptionalPlotIdPageValue(sp.plotId);
+  if (parsedPlotId.kind === "invalid") notFound();
+  const selectedPlotId =
+    parsedPlotId.kind === "valid" ? parsedPlotId.plotId : undefined;
   const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : null;
 
   // Date window: month overrides range
@@ -244,22 +254,15 @@ export default async function AnalyticsPage({
   // Role-aware base filter
   // Archived plots are excluded from analytics; historical data for a plot
   // remains in the DB but stops surfacing once it's archived.
-  const plotFilter = {
-    status: { not: "ARCHIVED" as const },
-    ...(role === "STUDENT_FARMER"
-      ? {
-          assignments: {
-            some: { studentId: session.user.id, status: "ACTIVE" as const },
-          },
-        }
-      : role === "FACULTY"
-      ? { facultyId: session.user.id }
-      : {}),
-  };
+  const actor = { role, userId: session.user.id };
+  const plotFilter = buildAccessiblePlotWhere(actor, {
+    status: { not: "ARCHIVED" },
+  });
 
-  const combinedPlotFilter = selectedPlotId
-    ? { ...plotFilter, id: selectedPlotId }
-    : plotFilter;
+  const combinedPlotFilter = buildAccessiblePlotWhere(actor, {
+    status: { not: "ARCHIVED" },
+    ...(selectedPlotId !== undefined ? { id: selectedPlotId } : {}),
+  });
 
   const plots = await prisma.plot.findMany({
     where: plotFilter,
@@ -275,6 +278,13 @@ export default async function AnalyticsPage({
       },
     },
   });
+
+  if (
+    selectedPlotId !== undefined &&
+    !plots.some((plot) => plot.id === selectedPlotId)
+  ) {
+    notFound();
+  }
 
   const [
     totalReadings,
@@ -411,7 +421,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
   }
 
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
-  const plotCount = selectedPlotId ? 1 : plots.length;
+  const plotCount = selectedPlotId !== undefined ? 1 : plots.length;
 
   // Preserve active filter (month or range) sa plot health links
   const filterQs = month ? `month=${month}` : `range=${range}`;

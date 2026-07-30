@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Camera } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
@@ -7,18 +8,28 @@ import { AuthorFilter } from "@/components/monitoring/author-filter";
 import { DateFilter } from "@/components/monitoring/date-filter";
 import { LogFeedItem } from "@/components/monitoring/log-feed-item";
 import { EmptyState } from "@/components/ui/empty-state";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
 
 const PAGE_SIZE = 10;
 
 export default async function MonitoringPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plotId?: string; authorId?: string; page?: string; date?: string }>;
+  searchParams: Promise<{
+    plotId?: string | string[];
+    authorId?: string;
+    page?: string;
+    date?: string;
+  }>;
 }) {
   const session = await requireAuth();
   const sp = await searchParams;
   const role = session.user.role;
-  const selectedPlotId = sp.plotId;
+  const parsedPlotId = parseOptionalPlotIdPageValue(sp.plotId);
+  if (parsedPlotId.kind === "invalid") notFound();
+  const selectedPlotId =
+    parsedPlotId.kind === "valid" ? parsedPlotId.plotId : undefined;
   const selectedAuthorId = sp.authorId;
   const currentPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
 
@@ -35,23 +46,15 @@ export default async function MonitoringPage({
 
   // Role-aware base filter. Archived plots (and their logs) are excluded
   // from this active-activity view.
-  const plotFilter = {
-    status: { not: "ARCHIVED" as const },
-    ...(role === "STUDENT_FARMER"
-      ? {
-          assignments: {
-            some: { studentId: session.user.id, status: "ACTIVE" as const },
-          },
-        }
-      : role === "FACULTY"
-      ? { facultyId: session.user.id }
-      : {}),
-  };
+  const plotFilter = buildAccessiblePlotWhere(
+    { role, userId: session.user.id },
+    { status: { not: "ARCHIVED" } }
+  );
 
   // Build log filter
   const logFilter = {
     plot: plotFilter,
-    ...(selectedPlotId && { plotId: selectedPlotId }),
+    ...(selectedPlotId !== undefined ? { plotId: selectedPlotId } : {}),
     ...(selectedAuthorId && { userId: selectedAuthorId }),
     ...(dateWindow && { createdAt: dateWindow }),
   };
@@ -62,6 +65,13 @@ export default async function MonitoringPage({
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
+
+  if (
+    selectedPlotId !== undefined &&
+    !plots.some((plot) => plot.id === selectedPlotId)
+  ) {
+    notFound();
+  }
 
   // Fetch authors for filter dropdown (users who have logged in role-visible plots)
   const authorIds = await prisma.growthLog.findMany({

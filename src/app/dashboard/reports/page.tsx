@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ReportCard } from "@/components/reports/report-card";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 
 export default async function ReportsPage() {
   const session = await requireAuth();
@@ -11,18 +12,10 @@ export default async function ReportsPage() {
 
   // Archived plots are excluded from reports; historical data for a plot
   // remains in the DB but stops surfacing once it's archived.
-  const plotFilter = {
-    status: { not: "ARCHIVED" as const },
-    ...(role === "STUDENT_FARMER"
-      ? {
-          assignments: {
-            some: { studentId: session.user.id, status: "ACTIVE" as const },
-          },
-        }
-      : role === "FACULTY"
-      ? { facultyId: session.user.id }
-      : {}),
-  };
+  const plotFilter = buildAccessiblePlotWhere(
+    { role, userId: session.user.id },
+    { status: { not: "ARCHIVED" } }
+  );
 
   const plots = await prisma.plot.findMany({
     where: plotFilter,

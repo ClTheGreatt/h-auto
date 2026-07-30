@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import type { UserRole } from "@prisma/client";
+import type { Prisma, UserRole } from "@prisma/client";
 import { getDateFromRange, type TimeRange } from "@/lib/analytics/time-range";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 
 export type ReportFilters = {
   range: TimeRange;
@@ -15,10 +16,56 @@ export type ScopedReportFilters = ReportFilters & {
 // Plot-level scope for "all plots" (no specific plotId requested):
 // ADMIN/SUPER_ADMIN see everything, FACULTY only their advised plots,
 // STUDENT_FARMER only plots they're actively assigned to.
-function plotScopeWhere(role: UserRole, userId: string) {
-  if (role === "SUPER_ADMIN" || role === "ADMIN") return {};
-  if (role === "FACULTY") return { facultyId: userId };
-  return { assignments: { some: { studentId: userId, status: "ACTIVE" as const } } };
+export function buildReportPlotWhere(
+  role: UserRole,
+  userId: string,
+  additionalWhere: Prisma.PlotWhereInput = {}
+) {
+  return buildAccessiblePlotWhere({ role, userId }, additionalWhere);
+}
+
+export function buildStudentActivityStudentWhere(
+  role: UserRole,
+  advisedPlotIds: string[]
+): Prisma.UserWhereInput {
+  return {
+    role: "STUDENT_FARMER",
+    ...(role === "FACULTY"
+      ? {
+          status: "ACTIVE",
+          graduatedAt: null,
+          studentAssignments: {
+            some: buildStudentActivityAssignmentWhere(role, advisedPlotIds),
+          },
+        }
+      : {}),
+  };
+}
+
+export function buildStudentActivityAssignmentWhere(
+  role: UserRole,
+  advisedPlotIds: string[]
+): Prisma.PlotAssignmentWhereInput {
+  return {
+    status: "ACTIVE",
+    ...(role === "FACULTY"
+      ? {
+          endedAt: null,
+          plotId: { in: advisedPlotIds },
+        }
+      : {}),
+  };
+}
+
+export function buildStudentActivityGrowthLogWhere(
+  role: UserRole,
+  advisedPlotIds: string[],
+  additionalWhere: Prisma.GrowthLogWhereInput = {}
+): Prisma.GrowthLogWhereInput {
+  return {
+    ...additionalWhere,
+    ...(role === "FACULTY" ? { plotId: { in: advisedPlotIds } } : {}),
+  };
 }
 
 export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
@@ -27,9 +74,11 @@ export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
   const readings = await prisma.sensorReading.findMany({
     where: {
       ...(since ? { recordedAt: { gte: since } } : {}),
-      ...(filters.plotId
-        ? { plotId: filters.plotId }
-        : { plot: plotScopeWhere(filters.role, filters.userId) }),
+      plot: buildReportPlotWhere(
+        filters.role,
+        filters.userId,
+        filters.plotId !== undefined ? { id: filters.plotId } : {}
+      ),
     },
     orderBy: { recordedAt: "desc" },
     take: 5000,
@@ -58,7 +107,7 @@ export async function fetchPlotPerformanceData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
   const plots = await prisma.plot.findMany({
-    where: plotScopeWhere(filters.role, filters.userId),
+    where: buildReportPlotWhere(filters.role, filters.userId),
     orderBy: { name: "asc" },
     include: {
       crop: { select: { name: true, variety: true } },
@@ -120,9 +169,11 @@ export async function fetchGrowthLogData(filters: ScopedReportFilters) {
   const logs = await prisma.growthLog.findMany({
     where: {
       ...(since ? { createdAt: { gte: since } } : {}),
-      ...(filters.plotId
-        ? { plotId: filters.plotId }
-        : { plot: plotScopeWhere(filters.role, filters.userId) }),
+      plot: buildReportPlotWhere(
+        filters.role,
+        filters.userId,
+        filters.plotId !== undefined ? { id: filters.plotId } : {}
+      ),
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -152,9 +203,11 @@ export async function fetchAlertsData(filters: ScopedReportFilters) {
   const alerts = await prisma.alert.findMany({
     where: {
       ...(since ? { createdAt: { gte: since } } : {}),
-      ...(filters.plotId
-        ? { plotId: filters.plotId }
-        : { plot: plotScopeWhere(filters.role, filters.userId) }),
+      plot: buildReportPlotWhere(
+        filters.role,
+        filters.userId,
+        filters.plotId !== undefined ? { id: filters.plotId } : {}
+      ),
     },
     orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
     include: {
@@ -307,21 +360,27 @@ export async function fetchActivityData(filters: ReportFilters) {
 
 export async function fetchStudentActivityData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
+  const advisedPlotIds =
+    filters.role === "FACULTY"
+      ? (
+          await prisma.plot.findMany({
+            where: buildReportPlotWhere(filters.role, filters.userId),
+            select: { id: true },
+          })
+        ).map((plot) => plot.id)
+      : [];
+  const assignmentWhere = buildStudentActivityAssignmentWhere(
+    filters.role,
+    advisedPlotIds
+  );
+  const growthLogInRangeWhere = buildStudentActivityGrowthLogWhere(
+    filters.role,
+    advisedPlotIds,
+    since ? { createdAt: { gte: since } } : {}
+  );
 
   const students = await prisma.user.findMany({
-    where: {
-      role: "STUDENT_FARMER",
-      ...(filters.role === "SUPER_ADMIN" || filters.role === "ADMIN"
-        ? {}
-        : {
-            studentAssignments: {
-              some: {
-                status: "ACTIVE",
-                plot: plotScopeWhere(filters.role, filters.userId),
-              },
-            },
-          }),
-    },
+    where: buildStudentActivityStudentWhere(filters.role, advisedPlotIds),
     orderBy: { firstName: "asc" },
     select: {
       id: true,
@@ -332,8 +391,11 @@ export async function fetchStudentActivityData(filters: ScopedReportFilters) {
       section: true,
       _count: {
         select: {
-          growthLogs: since ? { where: { createdAt: { gte: since } } } : true,
-          studentAssignments: { where: { status: "ACTIVE" } },
+          growthLogs:
+            Object.keys(growthLogInRangeWhere).length > 0
+              ? { where: growthLogInRangeWhere }
+              : true,
+          studentAssignments: { where: assignmentWhere },
         },
       },
     },
@@ -342,20 +404,34 @@ export async function fetchStudentActivityData(filters: ScopedReportFilters) {
   const result = [];
   for (const s of students) {
     const totalObservations = await prisma.growthLog.count({
-      where: { userId: s.id },
+      where: buildStudentActivityGrowthLogWhere(
+        filters.role,
+        advisedPlotIds,
+        { userId: s.id }
+      ),
     });
 
     const photoCount = await prisma.growthImage.count({
       where: {
         growthLog: {
-          userId: s.id,
-          ...(since ? { createdAt: { gte: since } } : {}),
+          ...buildStudentActivityGrowthLogWhere(
+            filters.role,
+            advisedPlotIds,
+            {
+              userId: s.id,
+              ...(since ? { createdAt: { gte: since } } : {}),
+            }
+          ),
         },
       },
     });
 
     const latestLog = await prisma.growthLog.findFirst({
-      where: { userId: s.id },
+      where: buildStudentActivityGrowthLogWhere(
+        filters.role,
+        advisedPlotIds,
+        { userId: s.id }
+      ),
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     });

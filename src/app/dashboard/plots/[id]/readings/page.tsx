@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ReadingsFilters } from "@/components/plots/readings-filters";
 import { LiveRefresh } from "@/components/plots/live-refresh";
+import { findReadingHistoryPlot } from "@/lib/auth/plot-access";
 
 const PAGE_SIZE = 50;
 const DAY = 24 * 60 * 60 * 1000;
@@ -35,26 +36,21 @@ export default async function PlotReadingsPage({
   const range = sp.range === "7d" || sp.range === "30d" ? sp.range : null;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const plot = await prisma.plot.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      device: { select: { id: true } },
-      assignments: {
-        where: { status: "ACTIVE" },
-        select: { studentId: true },
-      },
-    },
-  });
+  const plot = await findReadingHistoryPlot(
+    role,
+    session.user.id,
+    id,
+    (where) =>
+      prisma.plot.findFirst({
+        where,
+        select: {
+          id: true,
+          name: true,
+          device: { select: { id: true } },
+        },
+      })
+  );
   if (!plot) notFound();
-
-  if (role === "STUDENT_FARMER") {
-    const assigned = plot.assignments.some(
-      (a) => a.studentId === session.user.id
-    );
-    if (!assigned) redirect("/dashboard/plots");
-  }
 
 // date window
   const recordedAt = resolveWindow(month, range);

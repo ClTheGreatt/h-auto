@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { findGrowthLogsInBucket } from "@/lib/analytics/observations-by-date";
+import { assertCanAccessPlot } from "@/lib/auth/plot-access";
+import { parseOptionalPlotIdSearchParams } from "@/lib/auth/plot-id";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -14,7 +16,19 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
     const bucketStartParam = sp.get("bucketStart");
     const bucketMsParam = sp.get("bucketMs");
-    const plotId = sp.get("plotId") ?? undefined;
+    const parsedPlotId = parseOptionalPlotIdSearchParams(sp);
+    if (parsedPlotId.kind === "invalid") {
+      return NextResponse.json({ error: "Invalid plotId" }, { status: 400 });
+    }
+    const plotId =
+      parsedPlotId.kind === "valid" ? parsedPlotId.plotId : undefined;
+
+    if (
+      plotId !== undefined &&
+      !(await assertCanAccessPlot(user.role, user.id, plotId))
+    ) {
+      return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+    }
 
     if (!bucketStartParam || !bucketMsParam) {
       return NextResponse.json(

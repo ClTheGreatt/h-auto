@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import {
+  buildDirectPlotAccessWhere,
+  isValidPlotId,
+} from "@/lib/auth/plot-access";
 
 const LIMIT = 50;
 const DAY = 24 * 60 * 60 * 1000;
@@ -15,6 +19,10 @@ export async function GET(
   }
 
   const { id } = await params;
+  if (!isValidPlotId(id)) {
+    return NextResponse.json({ error: "Invalid plotId" }, { status: 400 });
+  }
+
   const sp = req.nextUrl.searchParams;
   const cursor = sp.get("cursor");
   const order: "asc" | "desc" = sp.get("order") === "asc" ? "asc" : "desc";
@@ -22,15 +30,8 @@ export async function GET(
   const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null;
   const range = sp.get("range");
 
-  const access =
-    user.role === "STUDENT_FARMER"
-      ? { assignments: { some: { studentId: user.id, status: "ACTIVE" as const } } }
-      : user.role === "FACULTY"
-        ? { facultyId: user.id }
-        : {};
-
   const plot = await prisma.plot.findFirst({
-    where: { id, ...access },
+    where: buildDirectPlotAccessWhere(user.role, user.id, id),
     select: { id: true },
   });
   if (!plot) {

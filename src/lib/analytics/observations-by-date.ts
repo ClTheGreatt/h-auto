@@ -1,17 +1,26 @@
 import { prisma } from "@/lib/prisma";
+import type { UserRole } from "@prisma/client";
+import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
 
-export function plotScopeFilter(role: string, userId: string, plotId?: string) {
-  const base =
-    role === "STUDENT_FARMER"
-      ? { assignments: { some: { studentId: userId, status: "ACTIVE" as const } } }
-      : role === "FACULTY"
-      ? { facultyId: userId }
-      : {};
-  return plotId ? { ...base, id: plotId } : base;
+export function plotScopeFilter(
+  role: UserRole,
+  userId: string,
+  plotId?: string
+) {
+  const parsedPlotId = parseOptionalPlotIdPageValue(plotId);
+  return buildAccessiblePlotWhere(
+    { role, userId },
+    parsedPlotId.kind === "valid"
+      ? { id: parsedPlotId.plotId }
+      : parsedPlotId.kind === "invalid"
+        ? { id: { in: [] } }
+        : {}
+  );
 }
 
 export async function findGrowthLogsInBucket(params: {
-  role: string;
+  role: UserRole;
   userId: string;
   bucketStart: number;
   bucketMs: number;
