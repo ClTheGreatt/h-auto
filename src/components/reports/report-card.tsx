@@ -35,7 +35,7 @@ const ICONS: Record<string, LucideIcon> = {
   filetext: FileText,
 };
 
-type Plot = { id: string; name: string };
+type Plot = { id: string; name: string; group?: "Operational" | "Historical" };
 
 export function ReportCard({
   type,
@@ -143,7 +143,11 @@ export function ReportCard({
             <div>
               <Label className="text-xs">Plot</Label>
               <SearchableSelect
-                options={plots.map((p) => ({ value: p.id, label: p.name }))}
+                options={plots.map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                  group: p.group,
+                }))}
                 value={plotId}
                 onChange={setPlotId}
                 allLabel="All plots"

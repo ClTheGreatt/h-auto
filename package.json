@@ -10,6 +10,7 @@
     "test:analytics-dates": "tsx --test src/lib/analytics/manila-dates.test.ts",
     "test:analytics-access": "tsx --test src/lib/auth/analytics-access.test.ts",
     "test:device-offline": "tsx --test src/lib/alerts/device-offline.test.ts",
+    "test:lifecycle-scopes": "tsx --test src/lib/plots/lifecycle.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

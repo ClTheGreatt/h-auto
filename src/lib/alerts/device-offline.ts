@@ -3,18 +3,13 @@ import type {
   DeviceStatus,
   PlotStatus,
 } from "@prisma/client";
-import {
-  ACTIVE_MONITORING_PLOT_STATUSES,
-  DEVICE_OFFLINE_THRESHOLD_MS,
-} from "@/lib/utils/device-status";
+import { DEVICE_OFFLINE_THRESHOLD_MS } from "@/lib/utils/device-status";
+import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import type { AlertSuggestion } from "./suggestions";
 
 export const CRITICAL_OFFLINE_THRESHOLD_MS = 120 * 60 * 1000;
 
 const EXCLUDED_DEVICE_STATUSES: DeviceStatus[] = ["MAINTENANCE", "RETIRED"];
-const OPERATIONAL_PLOT_STATUSES: PlotStatus[] = [
-  ...ACTIVE_MONITORING_PLOT_STATUSES,
-];
 
 export type OfflineDeviceCandidate = {
   id: string;

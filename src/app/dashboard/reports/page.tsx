@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ReportCard } from "@/components/reports/report-card";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { HISTORICAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export default async function ReportsPage() {
   const session = await requireAuth();
@@ -10,18 +11,26 @@ export default async function ReportsPage() {
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
   const isFacultyOrAdmin = isAdmin || role === "FACULTY";
 
-  // Archived plots are excluded from reports; historical data for a plot
-  // remains in the DB but stops surfacing once it's archived.
-  const plotFilter = buildAccessiblePlotWhere(
-    { role, userId: session.user.id },
-    { status: { not: "ARCHIVED" } }
-  );
+  // Reports is historical reporting: unlike the live-monitoring surfaces,
+  // every lifecycle status (including ARCHIVED) is selectable here.
+  const plotFilter = buildAccessiblePlotWhere({ role, userId: session.user.id });
 
-  const plots = await prisma.plot.findMany({
+  const plotRows = await prisma.plot.findMany({
     where: plotFilter,
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, status: true },
   });
+
+  // Group the plot selector into "Operational" (setup + operational, i.e.
+  // not yet historical) and "Historical" (HARVESTED/FALLOW/ARCHIVED) using
+  // the canonical lifecycle classification.
+  const plots = plotRows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    group: (HISTORICAL_PLOT_STATUSES.includes(p.status)
+      ? "Historical"
+      : "Operational") as "Operational" | "Historical",
+  }));
 
   const reports = [
     {

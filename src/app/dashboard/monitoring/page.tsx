@@ -9,6 +9,7 @@ import { DateFilter } from "@/components/monitoring/date-filter";
 import { LogFeedItem } from "@/components/monitoring/log-feed-item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
 import {
   MANILA_TIME_ZONE,
@@ -48,11 +49,12 @@ export default async function MonitoringPage({
     ? getManilaDayRange(selectedDate) ?? undefined
     : undefined;
 
-  // Role-aware base filter. Archived plots (and their logs) are excluded
-  // from this active-activity view.
+  // Role-aware base filter, scoped to plots the lifecycle considers
+  // operational (PLANTED/GROWING/READY_FOR_HARVEST) — this is an active-
+  // activity view, not a historical one.
   const plotFilter = buildAccessiblePlotWhere(
     { role, userId: session.user.id },
-    { status: { not: "ARCHIVED" } }
+    { status: { in: OPERATIONAL_PLOT_STATUSES } }
   );
 
   // Build log filter

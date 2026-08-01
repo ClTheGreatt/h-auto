@@ -18,7 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-type Option = { value: string; label: string };
+type Option = { value: string; label: string; group?: string };
 
 type Props = {
   options: Option[];
@@ -41,6 +41,37 @@ export function SearchableSelect({
 }: Props) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
+  const hasGroups = options.some((o) => o.group);
+  const groupedOptions = hasGroups
+    ? options.reduce<Map<string, Option[]>>((map, option) => {
+        const key = option.group ?? "";
+        const bucket = map.get(key) ?? [];
+        bucket.push(option);
+        map.set(key, bucket);
+        return map;
+      }, new Map())
+    : null;
+
+  function renderItem(option: Option) {
+    return (
+      <CommandItem
+        key={option.value}
+        value={option.label}
+        onSelect={() => {
+          onChange(option.value === value ? undefined : option.value);
+          setOpen(false);
+        }}
+      >
+        <Check
+          className={cn(
+            "w-4 h-4 mr-2",
+            value === option.value ? "opacity-100" : "opacity-0"
+          )}
+        />
+        {option.label}
+      </CommandItem>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -67,7 +98,7 @@ export function SearchableSelect({
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
-              {/* "All" option — always at the top */}
+              {/* "All" option — always at the top, ungrouped */}
               <CommandItem
                 value="__all__"
                 onSelect={() => {
@@ -83,27 +114,17 @@ export function SearchableSelect({
                 />
                 {allLabel}
               </CommandItem>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onChange(
-                      option.value === value ? undefined : option.value
-                    );
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "w-4 h-4 mr-2",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option.label}
-                </CommandItem>
-              ))}
+              {!groupedOptions && options.map(renderItem)}
             </CommandGroup>
+            {groupedOptions &&
+              [...groupedOptions.entries()].map(([groupName, opts]) => (
+                <CommandGroup
+                  key={groupName || "__ungrouped__"}
+                  heading={groupName || undefined}
+                >
+                  {opts.map(renderItem)}
+                </CommandGroup>
+              ))}
           </CommandList>
         </Command>
       </PopoverContent>

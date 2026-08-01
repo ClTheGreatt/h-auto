@@ -32,29 +32,23 @@ import {
 } from "@/lib/sensors/threshold-status";
 import { NeedsActionList, type NeedsActionAlert } from "@/components/dashboard/needs-action-list";
 import { RestartTourButton } from "@/components/tour/restart-tour-button";
-import type { AlertSeverity, AlertType, PlotStatus } from "@prisma/client";
+import type { AlertSeverity, AlertType } from "@prisma/client";
 import {
   buildAccessiblePlotWhere,
   buildHistoricalAlertWhere,
   buildOperationalAlertWhere,
   OPERATIONAL_PLOT_STATUSES,
 } from "@/lib/alerts/scope";
+import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 const OBSERVATION_TRUNCATE_LENGTH = 100;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-// PREPARING remains visible for setup/readiness cards; live alert rows use
-// only the shared operational statuses.
-const DASHBOARD_PLOT_STATUSES = [
-  "PREPARING",
-  ...OPERATIONAL_PLOT_STATUSES,
-] satisfies PlotStatus[];
 
 // A missing device/stage is expected setup state while PREPARING — it only
 // becomes a real "the system can't monitor this" problem once the crop is
 // actually in the ground. READY_FOR_HARVEST counts too: the crop is still
 // physically there until it's harvested. HARVESTED/FALLOW/ARCHIVED never
-// appear in `plots` at all (excluded by DASHBOARD_PLOT_STATUSES above), so they're
+// appear in `plots` at all (excluded by ACTIVITY_PLOT_STATUSES below), so they're
 // moot here.
 // Vegetative/Harvest deliberately avoid green/amber — this file's grep check
 // (Step 8) requires zero red/amber/yellow/green/emerald matches anywhere in
@@ -303,8 +297,12 @@ export default async function DashboardPage() {
   const nowMs = now.getTime();
   const oneWeekAgo = new Date(nowMs - 7 * DAY_MS);
 
-  // Role-aware plot filter
-  const plotFilter = buildAccessiblePlotWhere(actor);
+  // Role-aware plot filter, scoped to plots the lifecycle considers active
+  // (setup + operational) so growth logs from HARVESTED/FALLOW/ARCHIVED
+  // plots don't leak into "this week" stats or the recent activity feed.
+  const plotFilter = buildAccessiblePlotWhere(actor, {
+    status: { in: ACTIVITY_PLOT_STATUSES },
+  });
 
   const [userCount, activeAssignmentCount, recentLogCount, recentLogs, plots] =
     await Promise.all([
@@ -336,7 +334,7 @@ export default async function DashboardPage() {
       // added here once rather than issuing a query per card.
       prisma.plot.findMany({
         where: buildAccessiblePlotWhere(actor, {
-          status: { in: DASHBOARD_PLOT_STATUSES },
+          status: { in: ACTIVITY_PLOT_STATUSES },
         }),
         orderBy: { name: "asc" },
         include: {

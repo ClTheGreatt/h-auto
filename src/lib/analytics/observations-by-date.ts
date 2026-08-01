@@ -3,6 +3,7 @@ import type { UserRole } from "@prisma/client";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
 import { getAnalyticsBucketRange } from "@/lib/analytics/manila-dates";
+import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export function plotScopeFilter(
   role: UserRole,
@@ -10,13 +11,18 @@ export function plotScopeFilter(
   plotId?: string
 ) {
   const parsedPlotId = parseOptionalPlotIdPageValue(plotId);
+  // A specific plot explicitly requested (e.g. single-plot drilldown) must
+  // still resolve regardless of lifecycle status. The lifecycle scope only
+  // applies when no specific plot was requested.
+  if (parsedPlotId.kind === "valid") {
+    return buildAccessiblePlotWhere({ role, userId }, { id: parsedPlotId.plotId });
+  }
+  if (parsedPlotId.kind === "invalid") {
+    return buildAccessiblePlotWhere({ role, userId }, { id: { in: [] } });
+  }
   return buildAccessiblePlotWhere(
     { role, userId },
-    parsedPlotId.kind === "valid"
-      ? { id: parsedPlotId.plotId }
-      : parsedPlotId.kind === "invalid"
-        ? { id: { in: [] } }
-        : {}
+    { status: { in: OPERATIONAL_PLOT_STATUSES } }
   );
 }
 

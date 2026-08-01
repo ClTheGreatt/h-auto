@@ -1,14 +1,12 @@
-import type { PlotStatus, Prisma, UserRole } from "@prisma/client";
-import { ACTIVE_MONITORING_PLOT_STATUSES } from "@/lib/utils/device-status";
+import type { Prisma, UserRole } from "@prisma/client";
+import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export type AlertScopeActor = {
   role: UserRole;
   userId: string;
 };
 
-export const OPERATIONAL_PLOT_STATUSES: PlotStatus[] = [
-  ...ACTIVE_MONITORING_PLOT_STATUSES,
-];
+export { OPERATIONAL_PLOT_STATUSES };
 
 function buildRolePlotWhere({
   role,
