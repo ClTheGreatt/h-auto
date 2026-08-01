@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
 import { resolveMobilePlotSelection } from "@/lib/analytics/mobile-plot-selection";
+import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import {
   DAY_MS,
   HOUR_MS,
@@ -42,12 +43,14 @@ export async function GET(req: NextRequest) {
         prisma.plot.findMany({
           where: buildAccessiblePlotWhere(
             { role: user.role, userId: user.id },
-            {
-              status: { not: "ARCHIVED" },
-              ...(requestedPlotId !== undefined
-                ? { id: requestedPlotId }
-                : {}),
-            }
+            // A specific plot explicitly requested (drilldown) resolves
+            // regardless of lifecycle status EXCEPT archived — archived
+            // means deliberately retired, so it stays unreachable even via
+            // direct plotId. The lifecycle scope only applies to the "all
+            // accessible plots" aggregate view.
+            requestedPlotId !== undefined
+              ? { id: requestedPlotId, status: { not: "ARCHIVED" } }
+              : { status: { in: OPERATIONAL_PLOT_STATUSES } }
           ),
           select: { id: true, status: true },
         })

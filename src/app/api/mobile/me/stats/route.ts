@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -10,18 +11,27 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const accessiblePlotWhere = buildAccessiblePlotWhere({
+    // "How many plots am I working on right now" — scoped to plots the
+    // lifecycle considers operational.
+    const operationalPlotWhere = buildAccessiblePlotWhere(
+      { role: user.role, userId: user.id },
+      { status: { in: OPERATIONAL_PLOT_STATUSES } }
+    );
+    const plotsAssigned = await prisma.plot.count({
+      where: operationalPlotWhere,
+    });
+
+    // "How many observations have I logged, ever" — a lifetime achievement
+    // stat. Deliberately unscoped by lifecycle status: harvest is success,
+    // not exit, so a plot being harvested must never make this count drop.
+    const anyStatusAccessiblePlotWhere = buildAccessiblePlotWhere({
       role: user.role,
       userId: user.id,
     });
-    const plotsAssigned = await prisma.plot.count({
-      where: accessiblePlotWhere,
-    });
-
     const observationsCount = await prisma.growthLog.count({
       where: {
         userId: user.id,
-        plot: accessiblePlotWhere,
+        plot: anyStatusAccessiblePlotWhere,
       },
     });
 
