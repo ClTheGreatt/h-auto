@@ -25,6 +25,10 @@ import {
   ALERT_TYPE_LABELS,
 } from "@/lib/analytics/aggregator";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import {
+  ACTIVITY_PLOT_STATUSES,
+  OPERATIONAL_PLOT_STATUSES,
+} from "@/lib/plots/lifecycle";
 import { parseOptionalPlotIdPageValue } from "@/lib/auth/plot-id";
 import {
   DAY_MS,
@@ -233,18 +237,27 @@ export default async function AnalyticsPage({
 
   const bucketMs = pickBucketMs(month, since);
 
-  // Role-aware base filter
-  // Archived plots are excluded from analytics; historical data for a plot
-  // remains in the DB but stops surfacing once it's archived.
+  // Role-aware base filter. This is the inventory list — plot picker, the
+  // "Plots" stat tile, and the plot health summary — so it's scoped to
+  // ACTIVITY_PLOT_STATUSES, matching the Dashboard's "Plots" count and the
+  // Plots page's "Active" tab.
   const actor = { role, userId: session.user.id };
   const plotFilter = buildAccessiblePlotWhere(actor, {
-    status: { not: "ARCHIVED" },
+    status: { in: ACTIVITY_PLOT_STATUSES },
   });
 
-  const combinedPlotFilter = buildAccessiblePlotWhere(actor, {
-    status: { not: "ARCHIVED" },
-    ...(selectedPlotId !== undefined ? { id: selectedPlotId } : {}),
-  });
+  // Every chart and sensor/alert/observation aggregate below is operational
+  // health data, so it's scoped to OPERATIONAL_PLOT_STATUSES — except when a
+  // specific plot is explicitly selected: that plot was already validated
+  // against the ACTIVITY-scoped `plots` list above (via the notFound() check
+  // below), which can never contain an ARCHIVED plot, so resolving it by id
+  // alone here is safe and lets PREPARING plots still be inspected directly.
+  const combinedPlotFilter = buildAccessiblePlotWhere(
+    actor,
+    selectedPlotId !== undefined
+      ? { id: selectedPlotId }
+      : { status: { in: OPERATIONAL_PLOT_STATUSES } }
+  );
 
   const plots = await prisma.plot.findMany({
     where: plotFilter,
