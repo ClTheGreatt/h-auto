@@ -7,6 +7,7 @@ import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { updateProfileImage } from "@/actions/profile";
+import { RemoveAvatarDialog } from "@/components/profile/remove-avatar-dialog";
 
 type Props = {
   currentImage: string | null;
@@ -124,6 +125,20 @@ export function AvatarUploadForm({ currentImage, initials }: Props) {
             Cancel
           </Button>
         </div>
+      )}
+
+      {!file && currentImage && (
+        <RemoveAvatarDialog
+          trigger={
+            <button
+              type="button"
+              disabled={submitting}
+              className="text-xs text-muted-foreground hover:text-red-600 disabled:cursor-not-allowed"
+            >
+              Remove photo
+            </button>
+          }
+        />
       )}
 
       <input

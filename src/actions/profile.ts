@@ -146,3 +146,21 @@ export async function updateProfileImage(formData: FormData) {
   revalidatePath("/dashboard");
   return { success: true, url: upload.url };
 }
+
+export async function removeProfileImage() {
+  const session = await requireAuth();
+
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { profileImage: null },
+    });
+  } catch (error) {
+    console.error("removeProfileImage error:", error);
+    return { error: "Failed to remove your photo. Please try again." };
+  }
+
+  revalidatePath("/dashboard/profile");
+  revalidatePath("/dashboard");
+  return { success: true };
+}

@@ -53,3 +53,29 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Clears the AUTHENTICATED user's own avatar. Never accepts a userId from
+// the request — always scoped to getMobileUser(req)'s id. Cloudinary asset
+// is intentionally not deleted here (see AVATAR-1 batch report).
+export async function DELETE(req: NextRequest) {
+  const user = await getMobileUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { profileImage: null },
+      select: USER_SELECT,
+    });
+
+    return NextResponse.json({ user: updated });
+  } catch (error) {
+    console.error("[mobile/me/avatar] error:", error);
+    return NextResponse.json(
+      { error: "Failed to remove avatar" },
+      { status: 500 }
+    );
+  }
+}
