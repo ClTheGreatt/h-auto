@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
-import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
+import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export async function GET(req: NextRequest) {
   const user = await getMobileUser(req);
@@ -11,14 +11,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // "How many plots am I working on right now" — scoped to plots the
-    // lifecycle considers operational.
-    const operationalPlotWhere = buildAccessiblePlotWhere(
+    // "My Plots" / "Total Plots" on the Profile screen — an inventory
+    // count, must match the Plots tab's "Active" filter and the mobile
+    // dashboard's plot count, both scoped to ACTIVITY_PLOT_STATUSES.
+    const activityPlotWhere = buildAccessiblePlotWhere(
       { role: user.role, userId: user.id },
-      { status: { in: OPERATIONAL_PLOT_STATUSES } }
+      { status: { in: ACTIVITY_PLOT_STATUSES } }
     );
     const plotsAssigned = await prisma.plot.count({
-      where: operationalPlotWhere,
+      where: activityPlotWhere,
     });
 
     // "How many observations have I logged, ever" — a lifetime achievement

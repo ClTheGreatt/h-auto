@@ -6,7 +6,7 @@ import {
   buildOperationalAlertWhere,
 } from "@/lib/alerts/scope";
 import { getCurrentManilaDayRange } from "@/lib/analytics/manila-dates";
-import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
+import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 const SEVERITY_ORDER: Record<string, number> = {
   CRITICAL: 0,
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const actor = { role: user.role, userId: user.id };
     const plotFilter = buildAccessiblePlotWhere(actor, {
-      status: { in: OPERATIONAL_PLOT_STATUSES },
+      status: { in: ACTIVITY_PLOT_STATUSES },
     });
     const operationalAlertsWhere = buildOperationalAlertWhere(actor);
 
