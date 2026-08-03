@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Laptop } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,8 +27,20 @@ const THEMES = [
   },
 ] as const;
 
+// useSyncExternalStore (not useState+useEffect) so this client/server
+// mounted guard doesn't trip the react-hooks/set-state-in-effect lint rule
+// — same technique as src/components/ui/theme-toggle.tsx.
+function useMounted() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
+
 export function AppearanceForm() {
   const { theme, setTheme } = useTheme();
+  const mounted = useMounted();
 
   return (
     <Card>
@@ -41,7 +54,7 @@ export function AppearanceForm() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {THEMES.map((t) => {
             const Icon = t.icon;
-            const isActive = theme === t.value;
+            const isActive = mounted && theme === t.value;
             return (
               <button
                 key={t.value}
