@@ -19,6 +19,7 @@ import { requireAuth } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 import { getDeviceFreshness } from "@/lib/utils/device-status";
 import { buildDirectPlotAccessWhere } from "@/lib/auth/plot-access";
+import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { RestorePlotDialog } from "@/components/plots/restore-plot-dialog";
 import { HarvestPlotDialog } from "@/components/plots/harvest-plot-dialog";
@@ -150,14 +151,10 @@ export default async function PlotDetailPage({
 
   const availableStudents = canManageAssignmentsNow
     ? await prisma.user.findMany({
-        where: {
-          role: "STUDENT_FARMER",
-          status: "ACTIVE",
-          graduatedAt: null, // bug fix: previously graduated students were
-          // offered in the picker even though assignStudent always
-          // rejects them.
-          ...(role === "FACULTY" ? { section: { in: advisedSections } } : {}),
-        },
+        where: await buildAssignableStudentsWhere({
+          role,
+          userId: session.user.id,
+        }),
         select: {
           id: true,
           firstName: true,
