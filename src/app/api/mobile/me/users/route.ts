@@ -10,6 +10,7 @@ import {
 } from "@/lib/validations/user";
 import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
+import { generateTempPassword } from "@/lib/auth/generate-password";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -26,10 +27,30 @@ const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE"];
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (same
 // rule as the web createUser action). Other roles (ADMIN/SUPER_ADMIN)
 // keep the lenient schema.
+//
+// TEMPPASS-1 backward compatibility: `password` is made optional here
+// (still validated with the same passwordStrengthSchema whenever it IS
+// supplied — .partial() only wraps the field in .optional(), it doesn't
+// relax the rule) so this one endpoint serves both the pre-rebuild APK
+// (always sends an admin-typed password) and the rebuilt APK (omits it,
+// expects the server to generate one — see the POST handler below). Once
+// the rebuilt APK has fully shipped, remove these *OptionalPassword
+// variants and go back to returning createUserSchema/createStudentSchema/
+// createFacultySchema directly.
+const createUserSchemaOptionalPassword = createUserSchema.partial({
+  password: true,
+});
+const createStudentSchemaOptionalPassword = createStudentSchema.partial({
+  password: true,
+});
+const createFacultySchemaOptionalPassword = createFacultySchema.partial({
+  password: true,
+});
+
 function pickCreateSchema(role: unknown) {
-  if (role === "STUDENT_FARMER") return createStudentSchema;
-  if (role === "FACULTY") return createFacultySchema;
-  return createUserSchema;
+  if (role === "STUDENT_FARMER") return createStudentSchemaOptionalPassword;
+  if (role === "FACULTY") return createFacultySchemaOptionalPassword;
+  return createUserSchemaOptionalPassword;
 }
 
 // Maps Prisma unique-constraint errors to friendly messages (same idea as web)
@@ -174,7 +195,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { password, ...rest } = parsed.data;
+    const { password: suppliedPassword, ...rest } = parsed.data;
+    // TEMPPASS-1: when the admin didn't supply a password, generate one —
+    // mirrors web's createUser action. The generated password is never run
+    // through passwordStrengthSchema: its format (Hauto-XXXX-XXXX, all
+    // uppercase letters + digits) doesn't satisfy the lowercase-letter
+    // rule, exactly like web never validates its generated password either.
+    const serverGeneratedPassword = suppliedPassword === undefined;
+    const password = suppliedPassword ?? generateTempPassword();
     const passwordHash = await bcrypt.hash(password, 10);
 
     let created;
@@ -245,7 +273,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ user: created });
+    // tempPassword is additive and only present when the server generated
+    // it — an admin-supplied password is never echoed back.
+    return NextResponse.json({
+      user: created,
+      ...(serverGeneratedPassword ? { tempPassword: password } : {}),
+    });
   } catch (error) {
     console.error("[mobile/me/users POST] error:", error);
     return NextResponse.json(
