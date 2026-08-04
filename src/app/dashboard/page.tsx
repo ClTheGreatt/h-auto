@@ -549,7 +549,10 @@ export default async function DashboardPage() {
            real EmptyState (dashed card, centered icon+title, generous
            padding) instead of a bare line, vertically centered in a tall
            wrapper so it doesn't read as a broken page. */
-        <div className="flex items-center justify-center min-h-[60vh]">
+        <div
+          className="flex items-center justify-center min-h-[60vh]"
+          data-tour="dashboard.attention-summary"
+        >
           <EmptyState
             icon={Sprout}
             title={
@@ -560,7 +563,10 @@ export default async function DashboardPage() {
                 : "No active plots yet."
             }
             action={
-              <div className="space-y-3 max-w-sm mx-auto">
+              <div
+                className="space-y-3 max-w-sm mx-auto"
+                data-tour="dashboard.plot-cards"
+              >
                 {isStudent && (
                   <>
                     <p className="text-sm text-muted-foreground">
@@ -597,6 +603,7 @@ export default async function DashboardPage() {
         <>
       {/* Attention summary */}
       <div
+        data-tour="dashboard.attention-summary"
         className={cn(
           "border rounded-md bg-card border-l-4 p-4",
           hasCriticalAttention
@@ -669,7 +676,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Plot cards */}
-      <Card>
+      <Card data-tour="dashboard.plot-cards">
         <CardHeader>
           <CardTitle className="text-base">Plots</CardTitle>
         </CardHeader>

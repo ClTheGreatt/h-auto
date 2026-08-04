@@ -46,29 +46,20 @@ export function createFacultyTour(router: AppRouterInstance): TourStep[] {
       },
     },
     {
-      element: '[data-tour="dashboard.stat-my-plots"]',
+      element: '[data-tour="dashboard.attention-summary"]',
       popover: {
-        title: "Plots I Oversee",
+        title: "Today's triage",
         description:
-          "This tile shows the number of plots assigned to you as faculty adviser. As a faculty member, you see all plots you oversee, not just individual ones. Click the tile to view the complete list.",
+          "H-Auto evaluates every plot you advise and surfaces what needs attention first, such as a critical alert, an offline device, or missing setup. Checking this is the first thing to do each day, before anything else on the dashboard.",
         side: "bottom",
       },
     },
     {
-      element: '[data-tour="dashboard.stat-alerts"]',
+      element: '[data-tour="dashboard.plot-cards"]',
       popover: {
-        title: "Open Alerts",
+        title: "Plot cards",
         description:
-          "This tile shows all open alerts on plots under your supervision. As a faculty member, you have the capability to resolve alerts after taking action. This resolve function is not available to Student users.",
-        side: "bottom",
-      },
-    },
-    {
-      element: '[data-tour="dashboard.my-plots-grid"]',
-      popover: {
-        title: "Your assigned plots",
-        description:
-          "These cards show the plots you oversee with their latest sensor readings. Click any card to view details and manage the students assigned to each plot.",
+          "Every plot you oversee gets its own card here, showing its latest sensor readings, device status, and any open alerts at a glance. Click a card to view its details and manage the students assigned to it.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,

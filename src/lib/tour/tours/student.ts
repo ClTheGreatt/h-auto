@@ -46,29 +46,20 @@ export function createStudentTour(router: AppRouterInstance): TourStep[] {
       },
     },
     {
-      element: '[data-tour="dashboard.stat-my-plots"]',
+      element: '[data-tour="dashboard.attention-summary"]',
       popover: {
-        title: "My Plots",
+        title: "Today's triage",
         description:
-          "This tile shows the number of plots assigned to you for monitoring. It updates in real time when new assignments are added or completed. Click the tile to view the full list of your plots.",
+          "H-Auto evaluates your assigned plots and surfaces what needs attention first, such as a critical alert, an offline device, or a growth stage that still needs to be set. Checking this is the first thing to do each day, before anything else on the dashboard.",
         side: "bottom",
       },
     },
     {
-      element: '[data-tour="dashboard.stat-alerts"]',
+      element: '[data-tour="dashboard.plot-cards"]',
       popover: {
-        title: "Open Alerts",
+        title: "Plot cards",
         description:
-          "This tile shows open alerts for your plots. Critical issues such as low soil moisture, high temperature, or low light appear here. A red number indicates critical alerts that need immediate action. Yellow or orange indicates warnings. Zero means all conditions are within optimal range.",
-        side: "bottom",
-      },
-    },
-    {
-      element: '[data-tour="dashboard.my-plots-grid"]',
-      popover: {
-        title: "Your assigned plots",
-        description:
-          "These cards show your assigned plots with the latest sensor readings including moisture, temperature, humidity, and NPK levels. Click any card to view details, log an observation with a photo, or check sensor history.",
+          "Each of your assigned plots gets its own card here, showing its latest sensor readings, device status, and any open alerts at a glance. Click a card to view details, log an observation with a photo, or check sensor history.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,

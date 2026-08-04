@@ -46,29 +46,20 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       },
     },
     {
-      element: '[data-tour="dashboard.stat-my-plots"]',
+      element: '[data-tour="dashboard.attention-summary"]',
       popover: {
-        title: "Total Plots",
+        title: "Today's triage",
         description:
-          "This tile shows the total plot count across the entire system. As an Admin, you see all plots regardless of assignment. Click the tile to view the complete list.",
+          "H-Auto evaluates every plot in the system and surfaces what needs attention first, such as a critical alert, an offline device, or missing setup. Checking this is the first thing to do each day, before anything else on the dashboard.",
         side: "bottom",
       },
     },
     {
-      element: '[data-tour="dashboard.stat-alerts"]',
+      element: '[data-tour="dashboard.plot-cards"]',
       popover: {
-        title: "Open Alerts",
+        title: "Plot cards",
         description:
-          "This tile shows the system wide alert count. As an Admin, you have the highest visibility. You can see alerts for all plots and users in the system.",
-        side: "bottom",
-      },
-    },
-    {
-      element: '[data-tour="dashboard.my-plots-grid"]',
-      popover: {
-        title: "System Activity Overview",
-        description:
-          "This section provides an overview of recent activity across the system. This is your operational dashboard covering all plots, all students, in real time.",
+          "Every plot in the system gets its own card here, showing its latest sensor readings, device status, and any open alerts at a glance. As an Admin, this covers every plot regardless of who it's assigned to.",
         side: "top",
         onNextClick: navigateAndAdvance(
           router,
