@@ -91,7 +91,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "Adding a single user",
         description:
-          "Click the Add user button to add users one at a time. Fill in the form with email, name, and role. Depending on the role, specific fields will appear. Course, Year, and Section for Students, or Department and Position for Faculty. Set an initial password for the user (required). This will be sent to their email as a temporary login credential, which they can change after signing in.",
+          "Click the Add user button to add users one at a time. Fill in the form with email, name, and role. Depending on the role, specific fields will appear. Course, Year, and Section for Students, or Department and Position for Faculty. A temporary password is generated automatically and emailed to the user, who can change it after signing in.",
         side: "bottom",
       },
     },

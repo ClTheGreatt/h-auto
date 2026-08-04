@@ -34,7 +34,7 @@ const ADMIN_SECTIONS: Section[] = [
       "Fill in personal information (name, email, phone)",
       "Select the appropriate role: Admin, Faculty, or Student Farmer",
       "For students: fill in course, year, and section",
-      "Set a strong initial password (user can change it later)",
+      "A temporary password is generated automatically and emailed to the user",
       "Click 'Create User' — the user can now log in",
     ],
   },
@@ -43,7 +43,7 @@ const ADMIN_SECTIONS: Section[] = [
     icon: Cpu,
     steps: [
       "Click 'Devices' in the sidebar",
-      "Click 'Add Device'",
+      "Click 'Register device'",
       "Enter a unique device code (e.g., ESP32-001)",
       "Assign the device to a plot",
       "Save — an API key will be generated",
@@ -72,7 +72,7 @@ const ADMIN_SECTIONS: Section[] = [
       "Fill in user data following the template format",
       "Upload the completed CSV",
       "Review the import preview — errors are flagged before commit",
-      "Click 'Confirm Import' to add all valid users at once",
+      "Click the 'Import valid row(s)' button to add all valid users at once",
     ],
   },
 ];
@@ -107,7 +107,7 @@ const FACULTY_SECTIONS: Section[] = [
       "Click 'Analytics' in the sidebar",
       "View sensor trends, observation activity, and alert patterns",
       "Filter by time range (24h, 7d, 30d, all-time)",
-      "Click any bar on the Daily Activity chart to see who logged observations that day",
+      "Click any bar on the Observations chart to see who logged observations that day",
       "Follow through to the Monitoring page (filtered by that date) for full context",
     ],
   },
@@ -121,7 +121,7 @@ const STUDENT_SECTIONS: Section[] = [
       "Your assigned plots appear on your Dashboard",
       "Click any plot card to see full details",
       "View current sensor readings, growth stage, and history",
-      "Faculty assignments are shown at the top of each plot",
+      "Faculty adviser information is shown on each plot's detail page",
     ],
   },
   {
@@ -133,7 +133,7 @@ const STUDENT_SECTIONS: Section[] = [
       "Select the current growth stage",
       "Enter plant height and leaf count",
       "Write observations and any notes",
-      "Upload up to 4 photos of the plants",
+      "Upload up to 5 photos of the plants",
       "Click 'Save Log' — the current sensor readings are automatically captured as a snapshot with your entry, giving you a permanent record of the conditions at that moment",
     ],
   },
@@ -201,7 +201,7 @@ const COMMON_SECTIONS: Section[] = [
     icon: BarChart3,
     steps: [
       "Click 'Analytics' in the sidebar",
-      "Stat cards show readings count, alert counts, and active devices",
+      "Stat cards show plot count, sensor readings, open alerts, and growth logs",
       "Line charts plot soil moisture, temperature, and humidity over time",
       "Bar charts show alert frequency by type",
       "Switch time ranges to see different periods",
@@ -360,11 +360,11 @@ export default async function HelpPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-gray-700 leading-relaxed">
-              Growth log entries are immutable once saved to preserve the
-              integrity of the historical record. The sensor snapshot
-              captured with each entry is also permanent. If you made a
-              mistake, log a new entry with the correction and note the
-              reason.
+              Growth log entries cannot be edited after saving — the sensor
+              snapshot captured with each entry is fixed at the moment of
+              logging. The author or an admin can delete an entry entirely;
+              this permanently removes the entry and its photos and cannot
+              be undone.
             </CardContent>
           </Card>
         </div>
