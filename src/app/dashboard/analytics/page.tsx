@@ -5,9 +5,13 @@ import {
   BellRing,
   TrendingUp,
   Sprout,
+  Sun,
+  FlaskConical,
+  Camera,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { TimeRangePicker } from "@/components/analytics/time-range-picker";
@@ -490,9 +494,11 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         </CardHeader>
         <CardContent>
           {sensorTrends.length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              No sensor data in this range.
-            </div>
+            <EmptyState
+              icon={Activity}
+              title="No sensor data in this range."
+              compact
+            />
           ) : (
             <SensorTrendsChart data={sensorTrends} />
           )}
@@ -509,9 +515,11 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
           </CardHeader>
           <CardContent>
             {sensorTrends.length === 0 ? (
-              <div className="text-center py-12 text-sm text-muted-foreground">
-                No sensor data in this range.
-              </div>
+              <EmptyState
+                icon={Sun}
+                title="No sensor data in this range."
+                compact
+              />
             ) : (
               <SensorLineChart series={lightSeries} range={range} unit=" lux" />
             )}
@@ -527,9 +535,11 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
           </CardHeader>
           <CardContent>
             {sensorTrends.length === 0 ? (
-              <div className="text-center py-12 text-sm text-muted-foreground">
-                No sensor data in this range.
-              </div>
+              <EmptyState
+                icon={FlaskConical}
+                title="No sensor data in this range."
+                compact
+              />
             ) : (
               <SensorLineChart series={npkSeries} range={range} unit=" mg/kg" />
             )}
@@ -547,9 +557,11 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         </CardHeader>
         <CardContent>
           {observationsByDate.length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              No observations in this range.
-            </div>
+            <EmptyState
+              icon={Camera}
+              title="No observations in this range."
+              compact
+            />
           ) : (
             <ObservationsChart
               data={observationsByDate}
@@ -570,9 +582,11 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
           </CardHeader>
           <CardContent>
             {alertsByDate.length === 0 ? (
-              <div className="text-center py-12 text-sm text-muted-foreground">
-                No alerts in this range.
-              </div>
+              <EmptyState
+                icon={BellRing}
+                title="No alerts in this range."
+                compact
+              />
             ) : (
               <AlertsOverTimeChart data={alertsByDate} />
             )}
@@ -613,9 +627,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
         </CardHeader>
         <CardContent className="p-0">
           {plots.length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              No plots to analyze.
-            </div>
+            <EmptyState icon={Sprout} title="No plots to analyze." compact />
           ) : (
             <div className="divide-y">
               {plots.map((plot) => {
