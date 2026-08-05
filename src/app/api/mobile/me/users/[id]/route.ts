@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
+import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -125,7 +126,7 @@ export async function PATCH(
 
     const target = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, role: true },
+      select: { id: true, role: true, status: true, email: true },
     });
     if (!target) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -146,9 +147,41 @@ export async function PATCH(
       );
     }
 
+    // Reactivation: INACTIVE -> ACTIVE. Mirrors updateUser()'s email-restore
+    // logic (src/actions/users.ts) — deactivateUser() prefixed the email to
+    // free the unique constraint, so reactivating must strip it back off.
+    // Unlike the web edit form, this PATCH body never carries an email
+    // field, so the prefixed value is always read from the stored record
+    // itself (target.email), never from client input.
+    const isReactivating = target.status === "INACTIVE" && status === "ACTIVE";
+    const updateData: Record<string, unknown> = { status };
+
+    if (isReactivating && isInactivePrefixed(target.email)) {
+      const finalEmail = stripInactivePrefix(target.email);
+
+      const conflict = await prisma.user.findFirst({
+        where: {
+          email: { equals: finalEmail, mode: "insensitive" },
+          id: { not: id },
+          status: "ACTIVE",
+        },
+      });
+
+      if (conflict) {
+        return NextResponse.json(
+          {
+            error: `Cannot reactivate: another active user (${conflict.firstName} ${conflict.lastName}) is using ${finalEmail}.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      updateData.email = finalEmail;
+    }
+
     const updated = await prisma.user.update({
       where: { id },
-      data: { status },
+      data: updateData,
       select: {
         id: true,
         firstName: true,
