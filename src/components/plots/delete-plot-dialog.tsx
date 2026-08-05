@@ -64,7 +64,7 @@ export function DeletePlotDialog({
               handleArchive();
             }}
             disabled={archiving}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
           >
             {archiving ? "Archiving..." : "Archive"}
           </AlertDialogAction>

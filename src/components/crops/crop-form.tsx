@@ -315,7 +315,7 @@ export function CropForm({
                       variant="ghost"
                       size="sm"
                       onClick={() => remove(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-danger-text hover:text-danger-text"
                     >
                       <Trash2 className="w-4 h-4 mr-1" />
                       Remove

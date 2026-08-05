@@ -249,7 +249,7 @@ export function DevicesTable({
                           e.preventDefault();
                           setDeleteId(d.id);
                         }}
-                        className="text-red-600 focus:text-red-600"
+                        className="text-danger-text focus:text-danger-text"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Delete
@@ -284,7 +284,7 @@ export function DevicesTable({
                 e.preventDefault();
                 handleDelete();
               }}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
             >
               Delete
             </AlertDialogAction>

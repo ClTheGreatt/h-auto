@@ -102,7 +102,7 @@ export function Header({
           <DropdownMenuItem
             onClick={handleSignOut}
             disabled={signingOut}
-            className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+            className="text-danger-text focus:text-danger-text focus:bg-danger-bg cursor-pointer"
           >
             <LogOut className="w-4 h-4 mr-2" />
             {signingOut ? "Signing out..." : "Sign out"}

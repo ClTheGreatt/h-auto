@@ -256,7 +256,7 @@ export function PlotAssignments({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-red-600 hover:text-red-700"
+                    className="text-danger-text hover:text-danger-text"
                     onClick={() => handleRemove(a.id)}
                   >
                     <X className="w-4 h-4" />

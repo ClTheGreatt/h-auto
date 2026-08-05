@@ -280,7 +280,7 @@ export function CropsTable({
                           trigger={
                             <DropdownMenuItem
                               onSelect={(e) => e.preventDefault()}
-                              className="text-red-600 focus:text-red-600"
+                              className="text-danger-text focus:text-danger-text"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Archive

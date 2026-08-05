@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
@@ -370,14 +371,15 @@ export default async function PlotDetailPage({
                 </Badge>
               )}
               {plot.device && latestReading && (
-                <Badge
-                  variant="secondary"
-                  className={
+                <StatusBadge
+                  variant={
                     deviceFreshness.state === "FRESH"
-                      ? "bg-green-100 text-green-700"
+                      ? "success"
                       : deviceFreshness.state === "STALE"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-red-100 text-red-700"
+                      ? "warning"
+                      : deviceFreshness.state === "OFFLINE"
+                      ? "danger"
+                      : "neutral"
                   }
                 >
                   {deviceFreshness.state === "FRESH"
@@ -387,7 +389,7 @@ export default async function PlotDetailPage({
                     : deviceFreshness.state === "OFFLINE"
                     ? "Offline"
                     : "Never reported"}
-                </Badge>
+                </StatusBadge>
               )}
             </div>
           </CardTitle>

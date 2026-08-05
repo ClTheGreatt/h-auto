@@ -59,7 +59,7 @@ export function RemoveAvatarDialog({
               handleRemove();
             }}
             disabled={removing}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
           >
             {removing ? "Removing..." : "Remove"}
           </AlertDialogAction>

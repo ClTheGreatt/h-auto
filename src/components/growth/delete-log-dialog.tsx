@@ -54,13 +54,20 @@ export function DeleteLogDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          {/* Intentionally solid red, not variant="destructive" — that variant
+              is a 10%-opacity ghost tint meant for inline/icon buttons and
+              would read weaker than the outline Cancel button beside it.
+              dark:bg-red-600 keeps the same vivid red on dark backgrounds;
+              dark:hover:bg-red-500 brightens on hover instead of darkening,
+              since darkening further would lose contrast against a dark
+              popover. Do not "fix" this into variant="destructive". */}
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
               handleDelete();
             }}
             disabled={deleting}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
           >
             {deleting ? "Deleting..." : "Delete"}
           </AlertDialogAction>
