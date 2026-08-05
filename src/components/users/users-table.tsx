@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Undo2, Users as UsersIcon } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pencil,
+  RotateCcw,
+  Trash2,
+  Undo2,
+  Users as UsersIcon,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DeleteUserDialog } from "./delete-user-dialog";
+import { ReactivateUserDialog } from "./reactivate-user-dialog";
 import { UngraduateStudentDialog } from "./ungraduate-student-dialog";
 import { StudentFarmerSection } from "./student-farmer-section";
 import { cn } from "@/lib/utils";
@@ -329,19 +337,33 @@ export function UserTableRow({
                 }
               />
             )}
-            <DeleteUserDialog
-              userId={user.id}
-              userName={`${user.firstName} ${user.lastName}`}
-              trigger={
-                <DropdownMenuItem
-                  onSelect={(e) => e.preventDefault()}
-                  className="text-danger-text focus:text-danger-text"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Deactivate
-                </DropdownMenuItem>
-              }
-            />
+            {user.status === "INACTIVE" ? (
+              <ReactivateUserDialog
+                userId={user.id}
+                userName={`${user.firstName} ${user.lastName}`}
+                userEmail={user.email}
+                trigger={
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reactivate
+                  </DropdownMenuItem>
+                }
+              />
+            ) : (
+              <DeleteUserDialog
+                userId={user.id}
+                userName={`${user.firstName} ${user.lastName}`}
+                trigger={
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-danger-text focus:text-danger-text"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Deactivate
+                  </DropdownMenuItem>
+                }
+              />
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

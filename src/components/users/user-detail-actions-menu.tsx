@@ -1,6 +1,7 @@
 "use client";
 
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
+import type { UserStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DeleteUserDialog } from "@/components/users/delete-user-dialog";
+import { ReactivateUserDialog } from "@/components/users/reactivate-user-dialog";
 
 // Client Component wrapper for the user detail page's "..." menu. The
 // caller (the detail page) is a Server Component — constructing a
@@ -20,9 +22,13 @@ import { DeleteUserDialog } from "@/components/users/delete-user-dialog";
 export function UserDetailActionsMenu({
   userId,
   userName,
+  userEmail,
+  userStatus,
 }: {
   userId: string;
   userName: string;
+  userEmail: string;
+  userStatus: UserStatus;
 }) {
   return (
     <DropdownMenu>
@@ -32,19 +38,33 @@ export function UserDetailActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DeleteUserDialog
-          userId={userId}
-          userName={userName}
-          trigger={
-            <DropdownMenuItem
-              onSelect={(e) => e.preventDefault()}
-              className="text-danger-text focus:text-danger-text"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Deactivate
-            </DropdownMenuItem>
-          }
-        />
+        {userStatus === "INACTIVE" ? (
+          <ReactivateUserDialog
+            userId={userId}
+            userName={userName}
+            userEmail={userEmail}
+            trigger={
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reactivate
+              </DropdownMenuItem>
+            }
+          />
+        ) : (
+          <DeleteUserDialog
+            userId={userId}
+            userName={userName}
+            trigger={
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                className="text-danger-text focus:text-danger-text"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Deactivate
+              </DropdownMenuItem>
+            }
+          />
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

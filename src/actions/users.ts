@@ -251,6 +251,42 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 }
 
 /**
+ * Reactivates an INACTIVE user directly from the row-actions menu, without
+ * requiring the admin to open the edit form. Delegates entirely to
+ * updateUser() — the only place the email-prefix strip and active-email
+ * conflict check live — by resubmitting the user's current field values
+ * unchanged except for status, exactly as if the admin had reopened the
+ * edit form and flipped the status dropdown to Active. This keeps a single
+ * reactivation code path instead of a second one duplicating that logic.
+ */
+export async function reactivateUser(id: string) {
+  await requireAdmin();
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    return { error: "User not found" };
+  }
+
+  return updateUser(id, {
+    firstName: user.firstName,
+    middleName: user.middleName ?? "",
+    lastName: user.lastName,
+    email: user.email,
+    phoneNumber: user.phoneNumber ?? "",
+    role: user.role,
+    idNumber: user.idNumber ?? "",
+    department: user.department ?? "",
+    course: user.course ?? "",
+    yearLevel: user.yearLevel ?? "",
+    section: user.section ?? "",
+    academicYear: user.academicYear ?? "",
+    position: user.position ?? "",
+    status: "ACTIVE",
+    password: "",
+  });
+}
+
+/**
  * Soft-deactivates a user account. Sets status to INACTIVE, renames the
  * email to free it up for future registrations, and increments tokenVersion
  * to invalidate any active session.
