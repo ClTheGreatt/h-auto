@@ -43,9 +43,11 @@ function allSectionKeys(courseGroups: CourseGroup[]): string[] {
 export function StudentFarmerSection({
   courseGroups,
   hasFilters,
+  inactiveCount,
 }: {
   courseGroups: CourseGroup[];
   hasFilters: boolean;
+  inactiveCount: number;
 }) {
   const totalCount = courseGroups.reduce((sum, c) => sum + c.count, 0);
   const totalBaseline = courseGroups.reduce((sum, c) => sum + c.totalCount, 0);
@@ -81,6 +83,11 @@ export function StudentFarmerSection({
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {countLabel(totalCount, totalBaseline, hasFilters)}
             </span>
+            {inactiveCount > 0 && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {inactiveCount} inactive
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {STUDENT_FARMER_META.description}

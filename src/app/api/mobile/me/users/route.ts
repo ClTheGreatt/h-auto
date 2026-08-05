@@ -11,6 +11,7 @@ import {
 import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
 import { generateTempPassword } from "@/lib/auth/generate-password";
+import { stripInactivePrefix } from "@/lib/users/inactive-prefix";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -133,6 +134,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       users: users.map((u) => ({
         ...u,
+        // Read-path only: deactivateUser() prefixes email with
+        // inactive_<timestamp>_ to free the unique constraint. A client has
+        // no use for that internal encoding — status is already returned,
+        // so "this account is inactive" is knowable without leaking it.
+        email: stripInactivePrefix(u.email),
         lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
         createdAt: u.createdAt.toISOString(),
         graduatedAt: u.graduatedAt?.toISOString() ?? null,

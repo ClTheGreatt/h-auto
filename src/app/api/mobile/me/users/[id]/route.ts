@@ -78,6 +78,11 @@ export async function GET(
     return NextResponse.json({
       user: {
         ...user,
+        // Read-path only: deactivateUser() prefixes email with
+        // inactive_<timestamp>_ to free the unique constraint. A client has
+        // no use for that internal encoding — status is already returned,
+        // so "this account is inactive" is knowable without leaking it.
+        email: stripInactivePrefix(user.email),
         lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),

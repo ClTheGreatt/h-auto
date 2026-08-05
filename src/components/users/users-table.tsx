@@ -133,6 +133,9 @@ export function UsersTable({
   const otherRoles = ROLE_ORDER.filter(
     (role) => role !== "STUDENT_FARMER" && grouped[role].length > 0
   );
+  const studentInactiveCount = users.filter(
+    (u) => u.role === "STUDENT_FARMER" && u.status === "INACTIVE"
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -145,7 +148,11 @@ export function UsersTable({
         />
       ))}
       {showStudentSection && (
-        <StudentFarmerSection courseGroups={courseGroups} hasFilters={hasFilters} />
+        <StudentFarmerSection
+          courseGroups={courseGroups}
+          hasFilters={hasFilters}
+          inactiveCount={studentInactiveCount}
+        />
       )}
     </div>
   );
@@ -161,6 +168,7 @@ function RoleSection({
   advisoriesByFacultyId?: Record<string, string[]>;
 }) {
   const meta = ROLE_META[role];
+  const inactiveCount = users.filter((u) => u.status === "INACTIVE").length;
 
   return (
     <section className="overflow-hidden rounded-md border bg-card shadow-sm">
@@ -174,6 +182,11 @@ function RoleSection({
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {users.length}
             </span>
+            {inactiveCount > 0 && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {inactiveCount} inactive
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">{meta.description}</p>
         </div>

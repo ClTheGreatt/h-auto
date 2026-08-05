@@ -100,10 +100,14 @@ export default async function UsersPage({
       ? sp.academicYear
       : undefined;
 
-  // Build Prisma filter
-  const where: Prisma.UserWhereInput = {
+  // Build Prisma filter. Split out the status-independent part so the
+  // inactive-count query below can reuse it with status forced to
+  // INACTIVE, regardless of whatever the status filter is currently set
+  // to — "how many inactive users match everything else" shouldn't
+  // collapse to a redundant echo of the main count when the admin has
+  // already narrowed to Inactive themselves.
+  const baseWhere: Prisma.UserWhereInput = {
     ...(role && { role }),
-    ...(status && { status }),
     ...(course && { course }),
     ...(yearLevel && { yearLevel }),
     ...(section && { section }),
@@ -118,26 +122,36 @@ export default async function UsersPage({
       ],
     }),
   };
+  const where: Prisma.UserWhereInput = {
+    ...baseWhere,
+    ...(status && { status }),
+  };
 
-  // Fetch all matching users (grouped by role in the component, no pagination needed)
-  const users = await prisma.user.findMany({
-    where,
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      role: true,
-      status: true,
-      idNumber: true,
-      course: true,
-      yearLevel: true,
-      section: true,
-      academicYear: true,
-      graduatedAt: true,
-    },
-  });
+  // Fetch all matching users (grouped by role in the component, no
+  // pagination needed), plus how many INACTIVE users match every filter
+  // except status — the toolbar surfaces this so a deactivated account
+  // isn't invisible just because the status dropdown is on its default.
+  const [users, inactiveCount] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+        status: true,
+        idNumber: true,
+        course: true,
+        yearLevel: true,
+        section: true,
+        academicYear: true,
+        graduatedAt: true,
+      },
+    }),
+    prisma.user.count({ where: { ...baseWhere, status: "INACTIVE" } }),
+  ]);
 
   const totalUsers = users.length;
   const hasFilters = Boolean(
@@ -166,20 +180,30 @@ export default async function UsersPage({
     (advisoriesByFacultyId[row.facultyId] ??= []).push(row.section);
   }
 
-  // Build URL preserving filters when switching tabs (page resets implicitly
-  // since this page has no pagination).
-  function tabUrl(targetView: "active" | "graduated"): string {
+  // Build URL preserving every current filter, with individual overrides
+  // (page resets implicitly since this page has no pagination). Shared by
+  // the Active/Graduated tab links and the toolbar's inactive-count link
+  // so neither builds a query string by hand.
+  function buildUsersUrl(
+    overrides: { view?: "active" | "graduated"; status?: UserStatus } = {}
+  ): string {
+    const targetView = overrides.view ?? view;
+    const targetStatus = overrides.status ?? status;
     const p = new URLSearchParams();
     if (targetView === "graduated") p.set("view", "graduated");
     if (search) p.set("search", search);
     if (role) p.set("role", role);
-    if (status) p.set("status", status);
+    if (targetStatus) p.set("status", targetStatus);
     if (course) p.set("course", course);
     if (yearLevel) p.set("year", yearLevel);
     if (section) p.set("section", section);
     if (academicYear) p.set("academicYear", academicYear);
     const qs = p.toString();
     return `/dashboard/users${qs ? "?" + qs : ""}`;
+  }
+
+  function tabUrl(targetView: "active" | "graduated"): string {
+    return buildUsersUrl({ view: targetView });
   }
 
   return (
@@ -279,6 +303,17 @@ export default async function UsersPage({
                 : `${totalUsers} user${totalUsers === 1 ? "" : "s"}${
                     hasFilters ? " found" : ""
                   }`}
+              {inactiveCount > 0 && (
+                <>
+                  {" · "}
+                  <Link
+                    href={buildUsersUrl({ status: "INACTIVE" })}
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    {inactiveCount} inactive
+                  </Link>
+                </>
+              )}
             </span>
             {hasFilters && (
               <Link
