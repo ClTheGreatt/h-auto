@@ -114,6 +114,8 @@ export function UsersTable({
   courseGroups,
   hasFilters,
   advisoriesByFacultyId,
+  plotNamesByStudentId,
+  neverLoggedByStudentId,
 }: {
   users: UserRow[];
   showStudentSection: boolean;
@@ -122,6 +124,10 @@ export function UsersTable({
   // Faculty only — one section-list per facultyId, fetched in a single
   // query by the page. Absent entirely for every other role's table.
   advisoriesByFacultyId?: Record<string, string[]>;
+  // Student Farmers only — passed through to StudentFarmerSection, never to
+  // RoleSection (Admin/Faculty/Super Admin rows have no plots or logs).
+  plotNamesByStudentId: Record<string, string[]>;
+  neverLoggedByStudentId: Record<string, boolean>;
 }) {
   if (users.length === 0 && !showStudentSection) {
     return (
@@ -160,6 +166,8 @@ export function UsersTable({
           courseGroups={courseGroups}
           hasFilters={hasFilters}
           inactiveCount={studentInactiveCount}
+          plotNamesByStudentId={plotNamesByStudentId}
+          neverLoggedByStudentId={neverLoggedByStudentId}
         />
       )}
     </div>
@@ -208,11 +216,15 @@ function RoleSection({
 // Shared column widths, so any table built from these pieces (RoleSection's
 // own table, or the Student Farmers single continuous table) lines up
 // identically regardless of how many rows/labels are interleaved above it.
-// `showAdvisories` is only ever passed for the Faculty section's own table.
+// `showAdvisories` is only ever passed for the Faculty section's own table;
+// `showPlots` only ever for the Student Farmers section's own table — the
+// two never coexist since they're different <Table> instances.
 export function UserTableColgroup({
   showAdvisories = false,
+  showPlots = false,
 }: {
   showAdvisories?: boolean;
+  showPlots?: boolean;
 } = {}) {
   return (
     <colgroup>
@@ -220,6 +232,7 @@ export function UserTableColgroup({
       <col className="w-[28%]" />
       <col className="w-[12%]" />
       <col className="w-[12%]" />
+      {showPlots && <col className="w-[16%]" />}
       {showAdvisories && <col className="w-[16%]" />}
       <col className="w-12" />
     </colgroup>
@@ -228,8 +241,10 @@ export function UserTableColgroup({
 
 export function UserTableHeaderRow({
   showAdvisories = false,
+  showPlots = false,
 }: {
   showAdvisories?: boolean;
+  showPlots?: boolean;
 } = {}) {
   return (
     <TableRow>
@@ -237,6 +252,7 @@ export function UserTableHeaderRow({
       <TableHead className="px-4 text-xs">Email</TableHead>
       <TableHead className="px-4 text-xs">Status</TableHead>
       <TableHead className="px-4 text-xs">ID number</TableHead>
+      {showPlots && <TableHead className="px-4 text-xs">Plots</TableHead>}
       {showAdvisories && (
         <TableHead className="px-4 text-xs">Advised sections</TableHead>
       )}
@@ -248,11 +264,18 @@ export function UserTableHeaderRow({
 export function UserTableRow({
   user,
   advisedSections,
+  plotNames,
+  neverLogged = false,
 }: {
   user: UserRow;
   // Only ever passed by the Faculty section's table. `undefined` (Admin,
   // Super Admin, Student Farmer rows) renders no extra cell at all.
   advisedSections?: string[];
+  // Only ever passed by the Student Farmers section's table, same
+  // undefined-means-no-cell convention as advisedSections above.
+  plotNames?: string[];
+  // Only ever true when passed by the Student Farmers section's table.
+  neverLogged?: boolean;
 }) {
   const router = useRouter();
 
@@ -280,6 +303,13 @@ export function UserTableRow({
               GRADUATED
             </span>
           )}
+          {/* Quiet, non-alarm marker — not having logged yet isn't an
+              error, it may just mean the student was recently assigned. */}
+          {neverLogged && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              No logs yet
+            </span>
+          )}
         </div>
       </TableCell>
       <TableCell className="px-4 py-3 text-muted-foreground">
@@ -292,6 +322,20 @@ export function UserTableRow({
           </span>
         )}
       </TableCell>
+      {plotNames !== undefined && (
+        <TableCell className="px-4 py-3 text-muted-foreground">
+          {plotNames.length === 0 ? (
+            <span>—</span>
+          ) : (
+            <span
+              className="block truncate"
+              title={plotNames.join(", ")}
+            >
+              {plotNames.join(", ")}
+            </span>
+          )}
+        </TableCell>
+      )}
       {advisedSections !== undefined && (
         <TableCell className="px-4 py-3">
           {advisedSections.length === 0 ? (

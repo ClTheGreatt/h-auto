@@ -44,10 +44,14 @@ export function StudentFarmerSection({
   courseGroups,
   hasFilters,
   inactiveCount,
+  plotNamesByStudentId,
+  neverLoggedByStudentId,
 }: {
   courseGroups: CourseGroup[];
   hasFilters: boolean;
   inactiveCount: number;
+  plotNamesByStudentId: Record<string, string[]>;
+  neverLoggedByStudentId: Record<string, boolean>;
 }) {
   const totalCount = courseGroups.reduce((sum, c) => sum + c.count, 0);
   const totalBaseline = courseGroups.reduce((sum, c) => sum + c.totalCount, 0);
@@ -107,9 +111,9 @@ export function StudentFarmerSection({
         <TooltipProvider delayDuration={200}>
           <div>
             <Table className="min-w-[760px] table-fixed">
-              <UserTableColgroup />
+              <UserTableColgroup showPlots />
               <TableHeader>
-                <UserTableHeaderRow />
+                <UserTableHeaderRow showPlots />
               </TableHeader>
               <TableBody>
                 {courseGroups.map((course) => (
@@ -119,6 +123,8 @@ export function StudentFarmerSection({
                     hasFilters={hasFilters}
                     expanded={expanded}
                     onToggleSection={toggle}
+                    plotNamesByStudentId={plotNamesByStudentId}
+                    neverLoggedByStudentId={neverLoggedByStudentId}
                   />
                 ))}
               </TableBody>
@@ -135,11 +141,15 @@ function CourseRows({
   hasFilters,
   expanded,
   onToggleSection,
+  plotNamesByStudentId,
+  neverLoggedByStudentId,
 }: {
   course: CourseGroup;
   hasFilters: boolean;
   expanded: Set<string>;
   onToggleSection: (key: string) => void;
+  plotNamesByStudentId: Record<string, string[]>;
+  neverLoggedByStudentId: Record<string, boolean>;
 }) {
   const abbreviated = useMemo(() => abbreviateCourse(course.label), [course.label]);
   const showTooltip = abbreviated !== course.label;
@@ -147,7 +157,7 @@ function CourseRows({
   return (
     <>
       <TableRow className="bg-muted/30 hover:bg-muted/30">
-        <TableCell colSpan={5} className="px-4 py-2">
+        <TableCell colSpan={6} className="px-4 py-2">
           <div className="flex items-center gap-2">
             {showTooltip ? (
               <Tooltip>
@@ -169,12 +179,17 @@ function CourseRows({
       {course.isUncategorized ? (
         <>
           <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={5} className="px-4 pt-0 pb-1 text-xs text-muted-foreground">
+            <TableCell colSpan={6} className="px-4 pt-0 pb-1 text-xs text-muted-foreground">
               These users are missing course, year, or section information.
             </TableCell>
           </TableRow>
           {course.flatUsers.map((user) => (
-            <UserTableRow key={user.id} user={user} />
+            <UserTableRow
+              key={user.id}
+              user={user}
+              plotNames={plotNamesByStudentId[user.id] ?? []}
+              neverLogged={neverLoggedByStudentId[user.id] ?? false}
+            />
           ))}
         </>
       ) : (
@@ -186,6 +201,8 @@ function CourseRows({
             hasFilters={hasFilters}
             expanded={expanded}
             onToggleSection={onToggleSection}
+            plotNamesByStudentId={plotNamesByStudentId}
+            neverLoggedByStudentId={neverLoggedByStudentId}
           />
         ))
       )}
@@ -199,17 +216,21 @@ function YearRows({
   hasFilters,
   expanded,
   onToggleSection,
+  plotNamesByStudentId,
+  neverLoggedByStudentId,
 }: {
   courseKey: string;
   year: YearGroup;
   hasFilters: boolean;
   expanded: Set<string>;
   onToggleSection: (key: string) => void;
+  plotNamesByStudentId: Record<string, string[]>;
+  neverLoggedByStudentId: Record<string, boolean>;
 }) {
   return (
     <>
       <TableRow className="hover:bg-transparent">
-        <TableCell colSpan={5} className="px-4 py-1.5 pl-8">
+        <TableCell colSpan={6} className="px-4 py-1.5 pl-8">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {year.label}
@@ -230,7 +251,7 @@ function YearRows({
               onClick={() => onToggleSection(key)}
               className="cursor-pointer hover:bg-muted/50"
             >
-              <TableCell colSpan={5} className="px-4 py-1.5 pl-12 text-sm">
+              <TableCell colSpan={6} className="px-4 py-1.5 pl-12 text-sm">
                 <div className="flex items-center gap-2">
                   <ChevronRight
                     className={cn(
@@ -247,7 +268,14 @@ function YearRows({
               </TableCell>
             </TableRow>
             {isOpen &&
-              section.users.map((user) => <UserTableRow key={user.id} user={user} />)}
+              section.users.map((user) => (
+                <UserTableRow
+                  key={user.id}
+                  user={user}
+                  plotNames={plotNamesByStudentId[user.id] ?? []}
+                  neverLogged={neverLoggedByStudentId[user.id] ?? false}
+                />
+              ))}
           </Fragment>
         );
       })}

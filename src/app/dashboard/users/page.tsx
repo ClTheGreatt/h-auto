@@ -42,6 +42,7 @@ export default async function UsersPage({
     section?: string;
     academicYear?: string;
     view?: string;
+    neverLogged?: string;
   }>;
 }) {
   await requireAdmin();
@@ -99,15 +100,12 @@ export default async function UsersPage({
     academicYearOptions.includes(sp.academicYear)
       ? sp.academicYear
       : undefined;
+  const neverLogged = sp.neverLogged === "true";
 
-  // Build Prisma filter. Split out the status-independent part so the
-  // inactive-count query below can reuse it with status forced to
-  // INACTIVE, regardless of whatever the status filter is currently set
-  // to — "how many inactive users match everything else" shouldn't
-  // collapse to a redundant echo of the main count when the admin has
-  // already narrowed to Inactive themselves.
-  const baseWhere: Prisma.UserWhereInput = {
-    ...(role && { role }),
+  // Filters shared by every count/list query below except the one each is
+  // deliberately excluding (status for inactiveCount, role/neverLogged for
+  // neverLoggedCount — see each query's own comment).
+  const commonWhere: Prisma.UserWhereInput = {
     ...(course && { course }),
     ...(yearLevel && { yearLevel }),
     ...(section && { section }),
@@ -122,16 +120,35 @@ export default async function UsersPage({
       ],
     }),
   };
+  // Split out the status-independent part so the inactive-count query below
+  // can reuse it with status forced to INACTIVE, regardless of whatever the
+  // status filter is currently set to — "how many inactive users match
+  // everything else" shouldn't collapse to a redundant echo of the main
+  // count when the admin has already narrowed to Inactive themselves.
+  // neverLogged pins role to STUDENT_FARMER and requires zero growth logs,
+  // overriding any explicit role filter — see the "N never logged" link.
+  const baseWhere: Prisma.UserWhereInput = {
+    ...commonWhere,
+    ...(role && { role }),
+    ...(neverLogged && { role: "STUDENT_FARMER", growthLogs: { none: {} } }),
+  };
   const where: Prisma.UserWhereInput = {
     ...baseWhere,
     ...(status && { status }),
   };
 
+  // The Role filter and neverLogged both pin `role`; if an explicit,
+  // conflicting role filter is active (e.g. Faculty), no student can ever
+  // match, so skip the query below and report 0 rather than silently
+  // overriding the admin's own role filter.
+  const studentFilterConflict = Boolean(role) && role !== "STUDENT_FARMER";
+
   // Fetch all matching users (grouped by role in the component, no
-  // pagination needed), plus how many INACTIVE users match every filter
-  // except status — the toolbar surfaces this so a deactivated account
-  // isn't invisible just because the status dropdown is on its default.
-  const [users, inactiveCount] = await Promise.all([
+  // pagination needed), how many INACTIVE users match every filter except
+  // status, and how many STUDENT_FARMER users with zero growth logs match
+  // every filter except role/neverLogged themselves — each toolbar figure
+  // surfaces a state the default view would otherwise hide.
+  const [users, inactiveCount, neverLoggedCount] = await Promise.all([
     prisma.user.findMany({
       where,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -151,11 +168,28 @@ export default async function UsersPage({
       },
     }),
     prisma.user.count({ where: { ...baseWhere, status: "INACTIVE" } }),
+    studentFilterConflict
+      ? Promise.resolve(0)
+      : prisma.user.count({
+          where: {
+            ...commonWhere,
+            role: "STUDENT_FARMER",
+            ...(status && { status }),
+            growthLogs: { none: {} },
+          },
+        }),
   ]);
 
   const totalUsers = users.length;
   const hasFilters = Boolean(
-    search || role || status || course || yearLevel || section || academicYear
+    search ||
+      role ||
+      status ||
+      course ||
+      yearLevel ||
+      section ||
+      academicYear ||
+      neverLogged
   );
 
   const studentRows = users.filter((u) => u.role === "STUDENT_FARMER");
@@ -180,15 +214,51 @@ export default async function UsersPage({
     (advisoriesByFacultyId[row.facultyId] ??= []).push(row.section);
   }
 
+  // Student Farmers' PLOTS column and "never logged" marker — one pair of
+  // queries for every student row currently on the page, grouped by
+  // studentId, never per-row. Mirrors the advisoryRows pattern above.
+  const studentIds = studentRows.map((u) => u.id);
+  const [assignmentRows, loggedRows] =
+    studentIds.length > 0
+      ? await Promise.all([
+          prisma.plotAssignment.findMany({
+            where: { studentId: { in: studentIds }, status: "ACTIVE" },
+            select: { studentId: true, plot: { select: { name: true } } },
+            orderBy: { plot: { name: "asc" } },
+          }),
+          // Presence-only: which students have logged at least once. A full
+          // count isn't needed since the row marker is a boolean.
+          prisma.growthLog.findMany({
+            where: { userId: { in: studentIds } },
+            select: { userId: true },
+            distinct: ["userId"],
+          }),
+        ])
+      : [[], []];
+  const plotNamesByStudentId: Record<string, string[]> = {};
+  for (const row of assignmentRows) {
+    (plotNamesByStudentId[row.studentId] ??= []).push(row.plot.name);
+  }
+  const loggedStudentIds = new Set(loggedRows.map((r) => r.userId));
+  const neverLoggedByStudentId: Record<string, boolean> = {};
+  for (const id of studentIds) {
+    neverLoggedByStudentId[id] = !loggedStudentIds.has(id);
+  }
+
   // Build URL preserving every current filter, with individual overrides
   // (page resets implicitly since this page has no pagination). Shared by
-  // the Active/Graduated tab links and the toolbar's inactive-count link
-  // so neither builds a query string by hand.
+  // the Active/Graduated tab links and the toolbar's inactive/never-logged
+  // count links so none of them build a query string by hand.
   function buildUsersUrl(
-    overrides: { view?: "active" | "graduated"; status?: UserStatus } = {}
+    overrides: {
+      view?: "active" | "graduated";
+      status?: UserStatus;
+      neverLogged?: boolean;
+    } = {}
   ): string {
     const targetView = overrides.view ?? view;
     const targetStatus = overrides.status ?? status;
+    const targetNeverLogged = overrides.neverLogged ?? neverLogged;
     const p = new URLSearchParams();
     if (targetView === "graduated") p.set("view", "graduated");
     if (search) p.set("search", search);
@@ -198,6 +268,7 @@ export default async function UsersPage({
     if (yearLevel) p.set("year", yearLevel);
     if (section) p.set("section", section);
     if (academicYear) p.set("academicYear", academicYear);
+    if (targetNeverLogged) p.set("neverLogged", "true");
     const qs = p.toString();
     return `/dashboard/users${qs ? "?" + qs : ""}`;
   }
@@ -314,6 +385,17 @@ export default async function UsersPage({
                   </Link>
                 </>
               )}
+              {neverLoggedCount > 0 && (
+                <>
+                  {" · "}
+                  <Link
+                    href={buildUsersUrl({ neverLogged: true })}
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    {neverLoggedCount} never logged
+                  </Link>
+                </>
+              )}
             </span>
             {hasFilters && (
               <Link
@@ -355,6 +437,8 @@ export default async function UsersPage({
           courseGroups={courseGroups}
           hasFilters={hasFilters}
           advisoriesByFacultyId={advisoriesByFacultyId}
+          plotNamesByStudentId={plotNamesByStudentId}
+          neverLoggedByStudentId={neverLoggedByStudentId}
         />
       </div>
     </div>
