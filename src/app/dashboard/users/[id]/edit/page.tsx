@@ -16,7 +16,7 @@ export default async function EditUserPage({
   if (!user) notFound();
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
         <BackButton label="Back" />
         <h1 className="text-2xl font-semibold text-foreground">

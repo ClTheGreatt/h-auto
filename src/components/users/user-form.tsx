@@ -50,6 +50,7 @@ import {
   FACULTY_POSITIONS,
   studentIdPrefixRange,
   deriveAcademicYearFromIdPrefix,
+  isValidStudentIdPrefix,
 } from "@/lib/constants/user-import";
 import { createUser, updateUser } from "@/actions/users";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
@@ -174,6 +175,17 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     control: form.control,
     name: "lastName",
   });
+  const watchedIdNumber = useWatch({ control: form.control, name: "idNumber" });
+  // Live preview of the same derivation the onBlur handler below writes
+  // into academicYear — gated on the full prefix range too (not just
+  // format), so this never confirms a cohort the schema would still reject.
+  const trimmedIdNumber = (watchedIdNumber ?? "").trim();
+  const detectedCohort =
+    watchedRole === "STUDENT_FARMER"
+      ? deriveAcademicYearFromIdPrefix(trimmedIdNumber)
+      : null;
+  const showDetectedCohort =
+    detectedCohort !== null && isValidStudentIdPrefix(trimmedIdNumber);
   const similarFirstName = watchedFirstName?.trim() ?? "";
   const similarLastName = watchedLastName?.trim() ?? "";
   const similarKey =
@@ -343,6 +355,101 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     <Form {...form}>
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormErrorSummary form={form} />
+
+        {/* Role determines the shape of the rest of this form (which
+            details card appears below), so it — and Status, grouped with
+            it in the same card — comes first. Two columns on wide screens,
+            same grid idiom as the user detail page, instead of leaving the
+            right half of the page empty. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Role & access</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem className="min-w-0">
+                <FormLabel>Role <RequiredMark /></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                      <SelectItem value="FACULTY">Faculty</SelectItem>
+                      <SelectItem value="STUDENT_FARMER">Student Farmer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem className="min-w-0">
+                  <FormLabel>Status <RequiredMark /></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Deactivated users lose access but their data is preserved.
+                    Set to Active to restore access.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {mode === "create" ? (
+              <div className="md:col-span-2">
+                <FormLabel>Password</FormLabel>
+                <p className="text-xs text-muted-foreground mt-1">
+                  A temporary password will be generated automatically and
+                  emailed to the user.
+                </p>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>
+                      Password
+                      <span className="text-gray-400 text-xs ml-1 font-normal">
+                        (leave blank to keep current)
+                      </span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Minimum 8 characters, with at least 1 uppercase letter, 1
+                      lowercase letter, 1 number, and 1 symbol
+                    </FormDescription>
+                    <PasswordStrengthIndicator password={field.value ?? ""} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -521,6 +628,12 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                         Format: 12-34567 (year prefix {STUDENT_ID_MIN}–{STUDENT_ID_MAX}, dash, 5 digits)
                       </FormDescription>
                     )}
+                    {showDetectedCohort && (
+                      <p className="text-xs text-muted-foreground">
+                        Cohort {detectedCohort} detected — prefilled into
+                        Academic year below.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -528,95 +641,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Role & access</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem className="min-w-0">
-                <FormLabel>Role <RequiredMark /></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="FACULTY">Faculty</SelectItem>
-                      <SelectItem value="STUDENT_FARMER">Student Farmer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem className="min-w-0">
-                  <FormLabel>Status <RequiredMark /></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="ACTIVE">Active</SelectItem>
-                      <SelectItem value="INACTIVE">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Deactivated users lose access but their data is preserved.
-                    Set to Active to restore access.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {mode === "create" ? (
-              <div className="md:col-span-2">
-                <FormLabel>Password</FormLabel>
-                <p className="text-xs text-muted-foreground mt-1">
-                  A temporary password will be generated automatically and
-                  emailed to the user.
-                </p>
-              </div>
-            ) : (
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>
-                      Password
-                      <span className="text-gray-400 text-xs ml-1 font-normal">
-                        (leave blank to keep current)
-                      </span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormDescription className="text-xs">
-                      Minimum 8 characters, with at least 1 uppercase letter, 1
-                      lowercase letter, 1 number, and 1 symbol
-                    </FormDescription>
-                    <PasswordStrengthIndicator password={field.value ?? ""} />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-          </CardContent>
-        </Card>
+        </div>
 
         {watchedRole === "FACULTY" && (
           <Card>
