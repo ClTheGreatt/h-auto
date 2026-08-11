@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { ClipboardList } from "lucide-react";
+import type { Prisma } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
+import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import { AssignmentPlotFilter } from "@/components/assignments/assignment-plot-filter";
+import { AssignStudentDialog } from "@/components/assignments/assign-student-dialog";
 
 export default async function AssignmentsPage({
   searchParams,
@@ -25,6 +28,12 @@ export default async function AssignmentsPage({
 
   // Plot list for filter dropdown, scoped the same way the page's own
   // role-aware where is (students/faculty only see their own plots).
+  //
+  // NOTE (investigated, not fixed in this batch): this STUDENT_FARMER branch
+  // is missing the endedAt/student-active-and-not-graduated checks that
+  // buildAccessiblePlotWhere's canonical STUDENT_FARMER branch has. Left
+  // as-is per instruction — the new assignablePlotWhere below is a separate
+  // query and does not inherit this gap.
   const plotWhere =
     role === "STUDENT_FARMER"
       ? {
@@ -36,7 +45,28 @@ export default async function AssignmentsPage({
       ? { facultyId: session.user.id }
       : {};
 
-  const [assignments, plotsForFilter] = await Promise.all([
+  // "Plots this actor may assign a student to" — a stricter, separate scope
+  // from plotWhere above (that one is a view filter for the existing
+  // dropdown; this one gates the new assign flow). STUDENT_FARMER gets an
+  // always-empty where — the button/dialog is also omitted from the JSX
+  // entirely below, this is defense in depth, not the only guard.
+  // Lifecycle: only SETUP + OPERATIONAL (ACTIVITY_PLOT_STATUSES) — a
+  // HARVESTED/FALLOW/ARCHIVED plot takes no new monitors. Plots with no
+  // adviser (facultyId null) are excluded too: assignStudent() rejects
+  // those unconditionally with "Set a plot adviser before assigning
+  // students," so showing them in the picker would only ever be a dead end
+  // unrelated to which student was picked.
+  const assignablePlotWhere: Prisma.PlotWhereInput =
+    role === "SUPER_ADMIN" || role === "ADMIN"
+      ? { facultyId: { not: null }, status: { in: ACTIVITY_PLOT_STATUSES } }
+      : role === "FACULTY"
+      ? {
+          facultyId: session.user.id,
+          status: { in: ACTIVITY_PLOT_STATUSES },
+        }
+      : { id: { in: [] } };
+
+  const [assignments, plotsForFilter, assignablePlots] = await Promise.all([
     prisma.plotAssignment.findMany({
       where,
       orderBy: [{ plot: { name: "asc" } }, { assignedAt: "desc" }],
@@ -59,6 +89,11 @@ export default async function AssignmentsPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    prisma.plot.findMany({
+      where: assignablePlotWhere,
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   return (
@@ -74,8 +109,11 @@ export default async function AssignmentsPage({
         </p>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center justify-between">
         <AssignmentPlotFilter plots={plotsForFilter} current={plotId} />
+        {role !== "STUDENT_FARMER" && (
+          <AssignStudentDialog plots={assignablePlots} />
+        )}
       </div>
 
       {assignments.length === 0 ? (
@@ -89,13 +127,7 @@ export default async function AssignmentsPage({
             role === "ADMIN" ||
             role === "SUPER_ADMIN") && (
             <div className="mt-2">
-              <Link
-                href="/dashboard/plots"
-                className="text-green-600 hover:underline"
-              >
-                Go to plots
-              </Link>{" "}
-              to assign students.
+              Use &ldquo;Assign student&rdquo; above to get started.
             </div>
           )}
         </div>

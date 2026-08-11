@@ -24,8 +24,9 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { assignStudent, removeAssignment } from "@/actions/assignments";
+import { assignStudent } from "@/actions/assignments";
 import { formatDate } from "@/lib/format-date";
+import { RemoveAssignmentDialog } from "./remove-assignment-dialog";
 
 type Student = {
   id: string;
@@ -113,16 +114,6 @@ export function PlotAssignments({
     setDialogOpen(false);
     setSelectedStudent("");
     setNotes("");
-    router.refresh();
-  }
-
-  async function handleRemove(assignmentId: string) {
-    const result = await removeAssignment(assignmentId);
-    if (result?.error) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success("Assignment removed");
     router.refresh();
   }
 
@@ -253,14 +244,19 @@ export function PlotAssignments({
                   </div>
                 </div>
                 {canManage && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-danger-text hover:text-danger-text"
-                    onClick={() => handleRemove(a.id)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <RemoveAssignmentDialog
+                    assignmentId={a.id}
+                    studentName={`${a.student.firstName} ${a.student.lastName}`}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-danger-text hover:text-danger-text"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    }
+                  />
                 )}
               </div>
             );
