@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ReportCard } from "@/components/reports/report-card";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
-import { HISTORICAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
+import {
+  SETUP_PLOT_STATUSES,
+  OPERATIONAL_PLOT_STATUSES,
+} from "@/lib/plots/lifecycle";
 
 export default async function ReportsPage() {
   const session = await requireAuth();
@@ -21,15 +24,21 @@ export default async function ReportsPage() {
     select: { id: true, name: true, status: true },
   });
 
-  // Group the plot selector into "Operational" (setup + operational, i.e.
-  // not yet historical) and "Historical" (HARVESTED/FALLOW/ARCHIVED) using
-  // the canonical lifecycle classification.
+  // Group the plot selector into "Setup", "Operational", and "Historical"
+  // using the canonical lifecycle classification directly, rather than a
+  // not-Historical fallback — that previously mislabeled SETUP-stage
+  // (PREPARING) plots as "Operational".
   const plots = plotRows.map((p) => ({
     id: p.id,
     name: p.name,
-    group: (HISTORICAL_PLOT_STATUSES.includes(p.status)
-      ? "Historical"
-      : "Operational") as "Operational" | "Historical",
+    group: (SETUP_PLOT_STATUSES.includes(p.status)
+      ? "Setup"
+      : OPERATIONAL_PLOT_STATUSES.includes(p.status)
+      ? "Operational"
+      // Everything else is HISTORICAL_PLOT_STATUSES by lifecycle.ts's own
+      // compile-time exhaustiveness guarantee (every PlotStatus is exactly
+      // one of SETUP/OPERATIONAL/HISTORICAL) — no third .includes() needed.
+      : "Historical") as "Setup" | "Operational" | "Historical",
   }));
 
   const reports = [

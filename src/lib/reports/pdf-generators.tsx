@@ -82,6 +82,11 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
     fontSize: 10,
   },
+  scopeNote: {
+    fontSize: 8,
+    color: "#6b7280",
+    marginTop: 8,
+  },
   // Growth log entry
   logEntry: {
     borderWidth: 0.5,
@@ -167,7 +172,7 @@ export function SensorReadingsPDF({
     nitrogen: number | null;
     phosphorus: number | null;
     potassium: number | null;
-  }>;
+  }> & { truncated: boolean };
   rangeLabel: string;
   plotName?: string;
 }) {
@@ -175,6 +180,9 @@ export function SensorReadingsPDF({
     `Time range: ${rangeLabel}`,
     `Plot filter: ${plotName ?? "All plots"}`,
     `Total readings: ${data.length}`,
+    ...(data.truncated
+      ? ["Showing only the most recent 5,000 records."]
+      : []),
     `Generated: ${formatDateTime(new Date())}`,
   ];
 
@@ -293,15 +301,15 @@ export function PlotPerformancePDF({
   ];
 
   const cols = [
-    { label: "Plot", width: "10%" },
-    { label: "Crop / Variety", width: "16%" },
+    { label: "Plot", width: "8%" },
+    { label: "Crop / Variety", width: "12%" },
     { label: "Stage", width: "10%" },
     { label: "Status", width: "10%" },
     { label: "Planted", width: "10%" },
     { label: "Harvest", width: "10%" },
     { label: "Readings", width: "8%" },
     { label: "Logs", width: "6%" },
-    { label: "Alerts", width: "8%" },
+    { label: "Alerts (open / total)", width: "14%" },
     { label: "Latest H/L", width: "12%" },
   ];
 
@@ -329,10 +337,10 @@ export function PlotPerformancePDF({
                 key={i}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text style={[styles.tableCell, { width: "8%" }]}>
                   {row.plotName}
                 </Text>
-                <Text style={[styles.tableCell, { width: "16%" }]}>
+                <Text style={[styles.tableCell, { width: "12%" }]}>
                   {row.crop} / {row.variety}
                 </Text>
                 <Text style={[styles.tableCell, { width: "10%" }]}>
@@ -353,7 +361,7 @@ export function PlotPerformancePDF({
                 <Text style={[styles.tableCell, { width: "6%" }]}>
                   {row.logCount}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text style={[styles.tableCell, { width: "14%" }]}>
                   {row.openAlertCount} / {row.alertCount}
                 </Text>
                 <Text style={[styles.tableCell, { width: "12%" }]}>
@@ -365,6 +373,12 @@ export function PlotPerformancePDF({
               </View>
             ))}
           </View>
+        )}
+
+        {data.length > 0 && (
+          <Text style={styles.scopeNote}>
+            Lifetime (not time-range-scoped): open alert count, Latest H/L.
+          </Text>
         )}
 
         <ReportFooter />
@@ -565,12 +579,15 @@ export function ActivityPDF({
     eventType: string;
     description: string;
     actor: string;
-  }>;
+  }> & { truncated: boolean };
   rangeLabel: string;
 }) {
   const meta = [
     `Time range: ${rangeLabel}`,
     `Total events: ${data.length}`,
+    ...(data.truncated
+      ? ["Showing only the most recent 100 records per event type."]
+      : []),
     `Generated: ${formatDateTime(new Date())}`,
   ];
 
@@ -641,7 +658,6 @@ export function StudentActivityPDF({
   data: Array<{
     studentName: string;
     idNumber: string;
-    department: string;
     section: string;
     plotsAssigned: number;
     observationsInRange: number;
@@ -658,15 +674,14 @@ export function StudentActivityPDF({
   ];
 
   const cols = [
-    { label: "Student", width: "20%" },
-    { label: "ID Number", width: "12%" },
-    { label: "Department", width: "14%" },
-    { label: "Section", width: "8%" },
-    { label: "Plots", width: "7%" },
-    { label: "Logs (range)", width: "11%" },
-    { label: "Total Logs", width: "10%" },
-    { label: "Photos", width: "8%" },
-    { label: "Last Log", width: "10%" },
+    { label: "Student", width: "18%" },
+    { label: "ID Number", width: "14%" },
+    { label: "Section", width: "9%" },
+    { label: "Plots", width: "8%" },
+    { label: "Logs (range)", width: "13%" },
+    { label: "Total Logs", width: "12%" },
+    { label: "Photos (range)", width: "13%" },
+    { label: "Last Log", width: "13%" },
   ];
 
   return (
@@ -695,36 +710,39 @@ export function StudentActivityPDF({
                 key={i}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
-                <Text style={[styles.tableCell, { width: "20%" }]}>
+                <Text style={[styles.tableCell, { width: "18%" }]}>
                   {row.studentName}
                 </Text>
-                <Text style={[styles.tableCell, { width: "12%" }]}>
+                <Text style={[styles.tableCell, { width: "14%" }]}>
                   {row.idNumber}
                 </Text>
-                <Text style={[styles.tableCell, { width: "14%" }]}>
-                  {row.department}
-                </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text style={[styles.tableCell, { width: "9%" }]}>
                   {row.section}
                 </Text>
-                <Text style={[styles.tableCell, { width: "7%" }]}>
+                <Text style={[styles.tableCell, { width: "8%" }]}>
                   {row.plotsAssigned}
                 </Text>
-                <Text style={[styles.tableCell, { width: "11%" }]}>
+                <Text style={[styles.tableCell, { width: "13%" }]}>
                   {row.observationsInRange}
                 </Text>
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text style={[styles.tableCell, { width: "12%" }]}>
                   {row.totalObservations}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text style={[styles.tableCell, { width: "13%" }]}>
                   {row.photoCount}
                 </Text>
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text style={[styles.tableCell, { width: "13%" }]}>
                   {formatDate(row.lastLogAt)}
                 </Text>
               </View>
             ))}
           </View>
+        )}
+
+        {data.length > 0 && (
+          <Text style={styles.scopeNote}>
+            Lifetime (not time-range-scoped): Plots, Total Logs, Last Log.
+          </Text>
         )}
 
         <ReportFooter />

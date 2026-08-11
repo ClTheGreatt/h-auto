@@ -78,7 +78,7 @@ export async function generateSensorReadingsExcel(
     nitrogen: number | null;
     phosphorus: number | null;
     potassium: number | null;
-  }>,
+  }> & { truncated: boolean },
   rangeLabel: string,
   plotName?: string
 ) {
@@ -90,6 +90,9 @@ export async function generateSensorReadingsExcel(
     `Time range: ${rangeLabel}`,
     `Plot filter: ${plotName ?? "All plots"}`,
     `Total readings: ${data.length}`,
+    ...(data.truncated
+      ? ["Showing only the most recent 5,000 records."]
+      : []),
     `Generated: ${formatDateTime(new Date())}`,
   ];
 
@@ -255,6 +258,14 @@ export async function generatePlotPerformanceExcel(
       };
     }
     row++;
+  }
+
+  if (data.length > 0) {
+    sheet.mergeCells(row, 1, row, 15);
+    const noteCell = sheet.getCell(row, 1);
+    noteCell.value =
+      "Lifetime (not time-range-scoped): Open Alerts, Active Assignments, Latest Height, Latest Leaf Count.";
+    noteCell.font = { size: 9, color: { argb: "FF6B7280" } };
   }
 
   return Buffer.from(await wb.xlsx.writeBuffer());
@@ -458,7 +469,7 @@ export async function generateActivityExcel(
     eventType: string;
     description: string;
     actor: string;
-  }>,
+  }> & { truncated: boolean },
   rangeLabel: string
 ) {
   const wb = new ExcelJS.Workbook();
@@ -468,6 +479,9 @@ export async function generateActivityExcel(
   const meta = [
     `Time range: ${rangeLabel}`,
     `Total events: ${data.length}`,
+    ...(data.truncated
+      ? ["Showing only the most recent 100 records per event type."]
+      : []),
     `Generated: ${formatDateTime(new Date())}`,
   ];
 
@@ -513,7 +527,6 @@ export async function generateStudentActivityExcel(
   data: Array<{
     studentName: string;
     idNumber: string;
-    department: string;
     section: string;
     plotsAssigned: number;
     observationsInRange: number;
@@ -538,12 +551,11 @@ export async function generateStudentActivityExcel(
   const headers = [
     "Student",
     "ID Number",
-    "Department",
     "Section",
     "Plots Assigned",
     "Observations (range)",
     "Total Observations",
-    "Photos",
+    "Photos (range)",
     "Last Log",
   ];
   sheet.getRow(headerRowIndex).values = headers;
@@ -552,7 +564,6 @@ export async function generateStudentActivityExcel(
   sheet.columns = [
     { width: 24 },
     { width: 16 },
-    { width: 20 },
     { width: 12 },
     { width: 16 },
     { width: 20 },
@@ -566,7 +577,6 @@ export async function generateStudentActivityExcel(
     sheet.getRow(row).values = [
       r.studentName,
       r.idNumber,
-      r.department,
       r.section,
       r.plotsAssigned,
       r.observationsInRange,
@@ -582,6 +592,14 @@ export async function generateStudentActivityExcel(
       };
     }
     row++;
+  }
+
+  if (data.length > 0) {
+    sheet.mergeCells(row, 1, row, 8);
+    const noteCell = sheet.getCell(row, 1);
+    noteCell.value =
+      "Lifetime (not time-range-scoped): Plots Assigned, Total Observations, Last Log.";
+    noteCell.font = { size: 9, color: { argb: "FF6B7280" } };
   }
 
   return Buffer.from(await wb.xlsx.writeBuffer());

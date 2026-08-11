@@ -88,7 +88,7 @@ export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
     },
   });
 
-  return readings.map((r) => ({
+  const rows = readings.map((r) => ({
     recordedAt: r.recordedAt,
     plotName: r.plot.name,
     plotLocation: r.plot.location ?? "-",
@@ -101,6 +101,12 @@ export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
     phosphorus: r.phosphorus,
     potassium: r.potassium,
   }));
+
+  // take: 5000 above silently truncates a high-volume "All time" query —
+  // surface that instead of hiding it. Hitting the cap exactly (rather than
+  // there being exactly 5000 matching rows) is the only false positive, and
+  // is an accepted tradeoff of a length-based check.
+  return Object.assign(rows, { truncated: readings.length === 5000 });
 }
 
 export async function fetchPlotPerformanceData(filters: ScopedReportFilters) {
@@ -248,6 +254,9 @@ export async function fetchActivityData(filters: ReportFilters) {
   };
 
   const events: ActivityEvent[] = [];
+  // True if any single event source hit its take:100 cap — that source's
+  // real count could be higher, silently truncated to the 100 newest.
+  let truncated = false;
 
   // Fetch each entity type with safe try/catch so one bad source doesn't kill the report
   try {
@@ -263,6 +272,7 @@ export async function fetchActivityData(filters: ReportFilters) {
         role: true,
       },
     });
+    if (users.length === 100) truncated = true;
     for (const u of users) {
       events.push({
         timestamp: u.createdAt,
@@ -282,6 +292,7 @@ export async function fetchActivityData(filters: ReportFilters) {
       take: 100,
       select: { createdAt: true, name: true, location: true, status: true },
     });
+    if (plots.length === 100) truncated = true;
     for (const p of plots) {
       events.push({
         timestamp: p.createdAt,
@@ -301,6 +312,7 @@ export async function fetchActivityData(filters: ReportFilters) {
       take: 100,
       include: { plot: { select: { name: true } } },
     });
+    if (devices.length === 100) truncated = true;
     for (const d of devices) {
       events.push({
         timestamp: d.createdAt,
@@ -324,6 +336,7 @@ export async function fetchActivityData(filters: ReportFilters) {
         faculty: { select: { firstName: true, lastName: true } },
       },
     });
+    if (assignments.length === 100) truncated = true;
     for (const a of assignments) {
       events.push({
         timestamp: a.assignedAt,
@@ -343,6 +356,7 @@ export async function fetchActivityData(filters: ReportFilters) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+    if (imports.length === 100) truncated = true;
     for (const imp of imports) {
       events.push({
         timestamp: imp.createdAt,
@@ -355,7 +369,8 @@ export async function fetchActivityData(filters: ReportFilters) {
     console.warn("Activity: failed to fetch imports", e);
   }
 
-  return events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  const sorted = events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  return Object.assign(sorted, { truncated });
 }
 
 export async function fetchStudentActivityData(filters: ScopedReportFilters) {

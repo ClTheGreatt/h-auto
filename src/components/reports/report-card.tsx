@@ -35,7 +35,11 @@ const ICONS: Record<string, LucideIcon> = {
   filetext: FileText,
 };
 
-type Plot = { id: string; name: string; group?: "Operational" | "Historical" };
+type Plot = {
+  id: string;
+  name: string;
+  group?: "Setup" | "Operational" | "Historical";
+};
 
 export function ReportCard({
   type,
