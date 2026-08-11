@@ -26,10 +26,10 @@ export function LiveRefresh({ intervalMs = POLL_INTERVAL_MS }: { intervalMs?: nu
     return () => clearInterval(t);
   }, [active, intervalMs, router]);
 
-  // No visible output — this is a background auto-refresh timer. The
-  // actual device/reading status is shown by a single, accurate badge
-  // in the parent (computed from lastSeenAt), so this used to render a
-  // hardcoded "Live" label that misleadingly sat next to an "OFFLINE"
-  // badge even when the device wasn't actually online.
+  // No visible output — this is a background auto-refresh timer. Every
+  // caller of this component renders its own accurate device/reading
+  // status badge nearby (computed from lastSeenAt via getDeviceFreshness),
+  // so this used to render a hardcoded "Live" label that misleadingly sat
+  // next to an "OFFLINE" badge even when the device wasn't actually online.
   return null;
 }

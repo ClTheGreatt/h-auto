@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
+import { formatDateTime } from "@/lib/format-date";
+import { getDeviceFreshness } from "@/lib/utils/device-status";
 import { ReadingsFilters } from "@/components/plots/readings-filters";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { findReadingHistoryPlot } from "@/lib/auth/plot-access";
@@ -61,11 +65,14 @@ export default async function PlotReadingsPage({
         select: {
           id: true,
           name: true,
-          device: { select: { id: true } },
+          device: { select: { id: true, lastSeenAt: true } },
         },
       })
   );
   if (!plot) notFound();
+
+  const now = new Date();
+  const deviceFreshness = getDeviceFreshness(plot.device?.lastSeenAt, now);
 
   // date window
   const recordedAt = resolveWindow(parsedMonth, range);
@@ -149,7 +156,35 @@ export default async function PlotReadingsPage({
           Readings history
         </h1>
         <p className="text-sm text-muted-foreground mt-1">{plot.name}</p>
-        {plot.device && <LiveRefresh />}
+        {plot.device && (
+          <div className="flex items-center gap-2 mt-2">
+            <StatusBadge
+              variant={
+                deviceFreshness.state === "FRESH"
+                  ? "success"
+                  : deviceFreshness.state === "STALE"
+                  ? "warning"
+                  : deviceFreshness.state === "OFFLINE"
+                  ? "danger"
+                  : "neutral"
+              }
+            >
+              {deviceFreshness.state === "FRESH"
+                ? "Fresh"
+                : deviceFreshness.state === "STALE"
+                ? "Stale"
+                : deviceFreshness.state === "OFFLINE"
+                ? "Offline"
+                : "Never reported"}
+            </StatusBadge>
+            {plot.device.lastSeenAt && (
+              <span className="text-xs text-muted-foreground">
+                Last seen {formatDateTime(plot.device.lastSeenAt)}
+              </span>
+            )}
+            <LiveRefresh />
+          </div>
+        )}
       </div>
 
       <ReadingsFilters
@@ -161,8 +196,32 @@ export default async function PlotReadingsPage({
 
       {items.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No readings found for this filter.
+          <CardContent className="py-8">
+            {earliest ? (
+              // Readings exist somewhere for this plot — just not within
+              // the current filter — regardless of whether a device is
+              // still attached today.
+              <EmptyState
+                compact
+                icon={Activity}
+                title="No readings in this range"
+                description="The device hasn't reported during the selected period. Try Latest or a wider range to see its most recent data."
+              />
+            ) : !plot.device ? (
+              <EmptyState
+                compact
+                icon={Activity}
+                title="No monitoring device"
+                description="This plot doesn't have a device installed, so there are no sensor readings to show."
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={Activity}
+                title="No readings yet"
+                description="The device hasn't sent any readings yet. Check back once it starts reporting."
+              />
+            )}
           </CardContent>
         </Card>
       ) : (
