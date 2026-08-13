@@ -41,6 +41,13 @@ export async function updatePlot(id: string, input: PlotFormValues) {
   if (!parsed.success) return { error: "Invalid input" };
 
   const data = parsed.data;
+  // status is deliberately NOT written here — every status transition has
+  // its own dedicated, confirmed action (harvestPlot/unharvestPlot/
+  // archivePlot/restorePlot) that also updates harvestedAt/archivedAt to
+  // match. Writing status from this generic form bypassed all of that and
+  // left the plot silently inconsistent (e.g. status: HARVESTED with
+  // harvestedAt still null). data.status is still validated above (the
+  // form still submits the plot's current status, unedited) but unused.
   await prisma.plot.update({
     where: { id },
     data: {
@@ -52,7 +59,6 @@ export async function updatePlot(id: string, input: PlotFormValues) {
       currentStageId: data.currentStageId || null,
       plantingDate: parseDate(data.plantingDate),
       expectedHarvest: parseDate(data.expectedHarvest),
-      status: data.status,
     },
   });
 

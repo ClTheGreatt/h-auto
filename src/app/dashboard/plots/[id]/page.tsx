@@ -407,6 +407,15 @@ export default async function PlotDetailPage({
                   Link a device
                 </Link>
               )}
+              {/* Only reachable in this !plot.device branch — when a device
+                  IS linked, LatestReadings already shows its own "No stage
+                  set — thresholds unavailable" message, so this never
+                  doubles up. */}
+              {!plot.currentStage && (
+                <p className="text-xs text-muted-foreground italic mt-2">
+                  No growth stage set — thresholds and alerts are off.
+                </p>
+              )}
             </div>
           ) : !latestReading ? (
             <div className="text-sm text-muted-foreground">

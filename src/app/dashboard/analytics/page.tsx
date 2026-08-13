@@ -605,7 +605,15 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
             </p>
           </CardHeader>
           <CardContent>
-            <AlertsByTypeChart data={Array.from(alertTypeCounts.values())} />
+            {alertTypeCounts.size === 0 ? (
+              <EmptyState
+                icon={BellRing}
+                title="No alerts in this range."
+                compact
+              />
+            ) : (
+              <AlertsByTypeChart data={Array.from(alertTypeCounts.values())} />
+            )}
           </CardContent>
         </Card>
       </div>

@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteLogDialog } from "./delete-log-dialog";
+import { formatDateTime } from "@/lib/format-date";
 
 type LogItem = {
   id: string;
@@ -99,7 +100,7 @@ export function GrowthTimeline({
                   )}
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {new Date(log.createdAt).toLocaleString()}
+                    {formatDateTime(log.createdAt)}
                   </span>
                   {canDelete && (
                     <DeleteLogDialog

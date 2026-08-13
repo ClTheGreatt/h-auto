@@ -25,8 +25,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import { plotSchema, type PlotFormValues } from "@/lib/validations/plot";
 import { createPlot, updatePlot } from "@/actions/plots";
+import type { PlotStatus } from "@prisma/client";
+
+// Same mapping plots-table.tsx uses for the Plots list — the shared,
+// reusable status-badge idiom. Plot Detail's own status badge is a
+// page-local Badge+color map, not exported, so it isn't reusable here.
+const STATUS_LABELS: Record<PlotStatus, string> = {
+  PREPARING: "Preparing",
+  PLANTED: "Planted",
+  GROWING: "Growing",
+  READY_FOR_HARVEST: "Ready for harvest",
+  HARVESTED: "Harvested",
+  FALLOW: "Fallow",
+  ARCHIVED: "Archived",
+};
+const STATUS_VARIANT: Record<PlotStatus, StatusVariant> = {
+  PREPARING: "neutral",
+  PLANTED: "info",
+  GROWING: "success",
+  READY_FOR_HARVEST: "warning",
+  HARVESTED: "success",
+  FALLOW: "neutral",
+  ARCHIVED: "neutral",
+};
 
 type CropOption = {
   id: string;
@@ -192,31 +216,25 @@ export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFo
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status <RequiredMark /></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="PREPARING">Preparing</SelectItem>
-                      <SelectItem value="PLANTED">Planted</SelectItem>
-                      <SelectItem value="GROWING">Growing</SelectItem>
-                      <SelectItem value="READY_FOR_HARVEST">Ready for harvest</SelectItem>
-                      <SelectItem value="HARVESTED">Harvested</SelectItem>
-                      <SelectItem value="FALLOW">Fallow</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Status is read-only here — every transition has its own
+                dedicated, confirmed action on the plot detail page (Mark as
+                harvested, Archive, etc.), each of which also updates fields
+                like harvestedAt/archivedAt that this generic form does not
+                know about. Create mode has no existing status to show. */}
+            {mode === "edit" && defaultValues?.status && (
+              <div>
+                <FormLabel>Status</FormLabel>
+                <div className="mt-2">
+                  <StatusBadge variant={STATUS_VARIANT[defaultValues.status]}>
+                    {STATUS_LABELS[defaultValues.status]}
+                  </StatusBadge>
+                </div>
+                <FormDescription className="text-xs mt-1">
+                  Use Mark as harvested, Archive, or Restore on the plot page
+                  to change status.
+                </FormDescription>
+              </div>
+            )}
           </CardContent>
         </Card>
 
