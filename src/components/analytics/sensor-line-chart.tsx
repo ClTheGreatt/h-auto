@@ -73,7 +73,7 @@ const chartData = Array.from(timeMap.values())
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
-          margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
@@ -87,7 +87,7 @@ const chartData = Array.from(timeMap.values())
             fontSize={11}
             tickLine={false}
             unit={unit}
-            width={50}
+            width={80}
           />
           <Tooltip
             contentStyle={{

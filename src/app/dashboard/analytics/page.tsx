@@ -405,18 +405,22 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
     }
   }
 
+  // hasReadings is tracked independently of currentStage/device — a plot
+  // with zero readings in the selected window is "no data" whether that's
+  // because it has no device, hasn't reported yet, or simply falls outside
+  // the window, never because its optimal-percent happens to compute to 0.
   const plotHealth: Record<string, number> = {};
+  const plotHasReadingsInRange: Record<string, boolean> = {};
   for (const plot of plots) {
-    if (!plot.currentStage) {
-      plotHealth[plot.id] = 0;
-      continue;
-    }
     const readings = await prisma.sensorReading.findMany({
       where: { plotId: plot.id, ...readingWindow },
       take: 200,
       orderBy: { recordedAt: "desc" },
     });
-    plotHealth[plot.id] = calculateOptimalPercent(readings, plot.currentStage);
+    plotHasReadingsInRange[plot.id] = readings.length > 0;
+    plotHealth[plot.id] = plot.currentStage
+      ? calculateOptimalPercent(readings, plot.currentStage)
+      : 0;
   }
 
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
@@ -632,12 +636,17 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
             <div className="divide-y">
               {plots.map((plot) => {
                 const health = plotHealth[plot.id] ?? 0;
-                const healthColor =
-                  health >= 80
-                    ? "text-green-700 bg-green-100"
-                    : health >= 50
-                    ? "text-amber-700 bg-amber-100"
-                    : "text-red-700 bg-red-100";
+                const hasReadings = plotHasReadingsInRange[plot.id] ?? false;
+                // A plot with zero readings in this window has nothing to
+                // grade — showing it as a red "0% optimal" would read as
+                // "consistently out of range," not "no data yet."
+                const healthColor = !hasReadings
+                  ? "text-muted-foreground bg-muted"
+                  : health >= 80
+                  ? "text-green-700 bg-green-100"
+                  : health >= 50
+                  ? "text-amber-700 bg-amber-100"
+                  : "text-red-700 bg-red-100";
                 const isSelected = plot.id === selectedPlotId;
 
                 return (
@@ -690,7 +699,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
                         variant="secondary"
                         className={"font-mono " + healthColor}
                       >
-                        {Math.round(health)}% optimal
+                        {hasReadings ? `${Math.round(health)}% optimal` : "No data"}
                       </Badge>
                     </div>
                   </Link>
