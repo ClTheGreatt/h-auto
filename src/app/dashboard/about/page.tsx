@@ -61,7 +61,7 @@ const TECH_STACK = [
       "Neon Database",
       "Cloudinary",
       "Expo Push Notifications",
-      "Semaphore SMS",
+      "TextBee SMS",
       "Resend Email",
     ],
   },
