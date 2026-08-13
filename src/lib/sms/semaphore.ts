@@ -1,15 +1,16 @@
 import { normalizePhPhone } from "./phone";
+import { sendSMS as sendSMSViaTextbee, type SendResult } from "./textbee";
 
 const SEMAPHORE_API_URL = "https://api.semaphore.co/api/v4/messages";
 
-type SendResult = {
-  success: boolean;
-  messageId?: string;
-  error?: string;
-  mock?: boolean;
-};
+// ACTIVE PROVIDER: textbee (see ./textbee.ts). Semaphore is blocked on an
+// unapproved sender-name signature with no ETA. This file's own
+// implementation below (sendSMSViaSemaphore) is kept fully intact and
+// exported, unused — if the Semaphore signature is ever approved, revert
+// by pointing this export back at sendSMSViaSemaphore.
+export const sendSMS = sendSMSViaTextbee;
 
-export async function sendSMS(
+export async function sendSMSViaSemaphore(
   phoneNumber: string | null,
   message: string
 ): Promise<SendResult> {
