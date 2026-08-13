@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { plotSchema, type PlotFormValues } from "@/lib/validations/plot";
+import { FORM_EDITABLE_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 function parseDate(v: string | undefined | null): Date | null {
   if (!v || v === "") return null;
@@ -41,13 +42,31 @@ export async function updatePlot(id: string, input: PlotFormValues) {
   if (!parsed.success) return { error: "Invalid input" };
 
   const data = parsed.data;
-  // status is deliberately NOT written here — every status transition has
-  // its own dedicated, confirmed action (harvestPlot/unharvestPlot/
-  // archivePlot/restorePlot) that also updates harvestedAt/archivedAt to
-  // match. Writing status from this generic form bypassed all of that and
-  // left the plot silently inconsistent (e.g. status: HARVESTED with
-  // harvestedAt still null). data.status is still validated above (the
-  // form still submits the plot's current status, unedited) but unused.
+
+  const existing = await prisma.plot.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!existing) return { error: "Plot not found" };
+
+  // HARVESTED/ARCHIVED are locked out of this generic save — each has its
+  // own dedicated, confirmed action (harvestPlot/archivePlot) that also
+  // writes a companion timestamp (harvestedAt/archivedAt) this form doesn't
+  // know about. If the plot is already locked, its status is left exactly
+  // as-is no matter what the form submitted: defaultValues seeds the form
+  // with the current status so a normal save round-trips it unchanged, and
+  // a request that claims otherwise is treated as tampered, not honored.
+  const statusIsLocked = !FORM_EDITABLE_PLOT_STATUSES.includes(existing.status);
+  let nextStatus = existing.status;
+  if (!statusIsLocked) {
+    if (!FORM_EDITABLE_PLOT_STATUSES.includes(data.status)) {
+      return {
+        error: "Use the dedicated Harvest or Archive action to set that status.",
+      };
+    }
+    nextStatus = data.status;
+  }
+
   await prisma.plot.update({
     where: { id },
     data: {
@@ -59,6 +78,7 @@ export async function updatePlot(id: string, input: PlotFormValues) {
       currentStageId: data.currentStageId || null,
       plantingDate: parseDate(data.plantingDate),
       expectedHarvest: parseDate(data.expectedHarvest),
+      status: nextStatus,
     },
   });
 
@@ -69,23 +89,36 @@ export async function updatePlot(id: string, input: PlotFormValues) {
 
 // Soft delete: archives the plot instead of a hard `delete`, so historical
 // sensor readings, growth logs (with photos), and alerts are preserved
-// rather than cascade-deleted.
+// rather than cascade-deleted. Any active assignments are ended as part of
+// the same transaction (matching removeAssignment's own field writes)
+// rather than blocking the admin from archiving until they're removed one
+// by one. restorePlot does not reverse this — a restored plot comes back
+// with no active assignments and they must be re-assigned.
 export async function archivePlot(id: string) {
   await requireAdmin();
 
-  const assignmentCount = await prisma.plotAssignment.count({
-    where: { plotId: id, status: "ACTIVE" },
-  });
-  if (assignmentCount > 0) {
-    return { error: `Cannot archive: ${assignmentCount} active assignment(s) exist. End them first.` };
-  }
-
-  await prisma.plot.update({
+  const plot = await prisma.plot.findUnique({
     where: { id },
-    data: { status: "ARCHIVED", archivedAt: new Date() },
+    select: { status: true },
   });
+  if (!plot) return { error: "Plot not found" };
+  if (plot.status === "ARCHIVED") return { error: "Plot is already archived." };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.plotAssignment.updateMany({
+      where: { plotId: id, status: "ACTIVE" },
+      data: { status: "COMPLETED", endedAt: new Date() },
+    });
+    await tx.plot.update({
+      where: { id },
+      data: { status: "ARCHIVED", archivedAt: new Date() },
+    });
+  });
+
   revalidatePath("/dashboard/plots");
   revalidatePath("/dashboard/plots/archived");
+  revalidatePath("/dashboard/assignments");
+  revalidatePath(`/dashboard/plots/${id}`);
   return { success: true };
 }
 

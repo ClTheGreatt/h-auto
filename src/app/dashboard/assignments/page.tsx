@@ -162,7 +162,7 @@ export default async function AssignmentsPage({
                       {a.plot.location && ` • ${a.plot.location}`}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
-                      Assigned by {a.faculty.firstName} {a.faculty.lastName} •{" "}
+                      Adviser: {a.faculty.firstName} {a.faculty.lastName} •{" "}
                       {new Date(a.assignedAt).toLocaleDateString()}
                     </div>
                   </div>

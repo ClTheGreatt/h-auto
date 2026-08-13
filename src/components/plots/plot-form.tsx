@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import { plotSchema, type PlotFormValues } from "@/lib/validations/plot";
 import { createPlot, updatePlot } from "@/actions/plots";
+import { FORM_EDITABLE_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import type { PlotStatus } from "@prisma/client";
 
 // Same mapping plots-table.tsx uses for the Plots list — the shared,
@@ -216,12 +217,16 @@ export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFo
                 </FormItem>
               )}
             />
-            {/* Status is read-only here — every transition has its own
+            {/* HARVESTED/ARCHIVED are read-only here — each has its own
                 dedicated, confirmed action on the plot detail page (Mark as
-                harvested, Archive, etc.), each of which also updates fields
-                like harvestedAt/archivedAt that this generic form does not
-                know about. Create mode has no existing status to show. */}
-            {mode === "edit" && defaultValues?.status && (
+                harvested, Archive, etc.) that also updates a companion
+                timestamp (harvestedAt/archivedAt) this generic form does not
+                know about. Every other status has no such side effect, so it
+                stays a plain editable dropdown. Create mode has no existing
+                status to lock against, so it always gets the dropdown. */}
+            {mode === "edit" &&
+            defaultValues?.status &&
+            !FORM_EDITABLE_PLOT_STATUSES.includes(defaultValues.status) ? (
               <div>
                 <FormLabel>Status</FormLabel>
                 <div className="mt-2">
@@ -234,6 +239,35 @@ export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFo
                   to change status.
                 </FormDescription>
               </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {FORM_EDITABLE_PLOT_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {STATUS_LABELS[s]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">
+                      Use Mark as harvested or Archive on the plot page for
+                      those transitions.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
           </CardContent>
         </Card>

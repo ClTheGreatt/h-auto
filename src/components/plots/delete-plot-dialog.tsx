@@ -19,10 +19,12 @@ import { archivePlot } from "@/actions/plots";
 export function DeletePlotDialog({
   plotId,
   plotName,
+  activeAssignmentCount,
   trigger,
 }: {
   plotId: string;
   plotName: string;
+  activeAssignmentCount: number;
   trigger: React.ReactNode;
 }) {
   const router = useRouter();
@@ -54,6 +56,13 @@ export function DeletePlotDialog({
             This will archive <strong>{plotName}</strong> and preserve all
             historical data. It will no longer appear in active lists but can
             be restored by an administrator.
+            {activeAssignmentCount > 0 && (
+              <>
+                {" "}
+                This will also end {activeAssignmentCount} active assignment
+                {activeAssignmentCount === 1 ? "" : "s"}.
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

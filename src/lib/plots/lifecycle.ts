@@ -38,3 +38,16 @@ export const OPERATIONAL_PLOT_STATUSES: PlotStatus[] = [...OPERATIONAL];
 export const HISTORICAL_PLOT_STATUSES: PlotStatus[] = [...HISTORICAL];
 
 export const ACTIVITY_PLOT_STATUSES: PlotStatus[] = [...SETUP, ...OPERATIONAL];
+
+// Statuses with no dedicated action and no companion timestamp field to keep
+// in sync — safe to expose as a plain, unconfirmed dropdown on the generic
+// plot edit form (and to enforce server-side there). HARVESTED and ARCHIVED
+// are deliberately excluded even though FALLOW shares their HISTORICAL
+// classification above: each of those two has its own dedicated action
+// (harvestPlot/archivePlot) that also writes a companion timestamp
+// (harvestedAt/archivedAt), and setting either from this generic form would
+// leave that timestamp stale.
+export const FORM_EDITABLE_PLOT_STATUSES: PlotStatus[] = [
+  ...ACTIVITY_PLOT_STATUSES,
+  "FALLOW",
+];

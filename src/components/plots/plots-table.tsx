@@ -155,6 +155,7 @@ export function PlotsTable({
                       <DeletePlotDialog
                         plotId={plot.id}
                         plotName={plot.name}
+                        activeAssignmentCount={plot._count.assignments}
                         trigger={
                           <DropdownMenuItem
                             onSelect={(e) => e.preventDefault()}
