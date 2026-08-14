@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useFieldArray, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -110,7 +110,7 @@ export function CropForm({
     },
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove, replace, move } = useFieldArray({
     control: form.control,
     name: "stages",
   });
@@ -326,18 +326,45 @@ export function CropForm({
               <Card key={stage.id}>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Stage {index + 1}</CardTitle>
-                  {fields.length > 1 && (
+                  <div className="flex items-center gap-1">
+                    {/* Move controls — disabled (not hidden) at the ends, so
+                        the control set stays visually stable as the admin
+                        works through the list. Grouped and gapped away from
+                        Remove below so a reorder tap can't land on the
+                        destructive action. */}
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
-                      onClick={() => remove(index)}
-                      className="text-danger-text hover:text-danger-text"
+                      size="icon"
+                      disabled={index === 0}
+                      onClick={() => move(index, index - 1)}
+                      aria-label="Move stage up"
                     >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Remove
+                      <ArrowUp className="w-4 h-4" />
                     </Button>
-                  )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={index === fields.length - 1}
+                      onClick={() => move(index, index + 1)}
+                      aria-label="Move stage down"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </Button>
+                    {fields.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(index)}
+                        className="text-danger-text hover:text-danger-text ml-2"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Carries the existing stage's DB id through submission

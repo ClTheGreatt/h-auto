@@ -141,13 +141,37 @@ export async function updateCrop(id: string, input: CropFormValues) {
       });
     }
 
-    // Existing stages can only ever move to an equal-or-lower orderIndex
-    // here (CropForm's useFieldArray only supports append-at-end and
-    // remove — no reorder control), and removed stages are deleted above
-    // before this loop runs. Processing in ascending target-index order
-    // means every slot a still-live stage needs is already vacated by the
-    // time we reach it, so this never collides with
-    // @@unique([cropId, orderIndex]) — no two-pass write required.
+    // CropForm now supports reordering (move up/down), so an existing
+    // stage's target orderIndex can be higher OR lower than where it
+    // currently sits — e.g. swapping stage 1 and 2 asks to write stage 2's
+    // row into the slot stage 1's row still occupies. @@unique([cropId,
+    // orderIndex]) is non-deferred, so a single-pass write risks a mid-loop
+    // collision. Two passes avoid that:
+    //
+    // Pass 1 moves every existing (dbId-having) row to a temporary negative
+    // orderIndex (-(arrayIndex+1)). This range is provably disjoint from
+    // both (a) the final target range, which is always 0..stages.length-1
+    // (non-negative, since it's assigned from array position), and (b) any
+    // row not being touched — there is none: every CropStage for this
+    // cropId is either in this update loop or was already deleted above as
+    // a removed stage, so nothing outside this loop can hold a
+    // (cropId, orderIndex) the temp or final writes could collide with.
+    // Distinct array indices map to distinct negative offsets, so the temp
+    // values can't collide with each other either.
+    for (let i = 0; i < stages.length; i++) {
+      const s = stages[i];
+      if (s.dbId) {
+        await tx.cropStage.update({
+          where: { id: s.dbId },
+          data: { orderIndex: -(i + 1) },
+        });
+      }
+    }
+
+    // Pass 2 writes final data and final orderIndex. Every existing row is
+    // now off the 0..N-1 range (moved negative above), and every new
+    // (no-dbId) row doesn't exist in the DB yet, so no target slot in this
+    // pass can already be occupied by a row this loop hasn't gotten to yet.
     for (let i = 0; i < stages.length; i++) {
       const s = stages[i];
       if (s.dbId) {
