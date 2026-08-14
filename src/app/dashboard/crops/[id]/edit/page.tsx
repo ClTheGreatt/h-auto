@@ -23,6 +23,15 @@ export default async function EditCropPage({
 
   if (!crop) notFound();
 
+  // Plots currently sitting on one of this crop's stages — used to gate a
+  // confirmation before saving (STEP 4). Always 0 when the crop has no
+  // stages yet.
+  const plotsInUseCount = crop.stages.length
+    ? await prisma.plot.count({
+        where: { currentStageId: { in: crop.stages.map((s) => s.id) } },
+      })
+    : 0;
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
@@ -47,6 +56,7 @@ export default async function EditCropPage({
       <CropForm
         mode="edit"
         cropId={crop.id}
+        plotsInUseCount={plotsInUseCount}
         defaultValues={{
           name: crop.name,
           variety: crop.variety ?? "",
@@ -54,6 +64,7 @@ export default async function EditCropPage({
           daysToHarvest: crop.daysToHarvest,
           cultivationGuide: crop.cultivationGuide ?? "",
           stages: crop.stages.map((s) => ({
+            dbId: s.id,
             name: s.name,
             orderIndex: s.orderIndex,
             durationDays: s.durationDays,

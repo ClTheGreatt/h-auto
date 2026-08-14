@@ -2,6 +2,11 @@ import { z } from "zod";
 import { isValidThresholdRange } from "@/lib/sensors/threshold-status";
 
 const stageFields = z.object({
+  // Present for a stage that already exists in the DB (round-tripped from
+  // EditCropPage's defaultValues), absent for one newly appended in the
+  // form. Named dbId, not id — react-hook-form's useFieldArray injects its
+  // own generated `id` per row and strips any field literally called `id`.
+  dbId: z.string().optional(),
   name: z.string().min(1, "Stage name is required"),
   orderIndex: z.number().int().min(0),
   durationDays: z.number().int().positive("Duration must be at least 1 day"),

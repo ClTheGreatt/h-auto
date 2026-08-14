@@ -5,6 +5,31 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
 
+// The CropStage columns a form submission can actually write — explicitly
+// listed (not spread) so a submitted `dbId` can never reach Prisma as a
+// column. orderIndex is always assigned separately from array position.
+function toStageData(s: CropFormValues["stages"][number]) {
+  return {
+    name: s.name,
+    durationDays: s.durationDays,
+    description: s.description || null,
+    minSoilMoisture: s.minSoilMoisture,
+    maxSoilMoisture: s.maxSoilMoisture,
+    minTemperature: s.minTemperature,
+    maxTemperature: s.maxTemperature,
+    minHumidity: s.minHumidity,
+    maxHumidity: s.maxHumidity,
+    minLightIntensity: s.minLightIntensity,
+    maxLightIntensity: s.maxLightIntensity,
+    minNitrogen: s.minNitrogen,
+    maxNitrogen: s.maxNitrogen,
+    minPhosphorus: s.minPhosphorus,
+    maxPhosphorus: s.maxPhosphorus,
+    minPotassium: s.minPotassium,
+    maxPotassium: s.maxPotassium,
+  };
+}
+
 export async function createCrop(input: CropFormValues) {
   await requireAdmin();
 
@@ -20,6 +45,9 @@ export async function createCrop(input: CropFormValues) {
 
   const { stages, ...cropData } = parsed.data;
 
+  // A brand-new crop has no existing rows to match against — any submitted
+  // dbId (CropForm never sets one in create mode) is ignored regardless,
+  // since toStageData() never reads it.
   await prisma.crop.create({
     data: {
       ...cropData,
@@ -28,9 +56,8 @@ export async function createCrop(input: CropFormValues) {
       cultivationGuide: cropData.cultivationGuide || null,
       stages: {
         create: stages.map((s, i) => ({
-          ...s,
+          ...toStageData(s),
           orderIndex: i,
-          description: s.description || null,
         })),
       },
     },
@@ -55,25 +82,96 @@ export async function updateCrop(id: string, input: CropFormValues) {
 
   const { stages, ...cropData } = parsed.data;
 
-  await prisma.$transaction([
-    prisma.cropStage.deleteMany({ where: { cropId: id } }),
-    prisma.crop.update({
+  const currentStages = await prisma.cropStage.findMany({
+    where: { cropId: id },
+    select: { id: true, name: true },
+  });
+  const currentStageIds = new Set(currentStages.map((s) => s.id));
+
+  // SECURITY: a submitted dbId must actually belong to this crop. Without
+  // this, an admin could submit a stage id copied from a different crop and
+  // have updateCrop silently rewrite that other crop's stage in place.
+  for (const s of stages) {
+    if (s.dbId && !currentStageIds.has(s.dbId)) {
+      return { error: "One or more submitted stages do not belong to this crop." };
+    }
+  }
+
+  const submittedIds = new Set(
+    stages.filter((s): s is typeof s & { dbId: string } => Boolean(s.dbId)).map((s) => s.dbId)
+  );
+  const removedStages = currentStages.filter((s) => !submittedIds.has(s.id));
+
+  // STEP 3: block removing a stage that a plot is still actively on, rather
+  // than silently nulling Plot.currentStageId out from under it. GrowthLog
+  // is deliberately not checked here — historical logs referencing a
+  // removed stage are acceptable collateral, and blocking on them would
+  // make a stage undeletable forever the moment it's ever been logged
+  // against once.
+  if (removedStages.length > 0) {
+    const affectedPlots = await prisma.plot.findMany({
+      where: { currentStageId: { in: removedStages.map((s) => s.id) } },
+      select: { name: true, currentStageId: true },
+    });
+    if (affectedPlots.length > 0) {
+      const stageNameById = new Map(removedStages.map((s) => [s.id, s.name]));
+      const plotsByStage = new Map<string, string[]>();
+      for (const plot of affectedPlots) {
+        const stageName = stageNameById.get(plot.currentStageId!) ?? "a removed stage";
+        plotsByStage.set(stageName, [
+          ...(plotsByStage.get(stageName) ?? []),
+          plot.name,
+        ]);
+      }
+      const parts = Array.from(plotsByStage.entries()).map(
+        ([stageName, plotNames]) => `"${stageName}" (in use by ${plotNames.join(", ")})`
+      );
+      return {
+        error: `Cannot remove stage ${parts.join("; ")}. Change the affected plot's stage first, then save again.`,
+      };
+    }
+  }
+
+  // Nothing is written until this point — the checks above run entirely
+  // before the transaction opens, so a blocked save leaves the DB untouched.
+  await prisma.$transaction(async (tx) => {
+    if (removedStages.length > 0) {
+      await tx.cropStage.deleteMany({
+        where: { id: { in: removedStages.map((s) => s.id) } },
+      });
+    }
+
+    // Existing stages can only ever move to an equal-or-lower orderIndex
+    // here (CropForm's useFieldArray only supports append-at-end and
+    // remove — no reorder control), and removed stages are deleted above
+    // before this loop runs. Processing in ascending target-index order
+    // means every slot a still-live stage needs is already vacated by the
+    // time we reach it, so this never collides with
+    // @@unique([cropId, orderIndex]) — no two-pass write required.
+    for (let i = 0; i < stages.length; i++) {
+      const s = stages[i];
+      if (s.dbId) {
+        await tx.cropStage.update({
+          where: { id: s.dbId },
+          data: { ...toStageData(s), orderIndex: i },
+        });
+      } else {
+        await tx.cropStage.create({
+          data: { ...toStageData(s), orderIndex: i, cropId: id },
+        });
+      }
+    }
+
+    await tx.crop.update({
       where: { id },
       data: {
         ...cropData,
         variety: cropData.variety || null,
         description: cropData.description || null,
         cultivationGuide: cropData.cultivationGuide || null,
-        stages: {
-          create: stages.map((s, i) => ({
-            ...s,
-            orderIndex: i,
-            description: s.description || null,
-          })),
-        },
       },
-    }),
-  ]);
+    });
+  });
 
   revalidatePath("/dashboard/crops");
   revalidatePath(`/dashboard/crops/${id}/edit`);

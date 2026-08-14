@@ -35,6 +35,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
 import { createCrop, updateCrop } from "@/actions/crops";
@@ -47,6 +58,9 @@ type CropFormProps = {
   // Admin-promoted crops (Crop.isPreset = true), reshaped to the same
   // CropPreset shape as the 9 built-ins. Only relevant in create mode.
   customPresets?: CropPreset[];
+  // Plots currently on one of this crop's stages (edit mode only) — gates
+  // the save confirmation below. 0/undefined skips the dialog entirely.
+  plotsInUseCount?: number;
 };
 
 const NONE_PRESET = "__none__";
@@ -77,9 +91,12 @@ export function CropForm({
   cropId,
   defaultValues,
   customPresets = [],
+  plotsInUseCount = 0,
 }: CropFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const needsSaveConfirm = mode === "edit" && plotsInUseCount > 0;
 
   const form = useForm<CropFormValues>({
     resolver: zodResolver(cropSchema),
@@ -323,6 +340,11 @@ export function CropForm({
                   )}
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Carries the existing stage's DB id through submission
+                      so updateCrop can update it in place instead of
+                      deleting and recreating it. Not rendered as a visible
+                      field — nothing for the admin to see or edit here. */}
+                  <input type="hidden" {...form.register(`stages.${index}.dbId`)} />
                   <StageBasicFields control={form.control} index={index} />
                   <Separator />
                   <StageThresholdFields control={form.control} index={index} />
@@ -333,9 +355,47 @@ export function CropForm({
         </div>
 
         <div className="flex gap-3 sticky bottom-0 bg-muted py-4 border-t">
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Saving..." : mode === "create" ? "Create crop" : "Save changes"}
-          </Button>
+          {needsSaveConfirm ? (
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" disabled={submitting}>
+                  {submitting ? "Saving..." : "Save changes"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Save changes to this crop?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {plotsInUseCount === 1
+                      ? "1 plot is currently using a stage from this crop."
+                      : `${plotsInUseCount} plots are currently using a stage from this crop.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+                  {/* Default styling, not solid red — saving is no longer
+                      destructive to in-use stages (updateCrop now updates
+                      them in place and blocks removing one that's still in
+                      use). This is an awareness prompt, not a danger
+                      confirm. */}
+                  <AlertDialogAction
+                    disabled={submitting}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setConfirmOpen(false);
+                      form.handleSubmit(onSubmit)();
+                    }}
+                  >
+                    {submitting ? "Saving..." : "Save changes"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : mode === "create" ? "Create crop" : "Save changes"}
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
