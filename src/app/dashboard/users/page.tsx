@@ -3,7 +3,7 @@ import { Plus, Upload } from "lucide-react";
 import type { Prisma, UserRole, UserStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdmin, canManageUser } from "@/lib/auth-helpers";
 import { UsersTable } from "@/components/users/users-table";
 import { SearchBar } from "@/components/ui/search-bar";
 import { RoleFilter } from "@/components/users/role-filter";
@@ -45,7 +45,7 @@ export default async function UsersPage({
     neverLogged?: string;
   }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const sp = await searchParams;
   const search = sp.search?.trim() ?? "";
@@ -148,7 +148,7 @@ export default async function UsersPage({
   // status, and how many STUDENT_FARMER users with zero growth logs match
   // every filter except role/neverLogged themselves — each toolbar figure
   // surfaces a state the default view would otherwise hide.
-  const [users, inactiveCount, neverLoggedCount] = await Promise.all([
+  const [rawUsers, inactiveCount, neverLoggedCount] = await Promise.all([
     prisma.user.findMany({
       where,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -179,6 +179,17 @@ export default async function UsersPage({
           },
         }),
   ]);
+
+  // Whether the viewer is allowed to deactivate this specific row's account
+  // (Only a Super Admin may manage an Admin/Super Admin target — see
+  // canManageUser). Resolved once here, server-side, and passed down as a
+  // plain boolean so the client table never needs to import auth-helpers.ts
+  // (which also pulls in server-only session code) just to hide a button —
+  // same idiom as canManageAdvisories on the user detail page.
+  const users = rawUsers.map((u) => ({
+    ...u,
+    canManage: canManageUser(session.user.role, u.role),
+  }));
 
   const totalUsers = users.length;
   const hasFilters = Boolean(

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
+import { Prisma, type UserRole, type UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, canAssignRole, canManageUser } from "@/lib/auth-helpers";
 import { sendEmail } from "@/lib/email/send-email";
@@ -53,6 +53,31 @@ function handlePrismaError(error: unknown): { error: string } | null {
     }
   }
   return null;
+}
+
+// True if `target` is currently the system's only ACTIVE Super Admin and
+// `next` would take that away from them — either by deactivating them or by
+// moving them off the SUPER_ADMIN role. Shared by deactivateUser (status
+// change only) and updateUser (status and/or role change), the two places a
+// Super Admin's active membership can actually be revoked. Only queries the
+// DB when the change could plausibly matter, so the common no-op case (an
+// unrelated field edit) costs nothing extra.
+async function wouldLeaveNoActiveSuperAdmin(
+  target: { role: UserRole; status: UserStatus },
+  next: { role?: UserRole; status?: UserStatus }
+): Promise<boolean> {
+  const losingMembership =
+    target.role === "SUPER_ADMIN" &&
+    target.status === "ACTIVE" &&
+    ((next.status !== undefined && next.status !== "ACTIVE") ||
+      (next.role !== undefined && next.role !== "SUPER_ADMIN"));
+
+  if (!losingMembership) return false;
+
+  const activeSuperAdminCount = await prisma.user.count({
+    where: { role: "SUPER_ADMIN", status: "ACTIVE" },
+  });
+  return activeSuperAdminCount <= 1;
 }
 
 // Explicit return type — without it, TS infers a union from this function's
@@ -171,6 +196,18 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 
   if (rest.role !== existingUser.role && !canAssignRole(session.user.role, rest.role)) {
     return { error: "Only a Super Admin can assign Admin or Super Admin roles." };
+  }
+
+  if (
+    await wouldLeaveNoActiveSuperAdmin(existingUser, {
+      status: rest.status,
+      role: rest.role,
+    })
+  ) {
+    return {
+      error:
+        "Cannot deactivate or demote the last remaining Super Admin. Promote another account to Super Admin first.",
+    };
   }
 
   const updateData: Record<string, unknown> = {
@@ -294,10 +331,6 @@ export async function reactivateUser(id: string) {
  * Historical data (plots, growth logs, alerts, assignments) is preserved.
  * To reactivate: admin edits the user's profile and manually restores the
  * email (remove the inactive_<timestamp>_ prefix) plus sets status back to ACTIVE.
- *
- * (Renamed from deleteUser — a real prisma.user.delete() is still attempted
- * first and succeeds when the user has no related records; the above only
- * describes the far more common fallback path.)
  */
 export async function deactivateUser(id: string) {
   const session = await requireAdmin();
@@ -305,58 +338,53 @@ export async function deactivateUser(id: string) {
     return { error: "You cannot delete your own account" };
   }
 
-  // Try permanent delete first (works if user has no related records)
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { email: true, role: true, status: true },
+  });
+  if (!target) {
+    return { error: "User not found" };
+  }
+
+  if (!canManageUser(session.user.role, target.role)) {
+    return { error: "Only a Super Admin can manage Admin or Super Admin accounts." };
+  }
+
+  if (await wouldLeaveNoActiveSuperAdmin(target, { status: "INACTIVE" })) {
+    return {
+      error:
+        "Cannot deactivate the last remaining Super Admin. Promote another account to Super Admin first.",
+    };
+  }
+
+  // Prefix the email so it's freed up for a future registration — otherwise
+  // the unique constraint on email blocks re-signup under the same address.
+  // Also bump tokenVersion to invalidate any session/token this account
+  // currently holds.
+  const inactiveEmail = `inactive_${Date.now()}_${target.email}`;
   try {
-    await prisma.user.delete({ where: { id } });
-    revalidatePath("/dashboard/users");
-    return { success: true, mode: "deleted" };
+    await prisma.user.update({
+      where: { id },
+      data: {
+        status: "INACTIVE",
+        email: inactiveEmail,
+        tokenVersion: { increment: 1 },
+      },
+    });
   } catch (error) {
-    // Foreign key constraint = user has associated records (logs, assignments, etc.)
-    // Fall back to soft delete: deactivate to preserve history.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === "P2003" || error.code === "P2014")
-    ) {
-      try {
-        const target = await prisma.user.findUnique({
-          where: { id },
-          select: { email: true },
-        });
-        if (!target) {
-          return { error: "User not found" };
-        }
-
-        // Prefix the email so it's freed up for a future registration —
-        // otherwise the unique constraint on email blocks re-signup under
-        // the same address. Also bump tokenVersion to invalidate any
-        // session/token this account currently holds.
-        const inactiveEmail = `inactive_${Date.now()}_${target.email}`;
-        await prisma.user.update({
-          where: { id },
-          data: {
-            status: "INACTIVE",
-            email: inactiveEmail,
-            tokenVersion: { increment: 1 },
-          },
-        });
-        revalidatePath("/dashboard/users");
-        return {
-          success: true,
-          mode: "deactivated",
-          message:
-            "User has historical records, so they were deactivated instead of deleted. Their data remains intact.",
-        };
-      } catch (innerError) {
-        console.error("Soft delete fallback failed:", innerError);
-      }
-    }
-
     console.error("deactivateUser error:", error);
     return {
       error:
         "Failed to deactivate user. Please contact your administrator if this persists.",
     };
   }
+
+  revalidatePath("/dashboard/users");
+  return {
+    success: true,
+    mode: "deactivated",
+    message: "User has been deactivated. Their historical data remains intact.",
+  };
 }
 
 /**

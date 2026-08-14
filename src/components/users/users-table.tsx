@@ -49,6 +49,11 @@ export type UserRow = {
   section: string | null;
   academicYear: string | null;
   graduatedAt: Date | null;
+  // Resolved server-side (canManageUser) — whether the viewer is allowed to
+  // deactivate this specific account. Only ever false for an Admin/Super
+  // Admin row viewed by a plain Admin. Gates the Deactivate menu item below;
+  // the server action enforces the same rule regardless.
+  canManage: boolean;
 };
 
 const ROLE_ORDER: UserRole[] = [
@@ -394,19 +399,21 @@ export function UserTableRow({
                 }
               />
             ) : (
-              <DeleteUserDialog
-                userId={user.id}
-                userName={`${user.firstName} ${user.lastName}`}
-                trigger={
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-danger-text focus:text-danger-text"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Deactivate
-                  </DropdownMenuItem>
-                }
-              />
+              user.canManage && (
+                <DeleteUserDialog
+                  userId={user.id}
+                  userName={`${user.firstName} ${user.lastName}`}
+                  trigger={
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="text-danger-text focus:text-danger-text"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Deactivate
+                    </DropdownMenuItem>
+                  }
+                />
+              )
             )}
           </DropdownMenuContent>
         </DropdownMenu>

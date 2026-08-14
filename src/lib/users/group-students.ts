@@ -15,6 +15,11 @@ export type StudentUserRow = {
   section: string | null;
   academicYear: string | null;
   graduatedAt: Date | null;
+  // Always true for a Student Farmer row — canManageUser only ever
+  // restricts Admin/Super Admin targets. Carried through structurally so
+  // this type still matches UserRow (users-table.tsx), which UserTableRow
+  // requires.
+  canManage: boolean;
 };
 
 // Only the fields needed to compute filter dropdown options and baseline

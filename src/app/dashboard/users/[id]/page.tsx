@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdmin, canManageUser } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/format-date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -74,6 +74,12 @@ export default async function UserDetailPage({
   });
 
   if (!user) notFound();
+
+  // Whether the viewer is allowed to deactivate THIS user (only a Super
+  // Admin may manage an Admin/Super Admin target) — resolved server-side
+  // and passed down as a plain boolean, same idiom as canManageAdvisories
+  // above.
+  const canManageTarget = canManageUser(viewerRole, user.role);
 
   const fullName = [user.firstName, user.middleName, user.lastName]
     .filter(Boolean)
@@ -156,6 +162,7 @@ export default async function UserDetailPage({
               userName={fullName}
               userEmail={user.email}
               userStatus={user.status}
+              canManage={canManageTarget}
             />
           </div>
         </div>
