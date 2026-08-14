@@ -39,6 +39,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
   }
 
+  // The key is valid, so this request really is from this device, whether
+  // or not the reading below turns out to be acceptable. Recording that now
+  // — rather than only after the plot-status check and schema validation
+  // both pass — is what keeps a device that's alive but sending a
+  // malformed/rejected payload from showing stale/offline on the
+  // dashboard. Deliberately not inside the transaction below: this is the
+  // one and only status/lastSeenAt write for this request now, whichever
+  // path it takes from here.
+  await prisma.device.update({
+    where: { id: device.id },
+    data: { status: "ONLINE", lastSeenAt: new Date() },
+  });
+
   const plot = await prisma.plot.findUnique({
     where: { id: device.plotId },
     select: { status: true },
@@ -85,11 +98,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await tx.device.update({
-      where: { id: device.id },
-      data: { status: "ONLINE", lastSeenAt: acceptedAt },
-    });
-
+    // Device status/lastSeenAt is already handled above, before this
+    // transaction — not repeated here, to avoid writing it twice on the
+    // happy path.
     await resolveDeviceOfflineForHeartbeat({
       plotId: device.plotId,
       resolvedAt: acceptedAt,

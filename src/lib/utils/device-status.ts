@@ -1,5 +1,23 @@
-import type { PlotStatus } from "@prisma/client";
+import type { DeviceStatus, PlotStatus } from "@prisma/client";
 import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
+
+// Statuses an admin can declare directly via the Edit Device form — a device
+// deliberately taken out of service, with no companion timestamp field to
+// keep in sync. ONLINE/OFFLINE are deliberately excluded: they're
+// system-driven (ingest sets ONLINE on every accepted reading; the
+// offline-detection cron sets OFFLINE after DEVICE_OFFLINE_THRESHOLD_MS of
+// silence — see src/lib/alerts/device-offline.ts), so a form control
+// letting an admin hand-set either would just get overwritten by the next
+// heartbeat or scan, or falsely claim liveness with no evidence behind it.
+// These happen to be the same two values device-offline.ts's own
+// EXCLUDED_DEVICE_STATUSES excludes from offline-alert eligibility — the
+// same concept (a device deliberately out of live operation), declared
+// independently here rather than imported, to keep this form-facing change
+// from touching that already-tested alert-scan module.
+export const ADMIN_SETTABLE_DEVICE_STATUSES: DeviceStatus[] = [
+  "MAINTENANCE",
+  "RETIRED",
+];
 
 export const EXPECTED_REPORTING_INTERVAL_MS = 5 * 60 * 1000;
 export const DEVICE_STALE_THRESHOLD_MS = 15 * 60 * 1000;

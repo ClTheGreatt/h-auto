@@ -6,9 +6,33 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { deviceSchema, type DeviceFormValues } from "@/lib/validations/device";
 import { hashApiKey } from "@/lib/devices/hash-key";
+import { ADMIN_SETTABLE_DEVICE_STATUSES } from "@/lib/utils/device-status";
+import type { DeviceStatus } from "@prisma/client";
 
 function generateApiKey(): string {
   return "h-auto_" + randomBytes(24).toString("hex");
+}
+
+// The real enforcement boundary for FIX 1's status control — the dropdown
+// only ever offers a subset of this, but a tampered/hand-crafted request
+// must be held to the same rule.
+//   - ONLINE is never a valid submitted target from any current status —
+//     it's exclusively set by ingest on an accepted reading.
+//   - OFFLINE is only valid as the "resume automatic tracking" move OUT of
+//     a manually-declared state (current is MAINTENANCE or RETIRED) —
+//     never as a direct hand-declaration from ONLINE/OFFLINE itself, which
+//     would be the same "admin claims liveness state with no evidence"
+//     problem ONLINE has.
+//   - MAINTENANCE/RETIRED are reachable from any current status.
+function isAllowedStatusTransition(
+  current: DeviceStatus,
+  next: DeviceStatus
+): boolean {
+  if (next === "ONLINE") return false;
+  if (next === "OFFLINE") {
+    return current === "MAINTENANCE" || current === "RETIRED";
+  }
+  return ADMIN_SETTABLE_DEVICE_STATUSES.includes(next);
 }
 
 export async function createDevice(input: DeviceFormValues) {
@@ -60,12 +84,31 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
   });
   if (plotConflict) return { error: "This plot already has another device" };
 
+  const existing = await prisma.device.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!existing) return { error: "Device not found" };
+
+  // A submitted status that isn't a valid transition from the device's
+  // CURRENT status (including an absent value, meaning the admin didn't
+  // touch the control) leaves it untouched rather than being written
+  // through.
+  let nextStatus = existing.status;
+  if (
+    parsed.data.status &&
+    isAllowedStatusTransition(existing.status, parsed.data.status)
+  ) {
+    nextStatus = parsed.data.status;
+  }
+
   await prisma.device.update({
     where: { id },
     data: {
       deviceCode: parsed.data.deviceCode,
       plotId: parsed.data.plotId,
       firmwareVersion: parsed.data.firmwareVersion || null,
+      status: nextStatus,
     },
   });
 

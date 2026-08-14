@@ -256,7 +256,7 @@ export function CropForm({
                     <Input
                       type="number"
                       {...field}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
                     />
                   </FormControl>
                   <FormMessage />
@@ -468,7 +468,7 @@ function StageBasicFields({
               <Input
                 type="number"
                 {...field}
-                onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                onChange={(e) => field.onChange(e.target.valueAsNumber)}
               />
             </FormControl>
             <FormMessage />
@@ -562,7 +562,7 @@ function ThresholdPair({
                   step="any"
                   className="h-8"
                   {...f}
-                  onChange={(e) => f.onChange(e.target.valueAsNumber || 0)}
+                  onChange={(e) => f.onChange(e.target.valueAsNumber)}
                 />
               </FormControl>
               <FormMessage className="text-xs" />
@@ -581,7 +581,7 @@ function ThresholdPair({
                   step="any"
                   className="h-8"
                   {...f}
-                  onChange={(e) => f.onChange(e.target.valueAsNumber || 0)}
+                  onChange={(e) => f.onChange(e.target.valueAsNumber)}
                 />
               </FormControl>
               <FormMessage className="text-xs" />

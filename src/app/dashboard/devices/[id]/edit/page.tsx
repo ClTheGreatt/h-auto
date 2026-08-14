@@ -14,7 +14,10 @@ export default async function EditDevicePage({
   const { id } = await params;
 
   const [device, plots] = await Promise.all([
-    prisma.device.findUnique({ where: { id } }),
+    prisma.device.findUnique({
+      where: { id },
+      include: { _count: { select: { readings: true } } },
+    }),
     prisma.plot.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, location: true },
@@ -42,10 +45,12 @@ export default async function EditDevicePage({
         mode="edit"
         deviceId={device.id}
         plots={plots}
+        readingsCount={device._count.readings}
         defaultValues={{
           deviceCode: device.deviceCode,
           plotId: device.plotId,
           firmwareVersion: device.firmwareVersion ?? "",
+          status: device.status,
         }}
       />
     </div>

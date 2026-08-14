@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { isValidThresholdRange } from "@/lib/sensors/threshold-status";
 
+// -5 to 60°C — matches TEMPERATURE_MIN/MAX in validations/device.ts exactly,
+// so any storable sensor reading can always be expressed by some threshold
+// pair here (and any valid threshold could plausibly be triggered by a real
+// reading). Generous enough for a Philippines-sited deployment not to
+// reject real values, tight enough to catch a typo like max: 10000.
+const STAGE_TEMPERATURE_MIN = -5;
+const STAGE_TEMPERATURE_MAX = 60;
+
 const stageFields = z.object({
   // Present for a stage that already exists in the DB (round-tripped from
   // EditCropPage's defaultValues), absent for one newly appended in the
@@ -13,8 +21,8 @@ const stageFields = z.object({
   description: z.string().optional().or(z.literal("")),
   minSoilMoisture: z.number().min(0).max(100),
   maxSoilMoisture: z.number().min(0).max(100),
-  minTemperature: z.number(),
-  maxTemperature: z.number(),
+  minTemperature: z.number().min(STAGE_TEMPERATURE_MIN).max(STAGE_TEMPERATURE_MAX),
+  maxTemperature: z.number().min(STAGE_TEMPERATURE_MIN).max(STAGE_TEMPERATURE_MAX),
   minHumidity: z.number().min(0).max(100),
   maxHumidity: z.number().min(0).max(100),
   minLightIntensity: z.number().min(0),
