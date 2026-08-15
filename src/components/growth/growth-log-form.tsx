@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RequiredMark } from "@/components/ui/form-helpers";
 import { ImageUploader } from "./image-uploader";
 import {
   growthLogSchema,
@@ -206,7 +207,9 @@ export function GrowthLogForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Photos (up to 5)</CardTitle>
+            <CardTitle>
+              Photos (up to 5) <RequiredMark />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <FormField

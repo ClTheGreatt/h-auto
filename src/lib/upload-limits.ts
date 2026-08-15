@@ -12,16 +12,18 @@ export type ImageValidationError = { error: string; status: number };
 
 // Call this on the raw File from formData.get(...) BEFORE calling
 // file.arrayBuffer() anywhere. Returns null when the file is acceptable.
+// Presence is each caller's own concern (a missing file isn't a File at
+// all); this checks type before size once a File is confirmed present.
 export function validateImageFile(file: File): ImageValidationError | null {
-  if (file.size > MAX_IMAGE_BYTES) {
-    return {
-      error: `Image is too large (max ${MAX_IMAGE_BYTES / (1024 * 1024)}MB).`,
-      status: 400,
-    };
-  }
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return {
       error: "Invalid image type. Use JPEG, PNG, or WebP.",
+      status: 400,
+    };
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return {
+      error: `Image is too large (max ${MAX_IMAGE_BYTES / (1024 * 1024)}MB).`,
       status: 400,
     };
   }

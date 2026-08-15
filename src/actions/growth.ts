@@ -27,7 +27,9 @@ export async function createGrowthLog(plotId: string, input: GrowthLogFormValues
   }
 
   const parsed = growthLogSchema.safeParse(input);
-  if (!parsed.success) return { error: "Invalid input" };
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
 
   const latestReading = await prisma.sensorReading.findFirst({
     where: { plotId },

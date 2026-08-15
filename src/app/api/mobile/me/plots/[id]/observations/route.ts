@@ -63,27 +63,33 @@ export async function POST(
       );
     }
 
-    // Upload image if provided
-    let imageUrl: string | null = null;
-    if (image && image.size > 0) {
-      const validationError = validateImageFile(image);
-      if (validationError) {
-        return NextResponse.json(
-          { error: validationError.error },
-          { status: validationError.status }
-        );
-      }
-      try {
-        const buffer = Buffer.from(await image.arrayBuffer());
-        const result = await uploadToCloudinary(buffer);
-        imageUrl = result.url;
-      } catch (err) {
-        console.error("[observations] image upload failed:", err);
-        return NextResponse.json(
-          { error: "Failed to upload image. Try again." },
-          { status: 500 }
-        );
-      }
+    // A photo is required for every observation.
+    if (!image || image.size === 0) {
+      return NextResponse.json(
+        { error: "A photo is required to log an observation." },
+        { status: 400 }
+      );
+    }
+
+    const validationError = validateImageFile(image);
+    if (validationError) {
+      return NextResponse.json(
+        { error: validationError.error },
+        { status: validationError.status }
+      );
+    }
+
+    let imageUrl: string;
+    try {
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const result = await uploadToCloudinary(buffer);
+      imageUrl = result.url;
+    } catch (err) {
+      console.error("[observations] image upload failed:", err);
+      return NextResponse.json(
+        { error: "Failed to upload image. Try again." },
+        { status: 500 }
+      );
     }
 
     // Build observations text with GPS if available
@@ -133,14 +139,12 @@ if (locationName) {
         },
       });
 
-      if (imageUrl) {
-        await tx.growthImage.create({
-          data: {
-            growthLogId: created.id,
-            imageUrl,
-          },
-        });
-      }
+      await tx.growthImage.create({
+        data: {
+          growthLogId: created.id,
+          imageUrl,
+        },
+      });
 
       return created;
     });
