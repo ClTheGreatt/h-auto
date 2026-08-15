@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { uploadToCloudinary } from "@/lib/cloudinary-server";
+import { validateImageFile } from "@/lib/upload-limits";
 
 const USER_SELECT = {
   id: true,
@@ -33,6 +34,14 @@ export async function POST(req: NextRequest) {
 
     if (!image || image.size === 0) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
+    }
+
+    const validationError = validateImageFile(image);
+    if (validationError) {
+      return NextResponse.json(
+        { error: validationError.error },
+        { status: validationError.status }
+      );
     }
 
     const buffer = Buffer.from(await image.arrayBuffer());

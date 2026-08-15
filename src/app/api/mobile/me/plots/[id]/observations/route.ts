@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { uploadToCloudinary } from "@/lib/cloudinary-server";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
+import { validateImageFile } from "@/lib/upload-limits";
 
 export async function POST(
   req: NextRequest,
@@ -65,6 +66,13 @@ export async function POST(
     // Upload image if provided
     let imageUrl: string | null = null;
     if (image && image.size > 0) {
+      const validationError = validateImageFile(image);
+      if (validationError) {
+        return NextResponse.json(
+          { error: validationError.error },
+          { status: validationError.status }
+        );
+      }
       try {
         const buffer = Buffer.from(await image.arrayBuffer());
         const result = await uploadToCloudinary(buffer);
