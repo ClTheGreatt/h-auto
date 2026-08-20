@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, X } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
+import { formatDate } from "@/lib/format-date";
 import { AssignmentPlotFilter } from "@/components/assignments/assignment-plot-filter";
 import { AssignStudentDialog } from "@/components/assignments/assign-student-dialog";
+import { RemoveAssignmentDialog } from "@/components/plots/remove-assignment-dialog";
 
 export default async function AssignmentsPage({
   searchParams,
@@ -80,6 +83,14 @@ export default async function AssignmentsPage({
           select: { firstName: true, lastName: true, email: true },
         },
         faculty: {
+          select: { firstName: true, lastName: true },
+        },
+        // Who actually made the assignment — may be an admin, a super
+        // admin, or the adviser themselves. Distinct from `faculty` above
+        // (always the plot's adviser, regardless of who clicked). Null on
+        // rows created before this column existed — never fall back to
+        // `faculty` in that case, that was the original mislabeling bug.
+        assignedBy: {
           select: { firstName: true, lastName: true },
         },
       },
@@ -162,10 +173,31 @@ export default async function AssignmentsPage({
                       {a.plot.location && ` • ${a.plot.location}`}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
-                      Adviser: {a.faculty.firstName} {a.faculty.lastName} •{" "}
-                      {new Date(a.assignedAt).toLocaleDateString()}
+                      {a.assignedBy
+                        ? `Assigned by ${a.assignedBy.firstName} ${a.assignedBy.lastName} · ${formatDate(a.assignedAt)}`
+                        : `Assigned ${formatDate(a.assignedAt)}`}
                     </div>
                   </div>
+                  {role !== "STUDENT_FARMER" && (
+                    // RemoveAssignmentDialog (a Client Component) handles
+                    // stopping this click from bubbling to the surrounding
+                    // Link internally — this page is a Server Component and
+                    // cannot attach an event handler to a plain element
+                    // itself.
+                    <RemoveAssignmentDialog
+                      assignmentId={a.id}
+                      studentName={`${a.student.firstName} ${a.student.lastName}`}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-danger-text hover:text-danger-text shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      }
+                    />
+                  )}
                 </div>
               </Link>
             );
