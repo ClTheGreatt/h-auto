@@ -45,8 +45,20 @@ export function RemoveAssignmentDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent>
+      {/* Some callers (e.g. the Assignments page) nest this trigger inside
+          a card-wide <Link>. A plain click already opens this dialog via
+          AlertDialogTrigger's own handler, but the event still bubbles —
+          stopping it here (and again on AlertDialogContent below, since
+          Radix portals it outside the DOM tree but React still bubbles
+          through the component tree) keeps that click from also
+          triggering the Link's navigation. Harmless for callers with no
+          surrounding Link (plot-assignments.tsx) — nothing above to stop.
+          Same two-point stopPropagation idiom as DropdownMenuTrigger/
+          DropdownMenuContent in plots-table.tsx. */}
+      <span onClick={(e) => e.stopPropagation()} className="contents">
+        <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+      </span>
+      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
         <AlertDialogHeader>
           <AlertDialogTitle>Remove this assignment?</AlertDialogTitle>
           <AlertDialogDescription>

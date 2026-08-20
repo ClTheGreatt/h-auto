@@ -28,6 +28,7 @@ import { UnharvestPlotDialog } from "@/components/plots/unharvest-plot-dialog";
 import { LatestReadings } from "@/components/devices/latest-readings";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { GrowthTimeline } from "@/components/growth/growth-timeline";
+import { CultivationGuideCard } from "@/components/plots/cultivation-guide-card";
 import type { PlotStatus } from "@prisma/client";
 
 const statusLabels: Record<PlotStatus, string> = {
@@ -358,6 +359,14 @@ export default async function PlotDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Collapsed by default (see CultivationGuideCard) — reference
+          material for whoever advises/monitors this plot, not something
+          that should push Sensor readings or Growth history down the
+          page on every visit. Rendered for every role that can reach this
+          page at all; no additional gating (unlike the edit/harvest
+          actions above, this is read-only reference content). */}
+      {plot.crop && <CultivationGuideCard guide={plot.crop.cultivationGuide} />}
 
       <Card>
         <CardHeader>

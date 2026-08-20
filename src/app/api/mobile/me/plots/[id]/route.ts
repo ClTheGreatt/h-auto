@@ -52,6 +52,7 @@ export async function GET(
             name: true,
             variety: true,
             daysToHarvest: true,
+            cultivationGuide: true,
           },
         },
         currentStage: {
