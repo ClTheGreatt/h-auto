@@ -87,7 +87,7 @@ const CONDITION_LABEL: Record<PlotCondition, string> = {
   MISSING_DEVICE: "No device",
   NEVER_REPORTED: "No readings",
   OFFLINE: "Offline",
-  STALE: "Stale",
+  STALE: "Delayed",
   MISSING_STAGE: "Setup needed",
   CRITICAL: "Critical",
   WARNING: "Warning",
@@ -244,7 +244,7 @@ function formatFleetSummary({
     offlineDeviceCount > 0 &&
       `${offlineDeviceCount} device${offlineDeviceCount === 1 ? "" : "s"} offline`,
     staleDeviceCount > 0 &&
-      `${staleDeviceCount} device${staleDeviceCount === 1 ? "" : "s"} stale`,
+      `${staleDeviceCount} device${staleDeviceCount === 1 ? "" : "s"} delayed`,
     neverReportedCount > 0 &&
       `${neverReportedCount} device${neverReportedCount === 1 ? " has" : "s have"} never reported`,
     freshDeviceCount > 0 &&
@@ -513,7 +513,7 @@ export default async function DashboardPage() {
       )}${historicalEvidenceSuffix}${alertSuffix}`;
     }
     if (p.condition === "STALE") {
-      return `${p.name} sensor data is stale${historicalEvidenceSuffix}${alertSuffix}`;
+      return `${p.name} sensor data is delayed${historicalEvidenceSuffix}${alertSuffix}`;
     }
     if (p.condition === "MISSING_STAGE") {
       return `${p.name} has no growth stage set${alertSuffix}`;
@@ -778,7 +778,7 @@ export default async function DashboardPage() {
                     )}
                     {condition === "STALE" && (
                       <p className="text-xs font-medium text-warning-text mt-2">
-                        Sensor data is stale
+                        Sensor data is delayed
                       </p>
                     )}
 

@@ -172,7 +172,7 @@ export default async function PlotReadingsPage({
               {deviceFreshness.state === "FRESH"
                 ? "Fresh"
                 : deviceFreshness.state === "STALE"
-                ? "Stale"
+                ? "Delayed"
                 : deviceFreshness.state === "OFFLINE"
                 ? "Offline"
                 : "Never reported"}

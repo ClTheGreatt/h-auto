@@ -83,7 +83,7 @@ const freshnessVariant: Record<DeviceFreshnessState, StatusVariant> = {
 
 const freshnessLabel: Record<DeviceFreshnessState, string> = {
   FRESH: "Fresh",
-  STALE: "Stale",
+  STALE: "Delayed",
   OFFLINE: "Offline",
   NEVER_REPORTED: "Never reported",
 };

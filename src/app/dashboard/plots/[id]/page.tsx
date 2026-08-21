@@ -183,7 +183,7 @@ export default async function PlotDetailPage({
     ? deviceFreshness.state === "FRESH"
       ? `Last reading ${formatDateTime(latestReading.recordedAt)}`
       : deviceFreshness.state === "STALE"
-      ? `Sensor data is stale · Last reading ${formatStaleDuration(
+      ? `Sensor data is delayed · Last reading ${formatStaleDuration(
           deviceFreshness.elapsedMs ?? 0
         )} ago · ${formatDateTime(latestReading.recordedAt)}`
       : deviceFreshness.state === "OFFLINE"
@@ -394,7 +394,7 @@ export default async function PlotDetailPage({
                   {deviceFreshness.state === "FRESH"
                     ? "Fresh"
                     : deviceFreshness.state === "STALE"
-                    ? "Stale"
+                    ? "Delayed"
                     : deviceFreshness.state === "OFFLINE"
                     ? "Offline"
                     : "Never reported"}
