@@ -48,17 +48,50 @@ jobs:
       - name: Run offline-device scan
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          curl \
-            --request GET \
-            --fail-with-body \
-            --silent \
-            --show-error \
-            --max-time 90 \
-            --retry 2 \
-            --retry-delay 5 \
-            --retry-max-time 180 \
-            --retry-connrefused \
-            --header "Authorization: Bearer ${H_AUTO_CRON_SECRET}" \
-            "${H_AUTO_PRODUCTION_URL}/api/cron/device-offline"
+          response_file="$(mktemp)"
+
+          set +e
+          status="$(
+            curl \
+              --request GET \
+              --silent \
+              --show-error \
+              --max-time 90 \
+              --retry 2 \
+              --retry-delay 5 \
+              --retry-max-time 180 \
+              --retry-connrefused \
+              --header "Authorization: Bearer ${H_AUTO_CRON_SECRET}" \
+              --output "${response_file}" \
+              --write-out "%{http_code}" \
+              "${H_AUTO_PRODUCTION_URL}/api/cron/device-offline"
+          )"
+          curl_exit=$?
+          set -e
+
+          body="$(cat "${response_file}" 2>/dev/null || true)"
+          rm -f "${response_file}"
+
+          echo "Target : ${H_AUTO_PRODUCTION_URL}/api/cron/device-offline"
+          echo "Status : ${status:-<none>}"
+
+          if [[ "${curl_exit}" -ne 0 ]]; then
+            echo "::error::curl failed at the transport level (exit ${curl_exit})."
+            exit 1
+          fi
+
+          if [[ "${status}" != "200" ]]; then
+            echo "::error::Expected HTTP 200, got ${status}."
+            # Body is surfaced only on failure. This repository is public and
+            # workflow logs are world-readable, so successful scan output —
+            # which may name devices, plots, or alerts — stays out of the log.
+            echo "Body: ${body:-<empty>}"
+            if [[ "${status}" =~ ^3 ]]; then
+              echo "::error::A 3xx means the request was redirected before reaching the route handler. Check PUBLIC_PATHS in src/proxy.ts, and confirm H_AUTO_PRODUCTION_URL is the canonical www host (the apex 308-redirects and drops the Authorization header)."
+            fi
+            exit 1
+          fi
+
+          echo "Scan completed successfully."
