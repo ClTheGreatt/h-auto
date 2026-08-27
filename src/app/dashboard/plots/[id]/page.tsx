@@ -18,7 +18,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format-date";
-import { getDeviceFreshness } from "@/lib/utils/device-status";
+import {
+  getDeviceFreshness,
+  DEVICE_FRESHNESS_LABEL,
+} from "@/lib/utils/device-status";
 import { buildDirectPlotAccessWhere } from "@/lib/auth/plot-access";
 import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
@@ -391,13 +394,7 @@ export default async function PlotDetailPage({
                       : "neutral"
                   }
                 >
-                  {deviceFreshness.state === "FRESH"
-                    ? "Fresh"
-                    : deviceFreshness.state === "STALE"
-                    ? "Delayed"
-                    : deviceFreshness.state === "OFFLINE"
-                    ? "Offline"
-                    : "Never reported"}
+                  {DEVICE_FRESHNESS_LABEL[deviceFreshness.state]}
                 </StatusBadge>
               )}
             </div>

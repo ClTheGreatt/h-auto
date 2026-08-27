@@ -8,7 +8,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/format-date";
-import { getDeviceFreshness } from "@/lib/utils/device-status";
+import {
+  getDeviceFreshness,
+  DEVICE_FRESHNESS_LABEL,
+} from "@/lib/utils/device-status";
 import { ReadingsFilters } from "@/components/plots/readings-filters";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { findReadingHistoryPlot } from "@/lib/auth/plot-access";
@@ -169,13 +172,7 @@ export default async function PlotReadingsPage({
                   : "neutral"
               }
             >
-              {deviceFreshness.state === "FRESH"
-                ? "Fresh"
-                : deviceFreshness.state === "STALE"
-                ? "Delayed"
-                : deviceFreshness.state === "OFFLINE"
-                ? "Offline"
-                : "Never reported"}
+              {DEVICE_FRESHNESS_LABEL[deviceFreshness.state]}
             </StatusBadge>
             {plot.device.lastSeenAt && (
               <span className="text-xs text-muted-foreground">

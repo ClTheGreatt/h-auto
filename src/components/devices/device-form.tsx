@@ -40,7 +40,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { deviceSchema, type DeviceFormValues } from "@/lib/validations/device";
 import { createDevice, updateDevice } from "@/actions/devices";
-import { ADMIN_SETTABLE_DEVICE_STATUSES } from "@/lib/utils/device-status";
+import {
+  ADMIN_SETTABLE_DEVICE_STATUSES,
+  DEVICE_STATUS_LABEL,
+} from "@/lib/utils/device-status";
 import type { DeviceStatus } from "@prisma/client";
 
 type PlotOption = {
@@ -54,15 +57,6 @@ type PlotOption = {
 // OFFLINE string. Same idiom as NO_CROP/NO_FACULTY in plot-form.tsx.
 const NO_STATUS_CHANGE = "__no_change__";
 
-// Same idiom plots-table.tsx/plot-form.tsx use for PlotStatus — a small
-// local map, not imported from devices-table.tsx (a "use client" list
-// component, not a shared-constants module).
-const STATUS_LABELS: Record<DeviceStatus, string> = {
-  ONLINE: "Online",
-  OFFLINE: "Offline",
-  MAINTENANCE: "Maintenance",
-  RETIRED: "Retired",
-};
 const STATUS_VARIANT: Record<DeviceStatus, StatusVariant> = {
   ONLINE: "success",
   OFFLINE: "danger",
@@ -283,7 +277,7 @@ export function DeviceForm({
                 <FormLabel>Status</FormLabel>
                 <div className="mt-2 mb-2">
                   <StatusBadge variant={STATUS_VARIANT[defaultValues.status]}>
-                    {STATUS_LABELS[defaultValues.status]}
+                    {DEVICE_STATUS_LABEL[defaultValues.status]}
                   </StatusBadge>
                 </div>
                 <FormField
@@ -316,7 +310,7 @@ export function DeviceForm({
                           )}
                           {ADMIN_SETTABLE_DEVICE_STATUSES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {STATUS_LABELS[s]}
+                              {DEVICE_STATUS_LABEL[s]}
                             </SelectItem>
                           ))}
                           {isCurrentlyManual && (

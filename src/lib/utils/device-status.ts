@@ -76,3 +76,22 @@ export function isDeviceOnline(
   const state = getDeviceFreshness(lastSeenAt, now).state;
   return state === "FRESH" || state === "STALE";
 }
+
+// Display labels for device freshness. "Online" rather than "Fresh":
+// the four states form one plain-language vocabulary a non-technical
+// reader can rank — Online / Delayed / Offline / Never reported.
+export const DEVICE_FRESHNESS_LABEL: Record<DeviceFreshnessState, string> = {
+  FRESH: "Online",
+  STALE: "Delayed",
+  OFFLINE: "Offline",
+  NEVER_REPORTED: "Never reported",
+};
+
+// Display labels for the administrative device status. Rendering the
+// raw Prisma enum produces all-caps text next to title-case labels.
+export const DEVICE_STATUS_LABEL: Record<DeviceStatus, string> = {
+  ONLINE: "Online",
+  OFFLINE: "Offline",
+  MAINTENANCE: "Maintenance",
+  RETIRED: "Retired",
+};

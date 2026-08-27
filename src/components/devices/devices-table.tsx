@@ -51,6 +51,8 @@ import {
 import type { DeviceStatus } from "@prisma/client";
 import {
   getDeviceFreshness,
+  DEVICE_FRESHNESS_LABEL,
+  DEVICE_STATUS_LABEL,
   type DeviceFreshnessState,
 } from "@/lib/utils/device-status";
 import { formatDateTime } from "@/lib/format-date";
@@ -79,13 +81,6 @@ const freshnessVariant: Record<DeviceFreshnessState, StatusVariant> = {
   STALE: "warning",
   OFFLINE: "danger",
   NEVER_REPORTED: "neutral",
-};
-
-const freshnessLabel: Record<DeviceFreshnessState, string> = {
-  FRESH: "Fresh",
-  STALE: "Delayed",
-  OFFLINE: "Offline",
-  NEVER_REPORTED: "Never reported",
 };
 
 export function DevicesTable({
@@ -187,16 +182,22 @@ export function DevicesTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-wrap gap-1.5">
-                    <StatusBadge variant={freshnessVariant[freshness.state]}>
-                      {freshnessLabel[freshness.state]}
+                  {/* One badge per row, not two. When a device is under
+                      manual control, the fact that alerts are suppressed
+                      is the operationally important thing, not how
+                      recently it reported — so the administrative status
+                      wins and the freshness badge is suppressed entirely.
+                      The "Last seen" column still carries the recency
+                      information, so nothing is lost. */}
+                  {administrativeStatus ? (
+                    <StatusBadge variant={statusVariant[administrativeStatus]}>
+                      {DEVICE_STATUS_LABEL[administrativeStatus]}
                     </StatusBadge>
-                    {administrativeStatus && (
-                      <StatusBadge variant={statusVariant[administrativeStatus]}>
-                        {administrativeStatus}
-                      </StatusBadge>
-                    )}
-                  </div>
+                  ) : (
+                    <StatusBadge variant={freshnessVariant[freshness.state]}>
+                      {DEVICE_FRESHNESS_LABEL[freshness.state]}
+                    </StatusBadge>
+                  )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {d.lastSeenAt
