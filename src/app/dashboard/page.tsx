@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   WifiOff,
   Clock,
+  Wrench,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ const SEVERITY_RANK: Record<AlertSeverity, number> = {
 // the crop is in the ground, so it gets a calm treatment.
 type PlotCondition =
   | "MISSING_DEVICE"
+  | "MAINTENANCE"
   | "NEVER_REPORTED"
   | "OFFLINE"
   | "STALE"
@@ -85,6 +87,7 @@ type PlotCondition =
 
 const CONDITION_LABEL: Record<PlotCondition, string> = {
   MISSING_DEVICE: "No device",
+  MAINTENANCE: "In maintenance",
   NEVER_REPORTED: "No readings",
   OFFLINE: "Offline",
   STALE: "Delayed",
@@ -97,6 +100,7 @@ const CONDITION_LABEL: Record<PlotCondition, string> = {
 
 const CONDITION_TEXT_CLASS: Record<PlotCondition, string> = {
   MISSING_DEVICE: "text-muted-foreground",
+  MAINTENANCE: "text-warning-text",
   NEVER_REPORTED: "text-muted-foreground",
   OFFLINE: "text-danger-text",
   STALE: "text-warning-text",
@@ -109,6 +113,7 @@ const CONDITION_TEXT_CLASS: Record<PlotCondition, string> = {
 
 const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
   MISSING_DEVICE: "border-l-border",
+  MAINTENANCE: "border-l-warning-border",
   NEVER_REPORTED: "border-l-border",
   OFFLINE: "border-l-danger-border",
   STALE: "border-l-warning-border",
@@ -119,8 +124,13 @@ const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
   PREPARING: "border-l-border",
 };
 
+// MAINTENANCE uses Wrench rather than WifiOff: WifiOff reads as "broken /
+// can't connect", but a maintenance device is deliberately taken out of
+// tracking, not failing. Wrench reads as "deliberately paused for work"
+// without implying a fault.
 const CONDITION_ICON: Record<PlotCondition, React.ComponentType<{ className?: string }>> = {
   MISSING_DEVICE: WifiOff,
+  MAINTENANCE: Wrench,
   NEVER_REPORTED: WifiOff,
   OFFLINE: WifiOff,
   STALE: Clock,
@@ -217,6 +227,7 @@ function formatFleetSummary({
   offlineDeviceCount,
   neverReportedCount,
   missingDeviceCount,
+  maintenanceDeviceCount,
 }: {
   monitoredPlotCount: number;
   linkedDeviceCount: number;
@@ -225,6 +236,7 @@ function formatFleetSummary({
   offlineDeviceCount: number;
   neverReportedCount: number;
   missingDeviceCount: number;
+  maintenanceDeviceCount: number;
 }): string {
   if (monitoredPlotCount === 0) {
     return "No active monitoring expected yet";
@@ -249,6 +261,8 @@ function formatFleetSummary({
       `${neverReportedCount} device${neverReportedCount === 1 ? " has" : "s have"} never reported`,
     freshDeviceCount > 0 &&
       `${freshDeviceCount} device${freshDeviceCount === 1 ? "" : "s"} reporting`,
+    maintenanceDeviceCount > 0 &&
+      `${maintenanceDeviceCount} device${maintenanceDeviceCount === 1 ? "" : "s"} in maintenance`,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -340,7 +354,9 @@ export default async function DashboardPage() {
         include: {
           crop: { select: { name: true, variety: true, daysToHarvest: true } },
           currentStage: true,
-          device: { select: { id: true, deviceCode: true, lastSeenAt: true } },
+          device: {
+            select: { id: true, deviceCode: true, lastSeenAt: true, status: true },
+          },
           alerts: {
             where: buildOperationalAlertWhere(actor),
             select: { id: true, severity: true, type: true, message: true, createdAt: true },
@@ -375,6 +391,17 @@ export default async function DashboardPage() {
       condition = "PREPARING";
     } else if (!plot.device) {
       condition = "MISSING_DEVICE";
+    } else if (
+      plot.device.status === "MAINTENANCE" ||
+      plot.device.status === "RETIRED"
+    ) {
+      // A device under manual control reads as "in maintenance" regardless
+      // of how long it has been silent — that's the entire point of taking
+      // it out of automatic tracking. This branch must sit above the
+      // freshness checks below so the dashboard agrees with the alert
+      // engine (EXCLUDED_DEVICE_STATUSES in device-offline.ts), which
+      // suppresses DEVICE_OFFLINE alerts for these same two statuses.
+      condition = "MAINTENANCE";
     } else if (!plot.device.lastSeenAt || !reading) {
       condition = "NEVER_REPORTED";
     } else if (freshness.state === "OFFLINE") {
@@ -457,16 +484,27 @@ export default async function DashboardPage() {
     OPERATIONAL_PLOT_STATUSES.includes(p.status)
   );
   const linkedMonitoredPlots = monitoredPlots.filter((p) => p.device);
-  const freshDeviceCount = linkedMonitoredPlots.filter(
+  // Maintenance/retired devices are deliberately out of automatic tracking
+  // (same two statuses device-offline.ts's EXCLUDED_DEVICE_STATUSES
+  // excludes from alerting) — they get their own bucket below rather than
+  // inflating the offline/delayed counts, which would misreport a
+  // deliberate pause as a fault.
+  const maintenanceDeviceCount = linkedMonitoredPlots.filter(
+    (p) => p.condition === "MAINTENANCE"
+  ).length;
+  const trackedLinkedPlots = linkedMonitoredPlots.filter(
+    (p) => p.condition !== "MAINTENANCE"
+  );
+  const freshDeviceCount = trackedLinkedPlots.filter(
     (p) => p.freshness.state === "FRESH"
   ).length;
-  const staleDeviceCount = linkedMonitoredPlots.filter(
+  const staleDeviceCount = trackedLinkedPlots.filter(
     (p) => p.freshness.state === "STALE"
   ).length;
-  const offlineDeviceCount = linkedMonitoredPlots.filter(
+  const offlineDeviceCount = trackedLinkedPlots.filter(
     (p) => p.freshness.state === "OFFLINE"
   ).length;
-  const neverReportedCount = linkedMonitoredPlots.filter(
+  const neverReportedCount = trackedLinkedPlots.filter(
     (p) => p.freshness.state === "NEVER_REPORTED"
   ).length;
   const missingDeviceCount = monitoredPlots.length - linkedMonitoredPlots.length;
@@ -479,6 +517,7 @@ export default async function DashboardPage() {
     offlineDeviceCount,
     neverReportedCount,
     missingDeviceCount,
+    maintenanceDeviceCount,
   });
 
   const attentionPlots = plotsWithCondition.filter(
@@ -503,6 +542,9 @@ export default async function DashboardPage() {
 
     if (p.condition === "MISSING_DEVICE") {
       return `${p.name} has no device linked${alertSuffix}`;
+    }
+    if (p.condition === "MAINTENANCE") {
+      return `${p.name} device is in maintenance — alerts are paused`;
     }
     if (p.condition === "NEVER_REPORTED") {
       return `${p.name} has no readings yet${alertSuffix}`;
@@ -763,6 +805,11 @@ export default async function DashboardPage() {
                     {condition === "MISSING_DEVICE" && (
                       <p className="text-xs font-medium text-muted-foreground mt-2">
                         No device linked
+                      </p>
+                    )}
+                    {condition === "MAINTENANCE" && (
+                      <p className="text-xs font-medium text-warning-text mt-2">
+                        Alerts paused — device in maintenance
                       </p>
                     )}
                     {condition === "NEVER_REPORTED" && (
