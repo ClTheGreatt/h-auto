@@ -191,7 +191,7 @@ export default async function PlotDetailPage({
     deviceFreshness.state !== "FRESH" && latestReading !== null;
   const readingFreshnessLabel = latestReading
     ? deviceInMaintenance
-      ? `Alerts paused — device in maintenance · Last reading ${formatDateTime(
+      ? `Alerts paused — device powered off · Last reading ${formatDateTime(
           latestReading.recordedAt
         )}`
       : deviceFreshness.state === "FRESH"

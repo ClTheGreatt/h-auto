@@ -203,18 +203,18 @@ export function DeviceForm({
           <CardHeader>
             <CardTitle>Device information</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <FormField
               control={form.control}
               name="deviceCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Device code <RequiredMark /></FormLabel>
+                  <FormLabel>Device Name <RequiredMark /></FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. ESP32-A1" {...field} />
                   </FormControl>
                   <FormDescription className="text-xs">
-                    A unique identifier you give the physical device.
+                    
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -260,10 +260,13 @@ export function DeviceForm({
             />
             {/* Status is always visible (the badge shows the real current
                 value) and always editable (the Select below it) — the
-                admin can move INTO Maintenance/Retired from anywhere, and
-                once already there, move to the other one or back to
-                automatic tracking. ONLINE is never a selectable target —
-                it's exclusively set by ingest on an accepted reading.
+                admin can move INTO Powered off from anywhere, and once
+                already there, back to automatic tracking. (RETIRED is
+                still a valid stored value and still renders in the badge,
+                but it is no longer offered here — see
+                ADMIN_SETTABLE_DEVICE_STATUSES.) ONLINE is never a
+                selectable target — it's exclusively set by ingest on an
+                accepted reading.
                 "Resume automatic tracking" submits OFFLINE under the hood
                 (the honest, conservative resting value: it doesn't claim
                 liveness that hasn't actually been confirmed, and the very
@@ -301,10 +304,11 @@ export function DeviceForm({
                               to fall back to (ONLINE/OFFLINE case) — once a
                               real status is picked, this is how to get back
                               to "don't submit a status at all", without
-                              ever transmitting ONLINE/OFFLINE literally. The
-                              MAINTENANCE/RETIRED case doesn't need this: its
-                              own current value stays listed below and stays
-                              clickable, so reverting is just re-picking it. */}
+                              ever transmitting ONLINE/OFFLINE literally. A
+                              device already Powered off doesn't need this:
+                              its own current value stays listed below and
+                              stays clickable, so reverting is just
+                              re-picking it. */}
                           {!isCurrentlyManual && (
                             <SelectItem value={NO_STATUS_CHANGE}>No change</SelectItem>
                           )}
@@ -322,8 +326,8 @@ export function DeviceForm({
                       </Select>
                       <FormDescription className="text-xs">
                         {isCurrentlyManual
-                          ? "Won't trigger offline alerts while Maintenance or Retired. Resume automatic tracking to let ingest and the offline monitor manage its status again."
-                          : "Mark Maintenance or Retired to take this device out of automatic offline-alert tracking."}
+                          ? "Alerts are paused while this device is powered off. Resume automatic tracking to let ingest and the offline monitor manage its status again."
+                          : "Mark this device as Powered off to pause its offline alerts while it is deliberately switched off."}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

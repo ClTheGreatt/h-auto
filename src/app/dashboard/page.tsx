@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   WifiOff,
   Clock,
-  Wrench,
+  Power,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,7 @@ type PlotCondition =
 
 const CONDITION_LABEL: Record<PlotCondition, string> = {
   MISSING_DEVICE: "No device",
-  MAINTENANCE: "In maintenance",
+  MAINTENANCE: "Powered off",
   NEVER_REPORTED: "No readings",
   OFFLINE: "Offline",
   STALE: "Delayed",
@@ -124,13 +124,13 @@ const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
   PREPARING: "border-l-border",
 };
 
-// MAINTENANCE uses Wrench rather than WifiOff: WifiOff reads as "broken /
-// can't connect", but a maintenance device is deliberately taken out of
-// tracking, not failing. Wrench reads as "deliberately paused for work"
-// without implying a fault.
+// MAINTENANCE uses Power rather than WifiOff: WifiOff reads as "broken /
+// can't connect", but this device was deliberately switched off, not lost.
+// Power matches the label ("Powered off") and carries the same "someone
+// did this on purpose" reading without implying a fault.
 const CONDITION_ICON: Record<PlotCondition, React.ComponentType<{ className?: string }>> = {
   MISSING_DEVICE: WifiOff,
-  MAINTENANCE: Wrench,
+  MAINTENANCE: Power,
   NEVER_REPORTED: WifiOff,
   OFFLINE: WifiOff,
   STALE: Clock,
@@ -267,7 +267,7 @@ function formatFleetSummary({
     freshDeviceCount > 0 &&
       `${freshDeviceCount} device${freshDeviceCount === 1 ? "" : "s"} reporting`,
     maintenanceDeviceCount > 0 &&
-      `${maintenanceDeviceCount} device${maintenanceDeviceCount === 1 ? "" : "s"} in maintenance`,
+      `${maintenanceDeviceCount} device${maintenanceDeviceCount === 1 ? "" : "s"} powered off`,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -549,7 +549,7 @@ export default async function DashboardPage() {
       return `${p.name} has no device linked${alertSuffix}`;
     }
     if (p.condition === "MAINTENANCE") {
-      return `${p.name} device is in maintenance — alerts are paused`;
+      return `${p.name} is powered off — alerts are paused`;
     }
     if (p.condition === "NEVER_REPORTED") {
       return `${p.name} has no readings yet${alertSuffix}`;
@@ -814,7 +814,7 @@ export default async function DashboardPage() {
                     )}
                     {condition === "MAINTENANCE" && (
                       <p className="text-xs font-medium text-warning-text mt-2">
-                        Alerts paused — device in maintenance
+                        Alerts paused — device powered off
                       </p>
                     )}
                     {condition === "NEVER_REPORTED" && (

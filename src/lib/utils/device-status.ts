@@ -9,15 +9,25 @@ import { OPERATIONAL_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 // silence — see src/lib/alerts/device-offline.ts), so a form control
 // letting an admin hand-set either would just get overwritten by the next
 // heartbeat or scan, or falsely claim liveness with no evidence behind it.
-// These happen to be the same two values device-offline.ts's own
-// EXCLUDED_DEVICE_STATUSES excludes from offline-alert eligibility — the
-// same concept (a device deliberately out of live operation), declared
-// independently here rather than imported, to keep this form-facing change
-// from touching that already-tested alert-scan module.
-export const ADMIN_SETTABLE_DEVICE_STATUSES: DeviceStatus[] = [
-  "MAINTENANCE",
-  "RETIRED",
-];
+//
+// RETIRED is NOT dead. It remains a valid DeviceStatus enum value in the
+// schema, it is still one of device-offline.ts's EXCLUDED_DEVICE_STATUSES
+// (so a RETIRED device is still exempt from offline alerting), and every
+// read path still renders it — DEVICE_STATUS_LABEL below still maps it, and
+// the dashboard/plot pages still treat it as "out of automatic tracking"
+// alongside MAINTENANCE. It is withheld from this list for one reason only:
+// this deployment has no use for it. The device API key lives in the
+// database row rather than on the hardware, so a broken board is replaced
+// by reflashing the same key, not by retiring the device.
+//
+// One implicit consequence of withholding it here: actions/devices.ts's
+// isAllowedStatusTransition reads this same constant as its enforcement
+// boundary, so a hand-crafted request submitting RETIRED is now silently
+// ignored (the status is left untouched) rather than applied. That is
+// intended, but it happens here rather than at the guard — so if RETIRED
+// ever needs to be settable again, adding it back to this array is the
+// whole change.
+export const ADMIN_SETTABLE_DEVICE_STATUSES: DeviceStatus[] = ["MAINTENANCE"];
 
 export const EXPECTED_REPORTING_INTERVAL_MS = 5 * 60 * 1000;
 export const DEVICE_STALE_THRESHOLD_MS = 15 * 60 * 1000;
@@ -92,6 +102,6 @@ export const DEVICE_FRESHNESS_LABEL: Record<DeviceFreshnessState, string> = {
 export const DEVICE_STATUS_LABEL: Record<DeviceStatus, string> = {
   ONLINE: "Online",
   OFFLINE: "Offline",
-  MAINTENANCE: "Maintenance",
+  MAINTENANCE: "Powered off",
   RETIRED: "Retired",
 };
