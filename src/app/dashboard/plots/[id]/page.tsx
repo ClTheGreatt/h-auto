@@ -21,6 +21,7 @@ import { formatDate, formatDateTime } from "@/lib/format-date";
 import {
   getDeviceFreshness,
   DEVICE_FRESHNESS_LABEL,
+  DEVICE_STATUS_LABEL,
 } from "@/lib/utils/device-status";
 import { buildDirectPlotAccessWhere } from "@/lib/auth/plot-access";
 import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
@@ -87,7 +88,7 @@ export default async function PlotDetailPage({
       crop: true,
       currentStage: true,
       device: {
-        select: { id: true, deviceCode: true, lastSeenAt: true },
+        select: { id: true, deviceCode: true, lastSeenAt: true, status: true },
       },
       assignments: {
         where: {
@@ -180,10 +181,20 @@ export default async function PlotDetailPage({
 
   const now = new Date();
   const deviceFreshness = getDeviceFreshness(plot.device?.lastSeenAt, now);
+  // A device taken out of automatic tracking (the same two statuses
+  // device-offline.ts excludes from alerting) must not be reported as
+  // delayed or offline — that silence is deliberate, not a fault.
+  const deviceInMaintenance =
+    plot.device?.status === "MAINTENANCE" ||
+    plot.device?.status === "RETIRED";
   const readingsAreHistorical =
     deviceFreshness.state !== "FRESH" && latestReading !== null;
   const readingFreshnessLabel = latestReading
-    ? deviceFreshness.state === "FRESH"
+    ? deviceInMaintenance
+      ? `Alerts paused — device in maintenance · Last reading ${formatDateTime(
+          latestReading.recordedAt
+        )}`
+      : deviceFreshness.state === "FRESH"
       ? `Last reading ${formatDateTime(latestReading.recordedAt)}`
       : deviceFreshness.state === "STALE"
       ? `Sensor data is delayed · Last reading ${formatStaleDuration(
@@ -385,7 +396,9 @@ export default async function PlotDetailPage({
               {plot.device && latestReading && (
                 <StatusBadge
                   variant={
-                    deviceFreshness.state === "FRESH"
+                    deviceInMaintenance
+                      ? "warning"
+                      : deviceFreshness.state === "FRESH"
                       ? "success"
                       : deviceFreshness.state === "STALE"
                       ? "warning"
@@ -394,7 +407,9 @@ export default async function PlotDetailPage({
                       : "neutral"
                   }
                 >
-                  {DEVICE_FRESHNESS_LABEL[deviceFreshness.state]}
+                  {deviceInMaintenance
+                    ? DEVICE_STATUS_LABEL[plot.device.status]
+                    : DEVICE_FRESHNESS_LABEL[deviceFreshness.state]}
                 </StatusBadge>
               )}
             </div>

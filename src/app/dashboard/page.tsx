@@ -210,8 +210,13 @@ function shouldTreatSensorEvidenceAsHistorical({
   const plotPresentsHistoricalEvidence =
     condition === "STALE" ||
     condition === "OFFLINE" ||
-    condition === "NEVER_REPORTED";
+    condition === "NEVER_REPORTED" ||
+    condition === "MAINTENANCE";
 
+  // The AND with freshnessIsHistorical is deliberate: age of the data
+  // decides "historical", not the maintenance flag. A device switched to
+  // maintenance moments ago still has genuinely fresh readings, and those
+  // stay live-coloured rather than being greyed out as last-known.
   return (
     readingRecordedAt !== null &&
     freshnessIsHistorical &&
@@ -832,7 +837,8 @@ export default async function DashboardPage() {
                     <div className="mt-2">
                       {!reading ? (
                         condition === "MISSING_DEVICE" ||
-                        condition === "NEVER_REPORTED" ? null : (
+                        condition === "NEVER_REPORTED" ||
+                        condition === "MAINTENANCE" ? null : (
                           <p className="text-xs text-muted-foreground">
                             {!plot.device ? "No device linked" : "Awaiting first reading"}
                           </p>

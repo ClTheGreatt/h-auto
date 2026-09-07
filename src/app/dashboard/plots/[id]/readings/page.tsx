@@ -11,6 +11,7 @@ import { formatDateTime } from "@/lib/format-date";
 import {
   getDeviceFreshness,
   DEVICE_FRESHNESS_LABEL,
+  DEVICE_STATUS_LABEL,
 } from "@/lib/utils/device-status";
 import { ReadingsFilters } from "@/components/plots/readings-filters";
 import { LiveRefresh } from "@/components/plots/live-refresh";
@@ -68,7 +69,7 @@ export default async function PlotReadingsPage({
         select: {
           id: true,
           name: true,
-          device: { select: { id: true, lastSeenAt: true } },
+          device: { select: { id: true, lastSeenAt: true, status: true } },
         },
       })
   );
@@ -76,6 +77,12 @@ export default async function PlotReadingsPage({
 
   const now = new Date();
   const deviceFreshness = getDeviceFreshness(plot.device?.lastSeenAt, now);
+  // A device taken out of automatic tracking (the same two statuses
+  // device-offline.ts excludes from alerting) must not be reported as
+  // delayed or offline — that silence is deliberate, not a fault.
+  const deviceInMaintenance =
+    plot.device?.status === "MAINTENANCE" ||
+    plot.device?.status === "RETIRED";
 
   // date window
   const recordedAt = resolveWindow(parsedMonth, range);
@@ -163,7 +170,9 @@ export default async function PlotReadingsPage({
           <div className="flex items-center gap-2 mt-2">
             <StatusBadge
               variant={
-                deviceFreshness.state === "FRESH"
+                deviceInMaintenance
+                  ? "warning"
+                  : deviceFreshness.state === "FRESH"
                   ? "success"
                   : deviceFreshness.state === "STALE"
                   ? "warning"
@@ -172,7 +181,9 @@ export default async function PlotReadingsPage({
                   : "neutral"
               }
             >
-              {DEVICE_FRESHNESS_LABEL[deviceFreshness.state]}
+              {deviceInMaintenance
+                ? DEVICE_STATUS_LABEL[plot.device.status]
+                : DEVICE_FRESHNESS_LABEL[deviceFreshness.state]}
             </StatusBadge>
             {plot.device.lastSeenAt && (
               <span className="text-xs text-muted-foreground">
