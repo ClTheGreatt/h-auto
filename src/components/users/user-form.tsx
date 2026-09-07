@@ -366,7 +366,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
           <CardHeader>
             <CardTitle>Role & access</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="space-y-4">
             <FormField
               control={form.control}
               name="role"
@@ -407,16 +407,18 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       <SelectItem value="INACTIVE">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Deactivated users lose access but their data is preserved.
-                    Set to Active to restore access.
-                  </p>
+                  {!isCreate && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Deactivated users lose access but their data is preserved.
+                      Set to Active to restore access.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
             {mode === "create" ? (
-              <div className="md:col-span-2">
+              <div>
                 <FormLabel>Password</FormLabel>
                 <p className="text-xs text-muted-foreground mt-1">
                   A temporary password will be generated automatically and
@@ -428,7 +430,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                 control={form.control}
                 name="password"
                 render={({ field }) => (
-                  <FormItem className="md:col-span-2">
+                  <FormItem>
                     <FormLabel>
                       Password
                       <span className="text-gray-400 text-xs ml-1 font-normal">
@@ -712,7 +714,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
             <CardHeader>
               <CardTitle>Student details</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
               <FormField
                 control={form.control}
                 name="course"
