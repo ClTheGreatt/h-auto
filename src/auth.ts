@@ -120,17 +120,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // as the token's new baseline instead of comparing against the old
       // (intentionally superseded) tokenVersion.
       if (trigger === "update") {
-        const fresh = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: {
-            status: true,
-            role: true,
-            tokenVersion: true,
-            tourCompletedAt: true,
-            mustChangePassword: true,
-            graduatedAt: true,
-          },
-        });
+        let fresh: Awaited<ReturnType<typeof getUserForSessionCheck>>;
+        try {
+          fresh = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: {
+              status: true,
+              role: true,
+              tokenVersion: true,
+              tourCompletedAt: true,
+              mustChangePassword: true,
+              graduatedAt: true,
+            },
+          });
+        } catch (error) {
+          // Same reasoning as the per-request branch below: an unreachable
+          // database must not escape into @auth/core, which would clear the
+          // session cookie. Keep the token as-is until the DB is back.
+          console.error("[auth] session update could not reach the database", {
+            errorCode: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+          });
+          return token;
+        }
+
         if (fresh && fresh.status === "ACTIVE" && !fresh.graduatedAt) {
           token.role = fresh.role;
           token.tokenVersion = fresh.tokenVersion;
@@ -146,7 +158,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // invalidates the session immediately (used to revoke suspended
       // accounts, graduated students, and sessions superseded by a password
       // change).
-      const fresh = await getUserForSessionCheck(token.id as string);
+      let fresh: Awaited<ReturnType<typeof getUserForSessionCheck>>;
+      try {
+        fresh = await getUserForSessionCheck(token.id as string);
+      } catch (error) {
+        // The session check cannot reach the database. Returning the
+        // existing token keeps the user signed in; letting this throw
+        // would escape into @auth/core, which deletes the session cookie
+        // and logs the user out permanently for what is usually a
+        // momentary Neon cold start or pool timeout.
+        //
+        // Revocation is not weakened in normal operation: tokenVersion is
+        // still compared on every reachable request, so a password change
+        // or deactivation still takes effect on the next successful
+        // check. Only the window where the database is unreachable is
+        // tolerated — and during that window the app cannot serve
+        // anything anyway.
+        console.error("[auth] session check could not reach the database", {
+          errorCode: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+        });
+        return token;
+      }
+
       if (
         !fresh ||
         fresh.status !== "ACTIVE" ||
