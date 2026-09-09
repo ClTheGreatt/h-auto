@@ -168,7 +168,7 @@ export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFo
           <CardHeader>
             <CardTitle>Plot information</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <FormField
               control={form.control}
               name="name"
@@ -276,7 +276,7 @@ export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFo
           <CardHeader>
             <CardTitle>Crop & schedule</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <FormField
               control={form.control}
               name="cropId"

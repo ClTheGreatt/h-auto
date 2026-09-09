@@ -71,7 +71,7 @@ export function ProfileInfoForm({ defaultValues }: Props) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormErrorSummary form={form} />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <FormField
                 control={form.control}
                 name="firstName"

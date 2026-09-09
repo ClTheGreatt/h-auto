@@ -219,7 +219,7 @@ export function CropForm({
           <CardHeader>
             <CardTitle>Crop information</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <FormField
               control={form.control}
               name="name"
@@ -444,7 +444,7 @@ function StageBasicFields({
   index: number;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
       <FormField
         control={control}
         name={`stages.${index}.name`}
@@ -549,7 +549,7 @@ function ThresholdPair({
   return (
     <div className="border rounded-md p-3 bg-muted">
       <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 items-start">
         <FormField
           control={control}
           name={minName}
