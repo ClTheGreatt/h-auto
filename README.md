@@ -294,10 +294,10 @@ Academic Year 2025–2026
 
 | Name | Role |
 |------|------|
-| Said Hussin | Project Lead / Full-stack Developer |
-| Chrislord Dizon | Backend / IoT Integration |
-| Geoffrey Perello | Frontend / UI Design |
-| Jhan Criss Alba | Documentation / Research |
+| Chrislord Dizon | Lead Developer & System Architect |
+| Said Hussin | Documentation & Research |
+| Geoffrey Perello | Documentation & Research |
+| Jhan Criss Alba | Documentation & Research |
 
 ##  Acknowledgments
 
