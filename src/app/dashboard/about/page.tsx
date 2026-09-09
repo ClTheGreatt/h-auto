@@ -7,6 +7,8 @@ import {
   Database,
   Smartphone,
   BellRing,
+  MessageSquare,
+  UserCheck,
   Target,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +102,16 @@ const FEATURES = [
     icon: Database,
     title: "Comprehensive Reporting",
     description: "Role-based PDF and Excel exports for sensor data, plot performance, growth logs, alerts, and student activity.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Works Without Internet",
+    description: "Alerts arrive as ordinary text messages from a mobile number, so they reach anyone on any phone — no smartphone, app, or internet connection required.",
+  },
+  {
+    icon: UserCheck,
+    title: "Role-based Access",
+    description: "Everyone sees the plots that are theirs — students the ones they are assigned to, faculty the ones they advise — and the same list follows them to the mobile app.",
   },
 ];
 

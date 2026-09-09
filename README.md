@@ -12,7 +12,7 @@ H-Auto combines IoT sensor technology with a modern web platform to enable real-
 ##  Features
 
 -  **Real-time Sensor Monitoring** — soil moisture, temperature, humidity, light intensity, and NPK levels via ESP32-based IoT devices
--  **SMS Alerts** — automated notifications via Semaphore when readings fall outside optimal ranges
+-  **SMS Alerts** — automated notifications via TextBee when readings fall outside optimal ranges
 -  **Crop Profiling** — define crops with growth stages and per-stage optimal sensor thresholds
 -  **Role-based Access** — Super Admin, Admin, Faculty, and Student Farmer roles with appropriate permissions
 -  **Growth Logs** — photo-based observation tracking with up to 4 images per log
@@ -41,7 +41,7 @@ H-Auto combines IoT sensor technology with a modern web platform to enable real-
 
 **Integrations**
 - Cloudinary (image hosting)
-- Semaphore (Philippine SMS)
+- TextBee (SMS via Android gateway)
 - @react-pdf/renderer (PDF generation)
 - ExcelJS (spreadsheet export)
 
@@ -59,7 +59,7 @@ H-Auto combines IoT sensor technology with a modern web platform to enable real-
 - Node.js 20+
 - PostgreSQL database (free tier on [Neon](https://neon.tech) works great)
 - Cloudinary account (free tier)
-- Semaphore account (for SMS — optional, has mock mode)
+- TextBee account, plus an Android phone running the TextBee gateway app with an active SIM (for SMS — optional, has mock mode)
 
 ### Installation
 
@@ -100,9 +100,34 @@ Required in `.env`:
 | `CLOUDINARY_CLOUD_NAME` | From Cloudinary dashboard |
 | `CLOUDINARY_API_KEY` | From Cloudinary dashboard |
 | `CLOUDINARY_API_SECRET` | From Cloudinary dashboard |
-| `SEMAPHORE_API_KEY` | From Semaphore dashboard (or `test_mock_key` for mock mode) |
+| `TEXTBEE_API_KEY` | From the TextBee dashboard (or `test_mock_key` for mock mode) |
 
 See `.env.example` for the full template.
+
+### SMS Delivery
+
+Philippine telcos require an approved alphanumeric sender name before a
+commercial provider will deliver messages. This is an NTC requirement, so it
+applies to every commercial SMS provider rather than to any one of them —
+and the approval needs institutional documentation, which did not arrive.
+
+TextBee is used instead. It is an open-source Android SMS gateway: a phone
+running the gateway app on a project-owned SIM relays each alert as an
+ordinary person-to-person text, so no sender name is needed and there are no
+per-message credits.
+
+The trade-offs are real:
+
+- Delivery depends on a physical phone staying powered, connected, and in
+  signal range.
+- There are no delivery receipts — the system records that the gateway
+  accepted a message, not that it reached the handset.
+- It suits a single campus garden and would not scale to production volume.
+
+Both providers are implemented, which is why `.env.example` still ships an
+inactive `SEMAPHORE_API_KEY`. If a sender name is ever approved, reverting is
+a one-line change in `src/lib/sms/semaphore.ts` — point the `sendSMS` export
+back at `sendSMSViaSemaphore`.
 
 ### Production Scheduling
 
@@ -158,7 +183,7 @@ Open [http://localhost:3000](http://localhost:3000) — should now serve the pro
 ```
 h-auto/
 ├── prisma/
-│   ├── schema.prisma          # Database schema (13 tables)
+│   ├── schema.prisma          # Database schema (15 models)
 │   └── seed.ts                # Seed data
 ├── src/
 │   ├── app/                   # Next.js App Router
@@ -177,7 +202,7 @@ h-auto/
 │   │   ├── alerts/            # Alert processor
 │   │   ├── analytics/         # Analytics helpers
 │   │   ├── reports/           # Report generators
-│   │   ├── sms/               # Semaphore integration
+│   │   ├── sms/               # SMS providers
 │   │   ├── validations/       # Zod schemas
 │   │   ├── auth.ts            # NextAuth config
 │   │   └── prisma.ts          # Prisma client
@@ -213,22 +238,25 @@ The endpoint:
 2. Stores the reading
 3. Updates device `lastSeenAt` to mark it online
 4. Triggers alert processing (compares against crop thresholds)
-5. Sends SMS notifications to assigned faculty + students if alerts are critical
+5. Notifies the plot's adviser and assigned students by SMS, email, push, and in-app inbox — once per newly raised alert, at any severity
 
 Firmware for ESP32 is maintained separately (see hardware/firmware repo).
 
 ##  Database Schema
 
-13 tables:
+15 models:
 
 - `User` — accounts with roles
-- `Crop` + `GrowthStage` — crop profiles with stage-specific thresholds
+- `FacultySectionAdvisory` — which sections each faculty member advises
+- `Crop` + `CropStage` — crop profiles with stage-specific thresholds
 - `Plot` — physical garden plots
-- `Device` — registered ESP32 devices
 - `PlotAssignment` — student/faculty plot assignments
+- `Device` — registered ESP32 devices
 - `SensorReading` — IoT sensor data
-- `GrowthLog` + `GrowthLogImage` — student observations with photos
-- `Alert` + `Notification` — alerts and SMS delivery tracking
+- `Alert` + `AlertNotification` — alerts and per-channel delivery tracking
+- `PushToken` — registered mobile devices for push notifications
+- `GrowthLog` + `GrowthImage` — student observations with photos
+- `Report` — generated PDF and Excel exports
 - `ImportBatch` — bulk CSV import records
 
 Full schema in `prisma/schema.prisma`.
