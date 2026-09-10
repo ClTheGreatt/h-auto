@@ -148,10 +148,9 @@ export default async function AssignmentsPage({
             const initials =
               `${a.student.firstName[0]}${a.student.lastName[0]}`.toUpperCase();
             return (
-              <Link
+              <div
                 key={a.id}
-                href={`/dashboard/plots/${a.plot.id}`}
-                className="bg-card border rounded-md p-4 hover:shadow-sm hover:border-green-300 transition"
+                className="bg-card border rounded-md p-4"
               >
                 <div className="flex items-start gap-3">
                   <Avatar className="w-10 h-10">
@@ -164,9 +163,14 @@ export default async function AssignmentsPage({
                       <div className="font-medium text-sm">
                         {a.student.firstName} {a.student.lastName}
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {a.plot.name}
-                      </Badge>
+                      <Link
+                        href={`/dashboard/plots/${a.plot.id}`}
+                        className="hover:underline"
+                      >
+                        <Badge variant="secondary" className="text-xs">
+                          {a.plot.name}
+                        </Badge>
+                      </Link>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {a.plot.crop?.name ?? "No crop"}
@@ -179,11 +183,12 @@ export default async function AssignmentsPage({
                     </div>
                   </div>
                   {role !== "STUDENT_FARMER" && (
-                    // RemoveAssignmentDialog (a Client Component) handles
-                    // stopping this click from bubbling to the surrounding
-                    // Link internally — this page is a Server Component and
-                    // cannot attach an event handler to a plain element
-                    // itself.
+                    // The card is a plain <div>, not a <Link> — only the plot
+                    // badge above navigates. Do not re-wrap the card in a
+                    // Link: that would nest this <button> inside an <a>,
+                    // which is invalid HTML and navigates on click no matter
+                    // what the dialog's stopPropagation does (an anchor's
+                    // navigation is a default action, not a listener).
                     <RemoveAssignmentDialog
                       assignmentId={a.id}
                       studentName={`${a.student.firstName} ${a.student.lastName}`}
@@ -199,7 +204,7 @@ export default async function AssignmentsPage({
                     />
                   )}
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

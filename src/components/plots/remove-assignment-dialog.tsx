@@ -45,16 +45,23 @@ export function RemoveAssignmentDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      {/* Some callers (e.g. the Assignments page) nest this trigger inside
-          a card-wide <Link>. A plain click already opens this dialog via
-          AlertDialogTrigger's own handler, but the event still bubbles —
-          stopping it here (and again on AlertDialogContent below, since
-          Radix portals it outside the DOM tree but React still bubbles
-          through the component tree) keeps that click from also
-          triggering the Link's navigation. Harmless for callers with no
-          surrounding Link (plot-assignments.tsx) — nothing above to stop.
-          Same two-point stopPropagation idiom as DropdownMenuTrigger/
-          DropdownMenuContent in plots-table.tsx. */}
+      {/* stopPropagation here (and again on AlertDialogContent below, since
+          Radix portals that outside the DOM tree but React still bubbles
+          through the component tree) keeps a trigger click from also
+          reaching a clickable ancestor that navigates via an onClick
+          handler — a <TableRow onClick={() => router.push(...)}>, say.
+          Both current callers wrap this in a plain <div>, so today it stops
+          nothing; it is cheap insurance if a caller ever nests it inside
+          such a row.
+
+          It does NOT stop a real <a href> from navigating. An anchor's
+          navigation is the event's default action, not a listener, and only
+          preventDefault() cancels a default action. Worse, stopping
+          propagation also keeps Next's own Link handler from running, so
+          its internal preventDefault() never fires either and the browser
+          falls through to a full page load. Do not nest this component
+          inside a Link — link something else in the card instead, as
+          assignments/page.tsx does with the plot badge. */}
       <span onClick={(e) => e.stopPropagation()} className="contents">
         <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       </span>
