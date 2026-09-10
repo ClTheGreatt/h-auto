@@ -423,8 +423,17 @@ function formatElapsed(ms: number): string {
   if (minutes < 60) {
     return `${minutes} minute${minutes === 1 ? "" : "s"}`;
   }
-  const hours = Math.round(minutes / 60);
-  return `${hours} hour${hours === 1 ? "" : "s"}`;
+  // Floor to a tenth of an hour rather than rounding to a whole one. This
+  // string goes into the SMS body and onto the dashboard, so it must never
+  // claim a device has been silent longer than it actually has — rounding
+  // turned 90 minutes into "2 hours". Flooring can understate by up to six
+  // minutes, which is the safe direction for a monitoring system.
+  const tenthsOfAnHour = Math.floor(minutes / 6);
+  const hours = tenthsOfAnHour / 10;
+  // A whole number drops the decimal ("2 hours", not "2.0 hours"); only a
+  // fractional value carries one decimal place ("1.5 hours").
+  const value = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+  return `${value} hour${hours === 1 ? "" : "s"}`;
 }
 
 function sameSteps(left: string[], right: string[]): boolean {
