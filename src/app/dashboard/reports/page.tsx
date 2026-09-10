@@ -108,7 +108,7 @@ export default async function ReportsPage() {
             <ReportCard
               type="activity"
               title="System Activity"
-              description="Audit log of system events: user creations, imports, plot setup, device registrations, and assignments. Admin only."
+              description="Chronological record of when users, plots, devices, assignments, and imports were created. Admin only."
               icon="filetext"
               iconColor="bg-gray-100 text-gray-700"
             />

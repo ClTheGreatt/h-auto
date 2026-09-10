@@ -230,7 +230,7 @@ export function createAdminTour(router: AppRouterInstance): TourStep[] {
       popover: {
         title: "System Activity Report",
         description:
-          "This is an Admin exclusive report showing user actions across the system including logins, changes, and deletions. It provides an audit trail useful for compliance and internal review. Export the report as PDF or Excel.",
+          "This is an Admin exclusive report showing when accounts, plots, devices, assignments, and imports were added to the system. It is useful for tracing how the system was set up over time. Export the report as PDF or Excel.",
         side: "bottom",
       },
     },
