@@ -334,6 +334,10 @@ export async function fetchActivityData(filters: ReportFilters) {
         plot: { select: { name: true } },
         student: { select: { firstName: true, lastName: true } },
         faculty: { select: { firstName: true, lastName: true } },
+        // Who actually performed the assignment. Distinct from `faculty`
+        // above, which is always the plot's adviser regardless of who
+        // clicked — see the same note at assignments/page.tsx.
+        assignedBy: { select: { firstName: true, lastName: true } },
       },
     });
     if (assignments.length === 100) truncated = true;
@@ -342,7 +346,12 @@ export async function fetchActivityData(filters: ReportFilters) {
         timestamp: a.assignedAt,
         eventType: "Assignment",
         description: `${a.student.firstName} ${a.student.lastName} assigned to ${a.plot.name}`,
-        actor: `${a.faculty.firstName} ${a.faculty.lastName}`,
+        // Null on rows created before assignedById existed (added
+        // 2026-07-29, never backfilled) — report that honestly rather than
+        // falling back to `faculty`, which was the original mislabeling bug.
+        actor: a.assignedBy
+          ? `${a.assignedBy.firstName} ${a.assignedBy.lastName}`
+          : "Unknown",
       });
     }
   } catch (e) {
@@ -355,6 +364,11 @@ export async function fetchActivityData(filters: ReportFilters) {
       where: dateFilter ? { createdAt: dateFilter } : {},
       orderBy: { createdAt: "desc" },
       take: 100,
+      // ImportBatch.userId is non-nullable, so every batch has a known
+      // importer — no fallback needed here, unlike assignments above.
+      include: {
+        user: { select: { firstName: true, lastName: true } },
+      },
     });
     if (imports.length === 100) truncated = true;
     for (const imp of imports) {
@@ -362,7 +376,7 @@ export async function fetchActivityData(filters: ReportFilters) {
         timestamp: imp.createdAt,
         eventType: "Import",
         description: `Imported ${imp.successCount} ${imp.type.toLowerCase()} records (${imp.failureCount} failed)`,
-        actor: "System",
+        actor: `${imp.user.firstName} ${imp.user.lastName}`,
       });
     }
   } catch (e) {
