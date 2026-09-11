@@ -525,9 +525,30 @@ export default async function DashboardPage() {
     maintenanceDeviceCount,
   });
 
+  // DENYLIST, not an allowlist: every condition counts as needing attention
+  // unless it is excused here, so a newly added PlotCondition opts itself in
+  // by default. Two are excused. PREPARING has nothing to monitor yet.
+  // MAINTENANCE is excused because this deployment's ESP32 is not
+  // continuously deployed — it runs during observation periods and is
+  // powered off otherwise, so "powered off" is an expected operating state
+  // rather than a deviation. Flagging it every time would train the reader
+  // to ignore the banner. The plot stays fully visible on its card with its
+  // amber "Powered off" badge; only the attention count excuses it.
   const attentionPlots = plotsWithCondition.filter(
-    (p) => p.condition !== "ALL_IN_RANGE" && p.condition !== "PREPARING"
+    (p) =>
+      p.condition !== "ALL_IN_RANGE" &&
+      p.condition !== "PREPARING" &&
+      p.condition !== "MAINTENANCE"
   );
+  // Counted off plotsWithCondition — the same array attentionPlots derives
+  // from — so the banner's two numbers always come from one source. This is
+  // numerically identical to maintenanceDeviceCount above (a MAINTENANCE
+  // condition is only ever assigned to an operational plot that has a
+  // device), but that one belongs to the device-count chain feeding the
+  // header summary and would drift if that chain changed.
+  const maintenancePlotCount = plotsWithCondition.filter(
+    (p) => p.condition === "MAINTENANCE"
+  ).length;
   const hasCriticalAttention = attentionPlots.some(
     (p) => p.condition === "CRITICAL" || p.condition === "OFFLINE"
   );
@@ -547,9 +568,6 @@ export default async function DashboardPage() {
 
     if (p.condition === "MISSING_DEVICE") {
       return `${p.name} has no device linked${alertSuffix}`;
-    }
-    if (p.condition === "MAINTENANCE") {
-      return `${p.name} is powered off — alerts are paused`;
     }
     if (p.condition === "NEVER_REPORTED") {
       return `${p.name} has no readings yet${alertSuffix}`;
@@ -657,10 +675,28 @@ export default async function DashboardPage() {
             ? CONDITION_BORDER_CLASS.CRITICAL
             : attentionPlots.length > 0
             ? CONDITION_BORDER_CLASS.WARNING
-            : CONDITION_BORDER_CLASS.ALL_IN_RANGE
+            : // Nothing needs attention, but a powered-off plot was excused
+              // from the judgement rather than judged healthy — so this is
+              // not an all-clear. PREPARING's neutral rail is the same
+              // "excused, nothing to do" signal.
+              maintenancePlotCount > 0
+              ? CONDITION_BORDER_CLASS.PREPARING
+              : CONDITION_BORDER_CLASS.ALL_IN_RANGE
         )}
       >
-        {attentionPlots.length === 0 && (
+        {/* "monitored" is load-bearing: it tells the reader a plot was left
+            out of the judgement. A powered-off plot has no current readings,
+            so the system cannot know whether it is in range — claiming it is
+            would contradict that plot's own card below. */}
+        {attentionPlots.length === 0 && maintenancePlotCount > 0 && (
+          <p className="text-sm font-semibold text-foreground">
+            {`All monitored plots are in range · ${maintenancePlotCount} plot${
+              maintenancePlotCount === 1 ? "" : "s"
+            } powered off`}
+          </p>
+        )}
+
+        {attentionPlots.length === 0 && maintenancePlotCount === 0 && (
           <p className="text-sm font-semibold text-success-text">All plots are in range</p>
         )}
 
