@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 const assignBodySchema = z.object({
   studentId: z.string().min(1, "studentId is required"),
@@ -135,10 +136,19 @@ export async function POST(
 
     const plot = await prisma.plot.findUnique({
       where: { id: plotId },
-      select: { id: true, facultyId: true },
+      select: { id: true, facultyId: true, status: true },
     });
     if (!plot) {
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
+    }
+    if (!isActivityPlotStatus(plot.status)) {
+      return NextResponse.json(
+        {
+          error:
+            "Students can only be assigned while a plot is preparing or operational.",
+        },
+        { status: 409 }
+      );
     }
     if (!plot.facultyId) {
       return NextResponse.json(

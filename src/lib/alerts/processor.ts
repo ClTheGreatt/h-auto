@@ -17,6 +17,7 @@ import {
   getEligibleAlertRecipients,
   type AlertNotificationRecipient,
 } from "./recipients";
+import { isOperationalPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function processSensorReading(
   readingId: string,
@@ -52,6 +53,7 @@ export async function processSensorReading(
     });
   }
 
+  if (!isOperationalPlotStatus(reading.plot.status)) return;
   if (!reading.plot.currentStage) return;
 
   const thresholdEvaluationPolicy = {

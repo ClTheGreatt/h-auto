@@ -34,6 +34,10 @@ import { LiveRefresh } from "@/components/plots/live-refresh";
 import { GrowthTimeline } from "@/components/growth/growth-timeline";
 import { CultivationGuideCard } from "@/components/plots/cultivation-guide-card";
 import type { PlotStatus } from "@prisma/client";
+import {
+  isActivityPlotStatus,
+  isHistoricalPlotStatus,
+} from "@/lib/plots/lifecycle";
 
 const statusLabels: Record<PlotStatus, string> = {
   PREPARING: "Preparing",
@@ -130,12 +134,14 @@ export default async function PlotDetailPage({
   // but every mutating action on it is disabled — restore it first.
   const isArchived = plot.status === "ARCHIVED";
   const isHarvested = plot.status === "HARVESTED";
+  const isActivityPlot = isActivityPlotStatus(plot.status);
 
   const isAssignedStudent = plot.assignments.some(
     (a) => a.student.id === session.user.id
   );
-  const canLogGrowth = (canManageAssignments || isAssignedStudent) && !isArchived;
-  const canManageAssignmentsNow = canManageAssignments && !isArchived;
+  const canLogGrowth =
+    (canManageAssignments || isAssignedStudent) && isActivityPlot;
+  const canManageAssignmentsNow = canManageAssignments && isActivityPlot;
 
   // FACULTY is scoped to sections they actually advise; ADMIN/SUPER_ADMIN
   // stay unscoped. Zero advisories means zero eligible students — the
@@ -188,7 +194,9 @@ export default async function PlotDetailPage({
     plot.device?.status === "MAINTENANCE" ||
     plot.device?.status === "RETIRED";
   const readingsAreHistorical =
-    deviceFreshness.state !== "FRESH" && latestReading !== null;
+    latestReading !== null &&
+    (isHistoricalPlotStatus(plot.status) ||
+      deviceFreshness.state !== "FRESH");
   const readingFreshnessLabel = latestReading
     ? deviceInMaintenance
       ? `Alerts paused — device powered off · Last reading ${formatDateTime(
@@ -418,15 +426,20 @@ export default async function PlotDetailPage({
       <CardContent>
           {!plot.device ? (
             <div className="text-sm text-muted-foreground">
-              No device linked to this plot yet. Link one from the Devices tab
-              to start receiving readings.{" "}
-              {canEditPlot && !isArchived && (
-                <Link
-                  href="/dashboard/devices/new"
-                  className="text-green-600 hover:underline font-medium"
-                >
-                  Link a device
-                </Link>
+              No device linked to this plot yet.
+              {isActivityPlot && (
+                <>
+                  {" "}Link one from the Devices tab to start receiving
+                  readings.{" "}
+                  {canEditPlot && (
+                    <Link
+                      href="/dashboard/devices/new"
+                      className="text-green-600 hover:underline font-medium"
+                    >
+                      Link a device
+                    </Link>
+                  )}
+                </>
               )}
               {/* Only reachable in this !plot.device branch — when a device
                   IS linked, LatestReadings already shows its own "No stage

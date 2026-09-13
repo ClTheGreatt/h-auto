@@ -3,13 +3,17 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { DeviceForm } from "@/components/devices/device-form";
+import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export default async function NewDevicePage() {
   await requireAdmin();
 
-  // Only show plots that don't already have a device
+  // New devices can only be linked to device-less activity plots.
   const plots = await prisma.plot.findMany({
-    where: { device: null },
+    where: {
+      device: null,
+      status: { in: ACTIVITY_PLOT_STATUSES },
+    },
     orderBy: { name: "asc" },
     select: { id: true, name: true, location: true },
   });

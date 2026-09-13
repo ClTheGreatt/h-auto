@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { DeviceForm } from "@/components/devices/device-form";
+import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 
 export default async function EditDevicePage({
   params,
@@ -13,18 +14,26 @@ export default async function EditDevicePage({
   await requireAdmin();
   const { id } = await params;
 
-  const [device, plots] = await Promise.all([
-    prisma.device.findUnique({
-      where: { id },
-      include: { _count: { select: { readings: true } } },
-    }),
-    prisma.plot.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true },
-    }),
-  ]);
+  const device = await prisma.device.findUnique({
+    where: { id },
+    include: { _count: { select: { readings: true } } },
+  });
 
   if (!device) notFound();
+
+  const plots = await prisma.plot.findMany({
+    where: {
+      OR: [
+        { id: device.plotId },
+        {
+          device: null,
+          status: { in: ACTIVITY_PLOT_STATUSES },
+        },
+      ],
+    },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, location: true },
+  });
 
   return (
     <div className="space-y-6 max-w-4xl">

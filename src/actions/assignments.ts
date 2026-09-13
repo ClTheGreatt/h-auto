@@ -6,6 +6,7 @@ import { requireFaculty } from "@/lib/auth-helpers";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
 import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function assignStudent(
   plotId: string,
@@ -16,9 +17,14 @@ export async function assignStudent(
 
   const plot = await prisma.plot.findUnique({
     where: { id: plotId },
-    select: { facultyId: true },
+    select: { facultyId: true, status: true },
   });
   if (!plot) return { error: "Plot not found" };
+  if (!isActivityPlotStatus(plot.status)) {
+    return {
+      error: "Students can only be assigned while a plot is preparing or operational.",
+    };
+  }
 
   // No adviser set yet: a PlotAssignment requires a non-null facultyId, and
   // there's no adviser to record it as. Block every caller (including
@@ -125,9 +131,14 @@ export async function getAssignableStudentsForPlot(
 
   const plot = await prisma.plot.findUnique({
     where: { id: plotId },
-    select: { facultyId: true },
+    select: { facultyId: true, status: true },
   });
   if (!plot) return { error: "Plot not found" };
+  if (!isActivityPlotStatus(plot.status)) {
+    return {
+      error: "Students can only be assigned while a plot is preparing or operational.",
+    };
+  }
 
   // Mirrors canManageAssignments in the mobile assignable-students route
   // (src/app/api/mobile/me/plots/[id]/assignable-students/route.ts),

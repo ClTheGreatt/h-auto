@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sensorReadingSchema } from "@/lib/validations/device";
 import { hashApiKey } from "@/lib/devices/hash-key";
 import { resolveDeviceOfflineForHeartbeat } from "@/lib/alerts/device-offline";
+import { isHistoricalPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get("x-api-key");
@@ -59,9 +60,9 @@ export async function POST(request: NextRequest) {
   if (!plot) {
     return NextResponse.json({ error: "Plot not found" }, { status: 404 });
   }
-  if (plot.status === "HARVESTED" || plot.status === "ARCHIVED") {
+  if (isHistoricalPlotStatus(plot.status)) {
     return NextResponse.json(
-      { error: "Plot is not active (harvested or archived); reading rejected." },
+      { error: "Plot is historical; reading rejected." },
       { status: 409 }
     );
   }

@@ -4,6 +4,7 @@ import { getMobileUser } from "@/lib/mobile-auth";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import { getDeviceFreshness, isDeviceOnline } from "@/lib/utils/device-status";
 import { buildOperationalAlertWhere } from "@/lib/alerts/scope";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function GET(
   req: NextRequest,
@@ -109,14 +110,16 @@ export async function GET(
       : null;
     const deviceOnline = isDeviceOnline(plot.device?.lastSeenAt, now);
 
-    // Faculty may only manage assignments on the plot they advise; Admin/
-    // Super Admin manage any plot; Students never manage assignments.
+    // Assignment management is available only during the activity lifecycle.
+    // Within that scope, Faculty may manage the plot they advise, Admin/Super
+    // Admin may manage any plot, and Students never manage assignments.
     const canManageAssignments =
-      user.role === "ADMIN" || user.role === "SUPER_ADMIN"
+      isActivityPlotStatus(plot.status) &&
+      (user.role === "ADMIN" || user.role === "SUPER_ADMIN"
         ? true
         : user.role === "FACULTY"
           ? plot.facultyId === user.id
-          : false;
+          : false);
 
     // Fetch recent observations
 const observations = await prisma.growthLog.findMany({

@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { GrowthLogForm } from "@/components/growth/growth-log-form";
+import { buildDirectPlotAccessWhere } from "@/lib/auth/plot-access";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 export default async function NewGrowthLogPage({
   params,
@@ -14,31 +16,21 @@ export default async function NewGrowthLogPage({
   const { id } = await params;
   const role = session.user.role;
 
-  const plot = await prisma.plot.findUnique({
-    where: { id },
+  const plot = await prisma.plot.findFirst({
+    where: buildDirectPlotAccessWhere(role, session.user.id, id),
     include: {
       crop: {
         include: {
           stages: { orderBy: { orderIndex: "asc" } },
         },
       },
-      assignments: {
-        where: { status: "ACTIVE" },
-        select: { studentId: true },
-      },
     },
   });
 
   if (!plot) notFound();
 
-  // Access control: admins/faculty allowed; students only if assigned
-  const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN" || role === "FACULTY";
-  const isAssignedStudent = plot.assignments.some(
-    (a) => a.studentId === session.user.id
-  );
-
-  if (!isAdmin && !isAssignedStudent) {
-    redirect("/dashboard/monitoring");
+  if (!isActivityPlotStatus(plot.status)) {
+    redirect(`/dashboard/plots/${plot.id}`);
   }
 
   return (

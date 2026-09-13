@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import { growthLogSchema, type GrowthLogFormValues } from "@/lib/validations/growth";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function createGrowthLog(plotId: string, input: GrowthLogFormValues) {
   const session = await requireAuth();
@@ -19,11 +20,10 @@ export async function createGrowthLog(plotId: string, input: GrowthLogFormValues
     select: { status: true },
   });
   if (!plot) return { error: "Plot not found" };
-  if (plot.status === "HARVESTED") {
-    return { error: "This plot is harvested. Unmark it to add growth logs." };
-  }
-  if (plot.status === "ARCHIVED") {
-    return { error: "This plot is archived. Restore it to add growth logs." };
+  if (!isActivityPlotStatus(plot.status)) {
+    return {
+      error: "Growth logs can only be added while a plot is preparing or operational.",
+    };
   }
 
   const parsed = growthLogSchema.safeParse(input);

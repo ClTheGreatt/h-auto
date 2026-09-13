@@ -39,6 +39,18 @@ export const HISTORICAL_PLOT_STATUSES: PlotStatus[] = [...HISTORICAL];
 
 export const ACTIVITY_PLOT_STATUSES: PlotStatus[] = [...SETUP, ...OPERATIONAL];
 
+export function isActivityPlotStatus(status: PlotStatus): boolean {
+  return ACTIVITY_PLOT_STATUSES.includes(status);
+}
+
+export function isOperationalPlotStatus(status: PlotStatus): boolean {
+  return OPERATIONAL_PLOT_STATUSES.includes(status);
+}
+
+export function isHistoricalPlotStatus(status: PlotStatus): boolean {
+  return HISTORICAL_PLOT_STATUSES.includes(status);
+}
+
 // Statuses with no dedicated action and no companion timestamp field to keep
 // in sync — safe to expose as a plain, unconfirmed dropdown on the generic
 // plot edit form (and to enforce server-side there). HARVESTED and ARCHIVED

@@ -4,6 +4,7 @@ import { getMobileUser } from "@/lib/mobile-auth";
 import { uploadToCloudinary } from "@/lib/cloudinary-server";
 import { assertCanAccessPlot } from "@/lib/auth/plot-access";
 import { validateImageFile } from "@/lib/upload-limits";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function POST(
   req: NextRequest,
@@ -42,7 +43,7 @@ export async function POST(
       : null;
     const leafCount = leafCountRaw ? parseInt(leafCountRaw, 10) : null;
 
-    // Get plot's current stage (for stageId) + status (for the harvest guard)
+    // Get plot's current stage (for stageId) + status (for lifecycle policy)
     const plot = await prisma.plot.findUnique({
       where: { id: plotId },
       select: { currentStageId: true, status: true },
@@ -50,15 +51,12 @@ export async function POST(
     if (!plot) {
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
     }
-    if (plot.status === "HARVESTED") {
+    if (!isActivityPlotStatus(plot.status)) {
       return NextResponse.json(
-        { error: "This plot is harvested. Unmark it to add growth logs." },
-        { status: 409 }
-      );
-    }
-    if (plot.status === "ARCHIVED") {
-      return NextResponse.json(
-        { error: "This plot is archived. Restore it to add growth logs." },
+        {
+          error:
+            "Growth logs can only be added while a plot is preparing or operational.",
+        },
         { status: 409 }
       );
     }

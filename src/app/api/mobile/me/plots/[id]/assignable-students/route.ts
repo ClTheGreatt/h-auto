@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 
 // GET /api/mobile/me/plots/[id]/assignable-students — candidates for the
 // "Assign student" picker on this plot. A dedicated endpoint rather than
@@ -9,8 +10,8 @@ import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students
 // directory and must stay admin-only.
 //
 // Authorization mirrors canManageAssignments in
-// src/app/api/mobile/me/plots/[id]/route.ts (ADMIN/SUPER_ADMIN: any plot;
-// FACULTY: only the plot they advise; everyone else: 403) but is
+// src/app/api/mobile/me/plots/[id]/route.ts (ADMIN/SUPER_ADMIN: any activity
+// plot; FACULTY: only an activity plot they advise; everyone else: 403) but is
 // reimplemented inline here rather than reusing assertCanAccessPlot, which
 // also grants a STUDENT_FARMER access to a plot they're actively assigned
 // to — this endpoint must reject STUDENT_FARMER unconditionally. The two
@@ -30,7 +31,7 @@ export async function GET(
   try {
     const plot = await prisma.plot.findUnique({
       where: { id: plotId },
-      select: { id: true, facultyId: true },
+      select: { id: true, facultyId: true, status: true },
     });
     if (!plot) {
       return NextResponse.json({ error: "Plot not found" }, { status: 404 });
@@ -48,6 +49,10 @@ export async function GET(
         { error: "You don't have access to this plot" },
         { status: 403 }
       );
+    }
+
+    if (!isActivityPlotStatus(plot.status)) {
+      return NextResponse.json({ students: [] });
     }
 
     const students = await prisma.user.findMany({

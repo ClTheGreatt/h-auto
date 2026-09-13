@@ -8,6 +8,7 @@ import { deviceSchema, type DeviceFormValues } from "@/lib/validations/device";
 import { hashApiKey } from "@/lib/devices/hash-key";
 import { ADMIN_SETTABLE_DEVICE_STATUSES } from "@/lib/utils/device-status";
 import type { DeviceStatus } from "@prisma/client";
+import { canLinkDeviceToPlot } from "@/lib/devices/plot-eligibility";
 
 function generateApiKey(): string {
   return "h-auto_" + randomBytes(24).toString("hex");
@@ -46,6 +47,22 @@ export async function createDevice(input: DeviceFormValues) {
   });
   if (existingCode) return { error: "Device code already in use" };
 
+  const plot = await prisma.plot.findUnique({
+    where: { id: parsed.data.plotId },
+    select: { status: true },
+  });
+  if (!plot) return { error: "Plot not found" };
+  if (
+    !canLinkDeviceToPlot({
+      plotStatus: plot.status,
+      targetPlotId: parsed.data.plotId,
+    })
+  ) {
+    return {
+      error: "Devices can only be linked to preparing or operational plots.",
+    };
+  }
+
   const plotHasDevice = await prisma.device.findUnique({
     where: { plotId: parsed.data.plotId },
   });
@@ -79,16 +96,34 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
   });
   if (codeConflict) return { error: "Device code already in use" };
 
+  const existing = await prisma.device.findUnique({
+    where: { id },
+    select: { status: true, plotId: true },
+  });
+  if (!existing) return { error: "Device not found" };
+
+  const targetPlot = await prisma.plot.findUnique({
+    where: { id: parsed.data.plotId },
+    select: { status: true },
+  });
+  if (!targetPlot) return { error: "Plot not found" };
+  if (
+    !canLinkDeviceToPlot({
+      plotStatus: targetPlot.status,
+      targetPlotId: parsed.data.plotId,
+      currentPlotId: existing.plotId,
+    })
+  ) {
+    return {
+      error:
+        "Move this device to a preparing or operational plot; another historical plot is not eligible.",
+    };
+  }
+
   const plotConflict = await prisma.device.findFirst({
     where: { plotId: parsed.data.plotId, NOT: { id } },
   });
   if (plotConflict) return { error: "This plot already has another device" };
-
-  const existing = await prisma.device.findUnique({
-    where: { id },
-    select: { status: true },
-  });
-  if (!existing) return { error: "Device not found" };
 
   // A submitted status that isn't a valid transition from the device's
   // CURRENT status (including an absent value, meaning the admin didn't

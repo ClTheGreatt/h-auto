@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { plotSchema, type PlotFormValues } from "@/lib/validations/plot";
 import { FORM_EDITABLE_PLOT_STATUSES } from "@/lib/plots/lifecycle";
+import { applyPlotTransitionEffects } from "@/lib/plots/transition-effects";
 
 function parseDate(v: string | undefined | null): Date | null {
   if (!v || v === "") return null;
@@ -67,23 +68,40 @@ export async function updatePlot(id: string, input: PlotFormValues) {
     nextStatus = data.status;
   }
 
-  await prisma.plot.update({
-    where: { id },
-    data: {
-      name: data.name,
-      location: data.location || null,
-      sizeSqm: data.sizeSqm ?? null,
-      cropId: data.cropId || null,
-      facultyId: data.facultyId || null,
-      currentStageId: data.currentStageId || null,
-      plantingDate: parseDate(data.plantingDate),
-      expectedHarvest: parseDate(data.expectedHarvest),
-      status: nextStatus,
-    },
+  const transitionedAt = new Date();
+  const transitionEffects = await prisma.$transaction(async (tx) => {
+    const effects = await applyPlotTransitionEffects({
+      client: tx,
+      plotId: id,
+      previousStatus: existing.status,
+      nextStatus,
+      transitionedAt,
+    });
+    await tx.plot.update({
+      where: { id },
+      data: {
+        name: data.name,
+        location: data.location || null,
+        sizeSqm: data.sizeSqm ?? null,
+        cropId: data.cropId || null,
+        facultyId: data.facultyId || null,
+        currentStageId: data.currentStageId || null,
+        plantingDate: parseDate(data.plantingDate),
+        expectedHarvest: parseDate(data.expectedHarvest),
+        status: nextStatus,
+      },
+    });
+    return effects;
   });
 
   revalidatePath("/dashboard/plots");
   revalidatePath(`/dashboard/plots/${id}`);
+  if (transitionEffects.completedAssignments) {
+    revalidatePath("/dashboard/assignments");
+  }
+  if (transitionEffects.closedOpenAlerts) {
+    revalidatePath("/dashboard/alerts");
+  }
   return { success: true };
 }
 
@@ -104,21 +122,29 @@ export async function archivePlot(id: string) {
   if (!plot) return { error: "Plot not found" };
   if (plot.status === "ARCHIVED") return { error: "Plot is already archived." };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.plotAssignment.updateMany({
-      where: { plotId: id, status: "ACTIVE" },
-      data: { status: "COMPLETED", endedAt: new Date() },
+  const transitionedAt = new Date();
+  const transitionEffects = await prisma.$transaction(async (tx) => {
+    const effects = await applyPlotTransitionEffects({
+      client: tx,
+      plotId: id,
+      previousStatus: plot.status,
+      nextStatus: "ARCHIVED",
+      transitionedAt,
     });
     await tx.plot.update({
       where: { id },
-      data: { status: "ARCHIVED", archivedAt: new Date() },
+      data: { status: "ARCHIVED", archivedAt: transitionedAt },
     });
+    return effects;
   });
 
   revalidatePath("/dashboard/plots");
   revalidatePath("/dashboard/plots/archived");
   revalidatePath("/dashboard/assignments");
   revalidatePath(`/dashboard/plots/${id}`);
+  if (transitionEffects.closedOpenAlerts) {
+    revalidatePath("/dashboard/alerts");
+  }
   return { success: true };
 }
 
@@ -160,14 +186,31 @@ export async function harvestPlot(id: string) {
     return { error: "Cannot harvest an archived plot." };
   }
 
-  await prisma.plot.update({
-    where: { id },
-    data: { status: "HARVESTED", harvestedAt: new Date() },
+  const transitionedAt = new Date();
+  const transitionEffects = await prisma.$transaction(async (tx) => {
+    const effects = await applyPlotTransitionEffects({
+      client: tx,
+      plotId: id,
+      previousStatus: plot.status,
+      nextStatus: "HARVESTED",
+      transitionedAt,
+    });
+    await tx.plot.update({
+      where: { id },
+      data: { status: "HARVESTED", harvestedAt: transitionedAt },
+    });
+    return effects;
   });
 
   revalidatePath("/dashboard/plots");
   revalidatePath("/dashboard/plots/archived");
   revalidatePath(`/dashboard/plots/${id}`);
+  if (transitionEffects.completedAssignments) {
+    revalidatePath("/dashboard/assignments");
+  }
+  if (transitionEffects.closedOpenAlerts) {
+    revalidatePath("/dashboard/alerts");
+  }
   return { success: true };
 }
 
