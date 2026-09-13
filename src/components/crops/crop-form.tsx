@@ -149,21 +149,26 @@ export function CropForm({
 
   async function onSubmit(values: CropFormValues) {
     setSubmitting(true);
-    const result =
-      mode === "create"
-        ? await createCrop(values)
-        : await updateCrop(cropId!, values);
 
-    setSubmitting(false);
+    try {
+      const result =
+        mode === "create"
+          ? await createCrop(values)
+          : await updateCrop(cropId!, values);
 
-    if (result?.error) {
-      toast.error(result.error);
-      return;
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success(mode === "create" ? "Crop created" : "Crop updated");
+      router.push("/dashboard/crops");
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    toast.success(mode === "create" ? "Crop created" : "Crop updated");
-    router.push("/dashboard/crops");
-    router.refresh();
   }
 
   return (

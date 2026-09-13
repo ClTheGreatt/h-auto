@@ -132,33 +132,37 @@ export function PlotForm({ mode, plotId, crops, faculty, defaultValues }: PlotFo
   async function onSubmit(values: PlotFormValues) {
     setSubmitting(true);
 
-    if (mode === "create") {
-      const result = await createPlot(values);
-      setSubmitting(false);
+    try {
+      if (mode === "create") {
+        const result = await createPlot(values);
+
+        if (result?.error) {
+          toast.error(result.error);
+          return;
+        }
+
+        toast.success("Plot created");
+        router.push(`/dashboard/plots/${result.id}`);
+        router.refresh();
+        return;
+      }
+
+      const result = await updatePlot(plotId!, values);
 
       if (result?.error) {
         toast.error(result.error);
         return;
       }
 
-      toast.success("Plot created");
-      router.push(`/dashboard/plots/${result.id}`);
+      toast.success("Plot updated");
+      router.back();
+      // Refresh so the page we return to shows the updated data
       router.refresh();
-      return;
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    const result = await updatePlot(plotId!, values);
-    setSubmitting(false);
-
-    if (result?.error) {
-      toast.error(result.error);
-      return;
-    }
-
-    toast.success("Plot updated");
-    router.back();
-    // Refresh so the page we return to shows the updated data
-    router.refresh();
   }
 
   return (

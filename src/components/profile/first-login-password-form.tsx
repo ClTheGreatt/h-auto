@@ -55,24 +55,29 @@ export function FirstLoginPasswordForm() {
 
   async function onSubmit(values: ChangePasswordInput) {
     setSubmitting(true);
-    const result = await changePassword(values);
 
-    if (mapServerErrorsToForm(form, result ?? {})) {
+    try {
+      const result = await changePassword(values);
+
+      if (mapServerErrorsToForm(form, result ?? {})) {
+        toast.error(result?.error ?? "Please fix the errors below");
+        return;
+      }
+
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Password changed");
+      await update();
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
       setSubmitting(false);
-      toast.error(result?.error ?? "Please fix the errors below");
-      return;
     }
-
-    if (result?.error) {
-      setSubmitting(false);
-      toast.error(result.error);
-      return;
-    }
-
-    toast.success("Password changed");
-    await update();
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (

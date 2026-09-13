@@ -119,27 +119,32 @@ export function DeviceForm({
 
   async function onSubmit(values: DeviceFormValues) {
     setSubmitting(true);
-    const result =
-      mode === "create"
-        ? await createDevice(values)
-        : await updateDevice(deviceId!, values);
 
-    setSubmitting(false);
+    try {
+      const result =
+        mode === "create"
+          ? await createDevice(values)
+          : await updateDevice(deviceId!, values);
 
-    if (result?.error) {
-      toast.error(result.error);
-      return;
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      if (mode === "create" && result && "apiKey" in result && typeof result.apiKey === "string") {
+        setGeneratedKey(result.apiKey);
+        toast.success("Device registered. Copy the API key below.");
+        return;
+      }
+
+      toast.success(mode === "create" ? "Device created" : "Device updated");
+      router.push("/dashboard/devices");
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-   if (mode === "create" && result && "apiKey" in result && typeof result.apiKey === "string") {
-      setGeneratedKey(result.apiKey);
-      toast.success("Device registered. Copy the API key below.");
-      return;
-    }
-
-    toast.success(mode === "create" ? "Device created" : "Device updated");
-    router.push("/dashboard/devices");
-    router.refresh();
   }
 
   async function copyKey() {

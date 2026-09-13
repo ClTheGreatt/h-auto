@@ -64,17 +64,23 @@ export function GrowthLogForm({
 
   async function onSubmit(values: GrowthLogFormValues) {
     setSubmitting(true);
-    const result = await createGrowthLog(plotId, values);
-    setSubmitting(false);
 
-    if (result?.error) {
-      toast.error(result.error);
-      return;
+    try {
+      const result = await createGrowthLog(plotId, values);
+
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Growth log saved");
+      router.push(`/dashboard/plots/${plotId}`);
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    toast.success("Growth log saved");
-    router.push(`/dashboard/plots/${plotId}`);
-    router.refresh();
   }
 
   return (

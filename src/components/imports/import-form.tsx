@@ -179,22 +179,27 @@ export function ImportForm() {
     }
 
     setPhase("committing");
-    const res = await commitImport(importType, validRows, fileName);
-    setPhase("done");
+    try {
+      const res = await commitImport(importType, validRows, fileName);
+      setPhase("done");
 
-    if ("error" in res) {
-      toast.error(res.error);
+      if ("error" in res) {
+        toast.error(res.error);
+        setPhase("preview");
+        return;
+      }
+
+      setResult(res);
+
+      if (res.success.length > 0) {
+        toast.success(`Imported ${res.success.length} user(s)`);
+      }
+      if (res.failed.length > 0) {
+        toast.warning(`${res.failed.length} row(s) failed`);
+      }
+    } catch {
+      toast.error("Something went wrong. Please try again.");
       setPhase("preview");
-      return;
-    }
-
-    setResult(res);
-
-    if (res.success.length > 0) {
-      toast.success(`Imported ${res.success.length} user(s)`);
-    }
-    if (res.failed.length > 0) {
-      toast.warning(`${res.failed.length} row(s) failed`);
     }
   }
 

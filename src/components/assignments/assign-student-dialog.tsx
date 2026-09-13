@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { UserPlus, MapPinned, Users } from "lucide-react";
@@ -63,14 +63,17 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
   const [selectedPlot, setSelectedPlot] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const studentRequestIdRef = useRef(0);
   const [studentsError, setStudentsError] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function reset() {
+    studentRequestIdRef.current += 1;
     setSelectedPlot("");
     setStudents([]);
+    setLoadingStudents(false);
     setStudentsError(null);
     setSelectedStudent("");
     setNotes("");
@@ -82,19 +85,33 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
   }
 
   async function handlePlotChange(plotId: string) {
+    const requestId = ++studentRequestIdRef.current;
+
     setSelectedPlot(plotId);
     setSelectedStudent("");
     setStudents([]);
     setStudentsError(null);
     setLoadingStudents(true);
-    const result = await getAssignableStudentsForPlot(plotId);
-    setLoadingStudents(false);
 
-    if ("error" in result) {
-      setStudentsError(result.error);
-      return;
+    try {
+      const result = await getAssignableStudentsForPlot(plotId);
+
+      if (requestId !== studentRequestIdRef.current) return;
+
+      if ("error" in result) {
+        setStudentsError(result.error);
+        return;
+      }
+      setStudents(result.students);
+    } catch {
+      if (requestId === studentRequestIdRef.current) {
+        setStudentsError("Something went wrong. Please try again.");
+      }
+    } finally {
+      if (requestId === studentRequestIdRef.current) {
+        setLoadingStudents(false);
+      }
     }
-    setStudents(result.students);
   }
 
   async function handleAssign() {
@@ -103,18 +120,24 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
       return;
     }
     setSubmitting(true);
-    const result = await assignStudent(selectedPlot, selectedStudent, notes);
-    setSubmitting(false);
 
-    if (result?.error) {
-      toast.error(result.error);
-      return;
+    try {
+      const result = await assignStudent(selectedPlot, selectedStudent, notes);
+
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Student assigned");
+      setOpen(false);
+      reset();
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    toast.success("Student assigned");
-    setOpen(false);
-    reset();
-    router.refresh();
   }
 
   return (

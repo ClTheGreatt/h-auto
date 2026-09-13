@@ -50,22 +50,28 @@ export function PasswordChangeForm() {
 
   async function onSubmit(values: ChangePasswordInput) {
     setSubmitting(true);
-    const result = await changePassword(values);
-    setSubmitting(false);
 
-    if (mapServerErrorsToForm(form, result ?? {})) {
-      toast.error(result?.error ?? "Please fix the errors below");
-      return;
+    try {
+      const result = await changePassword(values);
+
+      if (mapServerErrorsToForm(form, result ?? {})) {
+        toast.error(result?.error ?? "Please fix the errors below");
+        return;
+      }
+
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Password changed successfully");
+      await update();
+      form.reset();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    if (result?.error) {
-      toast.error(result.error);
-      return;
-    }
-
-    toast.success("Password changed successfully");
-    await update();
-    form.reset();
   }
 
   return (

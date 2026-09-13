@@ -226,23 +226,55 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
 
-    if (mode === "create") {
-      const result = await createUser(values as CreateUserInput);
-      setSubmitting(false);
+    try {
+      if (mode === "create") {
+        const result = await createUser(values as CreateUserInput);
 
-      // "error" in result narrows first — mapServerErrorsToForm's
-      // ServerResult param has only optional properties, and TypeScript
-      // rejects passing the success branch (`{success,id,tempPassword}`,
-      // sharing zero property names with `{error?,fieldErrors?}`) as a
-      // "weak type" mismatch unless we've already excluded it here.
-      if ("error" in result) {
-        // Try server fieldErrors first (Zod validation that escaped client)
-        if (mapServerErrorsToForm(form, result)) {
-          toast.error(result.error ?? "Please fix the errors below");
+        // "error" in result narrows first — mapServerErrorsToForm's
+        // ServerResult param has only optional properties, and TypeScript
+        // rejects passing the success branch (`{success,id,tempPassword}`,
+        // sharing zero property names with `{error?,fieldErrors?}`) as a
+        // "weak type" mismatch unless we've already excluded it here.
+        if ("error" in result) {
+          // Try server fieldErrors first (Zod validation that escaped client)
+          if (mapServerErrorsToForm(form, result)) {
+            toast.error(result.error ?? "Please fix the errors below");
+            return;
+          }
+
+          // Fall back to keyword mapping for friendly Prisma errors
+          const errorMsg = result.error.toLowerCase();
+          if (errorMsg.includes("email")) {
+            form.setError("email", { message: result.error });
+          } else if (errorMsg.includes("id number")) {
+            form.setError("idNumber", { message: result.error });
+          } else if (errorMsg.includes("phone")) {
+            form.setError("phoneNumber", { message: result.error });
+          }
+          toast.error(result.error);
           return;
         }
 
-        // Fall back to keyword mapping for friendly Prisma errors
+        toast.success("User created");
+        // createUser() now has an explicit return type (CreateUserResult in
+        // src/actions/users.ts) instead of an inferred one, so a plain "in"
+        // check narrows cleanly — no typeof workaround needed anymore.
+        if ("success" in result) {
+          setCreatedUser({ id: result.id, tempPassword: result.tempPassword });
+        }
+        return;
+      }
+
+      const result = await updateUser(userId!, values as UpdateUserInput);
+
+      // Try server fieldErrors first (Zod validation that escaped client)
+      if (mapServerErrorsToForm(form, result ?? {})) {
+        toast.error(result?.error ?? "Please fix the errors below");
+        return;
+      }
+
+      // Fall back to keyword mapping for friendly Prisma errors
+      if (result?.error) {
         const errorMsg = result.error.toLowerCase();
         if (errorMsg.includes("email")) {
           form.setError("email", { message: result.error });
@@ -255,43 +287,15 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
         return;
       }
 
-      toast.success("User created");
-      // createUser() now has an explicit return type (CreateUserResult in
-      // src/actions/users.ts) instead of an inferred one, so a plain "in"
-      // check narrows cleanly — no typeof workaround needed anymore.
-      if ("success" in result) {
-        setCreatedUser({ id: result.id, tempPassword: result.tempPassword });
-      }
-      return;
+      toast.success("User updated");
+      router.back();
+      // Refresh so the page we return to shows the updated data
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    const result = await updateUser(userId!, values as UpdateUserInput);
-    setSubmitting(false);
-
-    // Try server fieldErrors first (Zod validation that escaped client)
-    if (mapServerErrorsToForm(form, result ?? {})) {
-      toast.error(result?.error ?? "Please fix the errors below");
-      return;
-    }
-
-    // Fall back to keyword mapping for friendly Prisma errors
-    if (result?.error) {
-      const errorMsg = result.error.toLowerCase();
-      if (errorMsg.includes("email")) {
-        form.setError("email", { message: result.error });
-      } else if (errorMsg.includes("id number")) {
-        form.setError("idNumber", { message: result.error });
-      } else if (errorMsg.includes("phone")) {
-        form.setError("phoneNumber", { message: result.error });
-      }
-      toast.error(result.error);
-      return;
-    }
-
-    toast.success("User updated");
-    router.back();
-    // Refresh so the page we return to shows the updated data
-    router.refresh();
   }
 
   // Preserves the navigation createUser's success branch used to perform

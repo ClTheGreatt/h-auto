@@ -102,19 +102,25 @@ export function PlotAssignments({
       return;
     }
     setSubmitting(true);
-    const result = await assignStudent(plotId, selectedStudent, notes);
-    setSubmitting(false);
 
-    if (result?.error) {
-      toast.error(result.error);
-      return;
+    try {
+      const result = await assignStudent(plotId, selectedStudent, notes);
+
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Student assigned");
+      setDialogOpen(false);
+      setSelectedStudent("");
+      setNotes("");
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    toast.success("Student assigned");
-    setDialogOpen(false);
-    setSelectedStudent("");
-    setNotes("");
-    router.refresh();
   }
 
   return (
