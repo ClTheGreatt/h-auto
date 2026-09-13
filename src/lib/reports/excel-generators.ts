@@ -89,9 +89,9 @@ export async function generateSensorReadingsExcel(
   const meta = [
     `Time range: ${rangeLabel}`,
     `Plot filter: ${plotName ?? "All plots"}`,
-    `Total readings: ${data.length}`,
+    `Included readings: ${data.length}`,
     ...(data.truncated
-      ? ["Showing only the most recent 5,000 records."]
+      ? ["Most recent 5,000 records shown; additional matching records omitted."]
       : []),
     `Generated: ${formatDateTime(new Date())}`,
   ];

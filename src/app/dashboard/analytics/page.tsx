@@ -289,7 +289,7 @@ export default async function AnalyticsPage({
     totalReadings,
     alerts,
     totalLogs,
-    allReadings,
+    latestReadings,
     observationLogs,
     earliestReading,
     earliestLog,
@@ -312,7 +312,7 @@ export default async function AnalyticsPage({
     }),
     prisma.sensorReading.findMany({
       where: { ...readingWindow, plot: combinedPlotFilter },
-      orderBy: { recordedAt: "asc" },
+      orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
       take: 2000,
       select: {
         recordedAt: true,
@@ -347,6 +347,8 @@ export default async function AnalyticsPage({
       select: { createdAt: true },
     }),
   ]);
+
+  const allReadings = latestReadings.reverse();
 
   const earliestDates = [
     earliestReading?.recordedAt,
@@ -409,18 +411,19 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
   // with zero readings in the selected window is "no data" whether that's
   // because it has no device, hasn't reported yet, or simply falls outside
   // the window, never because its optimal-percent happens to compute to 0.
-  const plotHealth: Record<string, number> = {};
+  const plotHealth: Record<string, number | null> = {};
   const plotHasReadingsInRange: Record<string, boolean> = {};
   for (const plot of plots) {
     const readings = await prisma.sensorReading.findMany({
       where: { plotId: plot.id, ...readingWindow },
       take: 200,
-      orderBy: { recordedAt: "desc" },
+      orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
     });
     plotHasReadingsInRange[plot.id] = readings.length > 0;
-    plotHealth[plot.id] = plot.currentStage
-      ? calculateOptimalPercent(readings, plot.currentStage)
-      : 0;
+    plotHealth[plot.id] = calculateOptimalPercent(
+      readings,
+      plot.currentStage
+    );
   }
 
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
@@ -487,6 +490,14 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
           accent="green"
         />
       </div>
+
+      {totalReadings > allReadings.length && (
+        <p className="text-xs text-muted-foreground">
+          Sensor charts use the most recent{" "}
+          {allReadings.length.toLocaleString("en-US")} of{" "}
+          {totalReadings.toLocaleString("en-US")} readings.
+        </p>
+      )}
 
       <Card>
         <CardHeader>
@@ -636,6 +647,10 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
               "Click a plot to filter this entire page to its data."
             )}
           </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Plot health is based on up to the 200 most recent readings per plot
+            within the selected range.
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           {plots.length === 0 ? (
@@ -643,12 +658,16 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
           ) : (
             <div className="divide-y">
               {plots.map((plot) => {
-                const health = plotHealth[plot.id] ?? 0;
+                const health = plotHealth[plot.id] ?? null;
                 const hasReadings = plotHasReadingsInRange[plot.id] ?? false;
-                // A plot with zero readings in this window has nothing to
-                // grade — showing it as a red "0% optimal" would read as
-                // "consistently out of range," not "no data yet."
-                const healthColor = !hasReadings
+                const healthLabel = !hasReadings
+                  ? "No data"
+                  : !plot.currentStage
+                  ? "No stage"
+                  : health === null
+                  ? "N/A"
+                  : `${Math.round(health)}% optimal`;
+                const healthColor = health === null
                   ? "text-muted-foreground bg-muted"
                   : health >= 80
                   ? "text-green-700 bg-green-100"
@@ -707,7 +726,7 @@ const sensorTrends = aggregateSensorReadings(allReadings, bucketMs);
                         variant="secondary"
                         className={"font-mono " + healthColor}
                       >
-                        {hasReadings ? `${Math.round(health)}% optimal` : "No data"}
+                        {healthLabel}
                       </Badge>
                     </div>
                   </Link>

@@ -46,7 +46,7 @@ export default async function ReportsPage() {
       type: "sensor-readings",
       title: "Sensor Readings",
       description:
-        "All sensor data (soil moisture, temperature, humidity, light, NPK) collected from IoT devices within the selected range.",
+        "Up to the 5,000 most recent sensor readings within the selected range, including soil moisture, temperature, humidity, light, and NPK.",
       icon: "activity",
       iconColor: "bg-blue-100 text-blue-700",
       hasPlotFilter: true,

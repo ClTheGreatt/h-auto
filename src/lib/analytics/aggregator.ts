@@ -12,13 +12,13 @@ const SENSOR_CHECKS = [
 
 /**
  * Calculate the percentage of sensor values that fall within optimal range
- * for the given stage's thresholds.
+ * for the given stage's thresholds, or null when evaluation is unavailable.
  */
 export function calculateOptimalPercent(
   readings: SensorReading[],
   stage: CropStage | null
-): number {
-  if (readings.length === 0 || !stage) return 0;
+): number | null {
+  if (readings.length === 0 || !stage) return null;
 
   let totalChecks = 0;
   let optimalChecks = 0;
@@ -38,19 +38,24 @@ export function calculateOptimalPercent(
     }
   }
 
-  return totalChecks === 0 ? 0 : (optimalChecks / totalChecks) * 100;
+  return totalChecks === 0 ? null : (optimalChecks / totalChecks) * 100;
 }
 
 /**
  * Reduce a long list of readings to a manageable number of points
- * by sampling evenly across the array.
+ * by sampling evenly while preserving chronological endpoints.
  */
 export function downsample<T>(arr: T[], maxPoints: number): T[] {
-  if (arr.length <= maxPoints) return arr;
-  const step = arr.length / maxPoints;
+  const limit = Math.floor(maxPoints);
+  if (limit <= 0) return [];
+  if (arr.length <= limit) return arr;
+  if (limit === 1) return [arr[arr.length - 1]];
+
   const result: T[] = [];
-  for (let i = 0; i < maxPoints; i++) {
-    result.push(arr[Math.floor(i * step)]);
+  const lastIndex = arr.length - 1;
+  for (let i = 0; i < limit; i++) {
+    const index = Math.round((i * lastIndex) / (limit - 1));
+    result.push(arr[index]);
   }
   return result;
 }

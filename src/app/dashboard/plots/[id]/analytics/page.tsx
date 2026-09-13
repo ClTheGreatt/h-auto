@@ -65,10 +65,11 @@ export default async function PlotAnalyticsPage({
     ? { plotId: plot.id, recordedAt: { gte: since } }
     : { plotId: plot.id };
 
-  const [rawReadings, growthLogs, alerts] = await Promise.all([
+  const [totalReadings, latestReadings, growthLogs, alerts] = await Promise.all([
+    prisma.sensorReading.count({ where: readingsWhere }),
     prisma.sensorReading.findMany({
       where: readingsWhere,
-      orderBy: { recordedAt: "asc" },
+      orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
       take: 1000,
     }),
     prisma.growthLog.findMany({
@@ -85,11 +86,29 @@ export default async function PlotAnalyticsPage({
     }),
   ]);
 
+  const rawReadings = latestReadings.reverse();
+
   // Downsample for chart performance
   const readings = downsample(rawReadings, 200);
 
   // Compute health %
   const healthPercent = calculateOptimalPercent(rawReadings, plot.currentStage);
+  const healthLabel =
+    rawReadings.length === 0
+      ? "No data"
+      : !plot.currentStage
+      ? "No stage"
+      : healthPercent === null
+      ? "N/A"
+      : `${Math.round(healthPercent)}%`;
+  const healthSublabel =
+    rawReadings.length === 0
+      ? "no readings in this range"
+      : !plot.currentStage
+      ? "stage required for evaluation"
+      : healthPercent === null
+      ? "no evaluable sensor values"
+      : "readings in optimal range";
 
   // Alert stats
   const openAlerts = alerts.filter((a) => !a.resolved).length;
@@ -157,7 +176,7 @@ export default async function PlotAnalyticsPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Readings"
-          value={rawReadings.length}
+          value={totalReadings}
           icon={Activity}
           accent="blue"
         />
@@ -176,14 +195,29 @@ export default async function PlotAnalyticsPage({
         />
         <StatCard
           label="Health"
-          value={`${Math.round(healthPercent)}%`}
+          value={healthLabel}
           icon={Leaf}
-          sublabel="readings in optimal range"
+          sublabel={healthSublabel}
           accent={
-            healthPercent >= 80 ? "green" : healthPercent >= 50 ? "amber" : "red"
+            healthPercent === null
+              ? "gray"
+              : healthPercent >= 80
+              ? "green"
+              : healthPercent >= 50
+              ? "amber"
+              : "red"
           }
         />
       </div>
+
+      {totalReadings > rawReadings.length && (
+        <p className="text-xs text-muted-foreground">
+          Charts and health use the most recent{" "}
+          {rawReadings.length.toLocaleString("en-US")} of{" "}
+          {totalReadings.toLocaleString("en-US")} readings. Charts display up
+          to {readings.length.toLocaleString("en-US")} sampled points.
+        </p>
+      )}
 
       {/* Health gauge + Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -192,7 +226,18 @@ export default async function PlotAnalyticsPage({
             <CardTitle className="text-base">Plot health</CardTitle>
           </CardHeader>
           <CardContent>
-            <PlotHealthGauge optimalPercent={healthPercent} />
+            {healthPercent === null ? (
+              <div className="h-48 flex flex-col items-center justify-center text-center">
+                <p className="text-2xl font-semibold text-muted-foreground">
+                  {healthLabel}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {healthSublabel}
+                </p>
+              </div>
+            ) : (
+              <PlotHealthGauge optimalPercent={healthPercent} />
+            )}
           </CardContent>
         </Card>
 

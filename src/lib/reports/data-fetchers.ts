@@ -71,7 +71,7 @@ export function buildStudentActivityGrowthLogWhere(
 export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
   const since = getDateFromRange(filters.range);
 
-  const readings = await prisma.sensorReading.findMany({
+  const fetchedReadings = await prisma.sensorReading.findMany({
     where: {
       ...(since ? { recordedAt: { gte: since } } : {}),
       plot: buildReportPlotWhere(
@@ -80,13 +80,16 @@ export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
         filters.plotId !== undefined ? { id: filters.plotId } : {}
       ),
     },
-    orderBy: { recordedAt: "desc" },
-    take: 5000,
+    orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
+    take: 5001,
     include: {
       plot: { select: { name: true, location: true } },
       device: { select: { deviceCode: true } },
     },
   });
+
+  const truncated = fetchedReadings.length > 5000;
+  const readings = fetchedReadings.slice(0, 5000);
 
   const rows = readings.map((r) => ({
     recordedAt: r.recordedAt,
@@ -102,11 +105,7 @@ export async function fetchSensorReadingsData(filters: ScopedReportFilters) {
     potassium: r.potassium,
   }));
 
-  // take: 5000 above silently truncates a high-volume "All time" query —
-  // surface that instead of hiding it. Hitting the cap exactly (rather than
-  // there being exactly 5000 matching rows) is the only false positive, and
-  // is an accepted tradeoff of a length-based check.
-  return Object.assign(rows, { truncated: readings.length === 5000 });
+  return Object.assign(rows, { truncated });
 }
 
 export async function fetchPlotPerformanceData(filters: ScopedReportFilters) {
