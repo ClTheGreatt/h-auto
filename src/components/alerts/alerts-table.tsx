@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import {
-  formatDate,
   formatDateTime,
   formatOpenAlertAge,
 } from "@/lib/format-date";
@@ -240,7 +239,7 @@ export function AlertsTable({
                             </div>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               {alert.resolved
-                                ? `Opened ${formatDate(alert.createdAt)}`
+                                ? `Opened · ${formatDateTime(alert.createdAt)}`
                                 : formatOpenAlertAge(alert.createdAt)}
                             </span>
                             {alert.resolved && (

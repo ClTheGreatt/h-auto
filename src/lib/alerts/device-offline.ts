@@ -60,8 +60,10 @@ type CreateOfflineAlertInput = {
   suggestion: AlertSuggestion | null;
 };
 
-type RefreshOfflineAlertInput = CreateOfflineAlertInput & {
+type RefreshOfflineAlertInput = {
   alertId: string;
+  plotId: string;
+  severity: AlertSeverity;
 };
 
 type SendOfflineNotificationInput = {
@@ -128,6 +130,26 @@ export type ResolveOfflineAlertsUpdate = {
   };
 };
 
+export type RecordAuthenticatedHeartbeatInput = {
+  deviceId: string;
+  plotId: string;
+  heartbeatAt: Date;
+};
+
+export type RecordAuthenticatedHeartbeatClient = {
+  device: {
+    update(input: {
+      where: { id: string };
+      data: { status: "ONLINE"; lastSeenAt: Date };
+    }): Promise<unknown>;
+  };
+  alert: {
+    updateMany(
+      update: ResolveOfflineAlertsUpdate
+    ): Promise<{ count: number }>;
+  };
+};
+
 export function getOfflinePolicyDecision({
   now,
   lastSeenAt,
@@ -190,6 +212,38 @@ export async function resolveDeviceOfflineForHeartbeat({
   return result.count;
 }
 
+export async function resolveDeviceOfflineForPowerOff({
+  plotId,
+  resolvedAt,
+  updateMany,
+}: ResolveOfflineAlertsInput & {
+  updateMany(
+    update: ResolveOfflineAlertsUpdate
+  ): Promise<{ count: number }>;
+}): Promise<number> {
+  return resolveDeviceOfflineForHeartbeat({ plotId, resolvedAt, updateMany });
+}
+
+export async function recordAuthenticatedDeviceHeartbeat({
+  deviceId,
+  plotId,
+  heartbeatAt,
+  client,
+}: RecordAuthenticatedHeartbeatInput & {
+  client: RecordAuthenticatedHeartbeatClient;
+}): Promise<number> {
+  await client.device.update({
+    where: { id: deviceId },
+    data: { status: "ONLINE", lastSeenAt: heartbeatAt },
+  });
+
+  return resolveDeviceOfflineForHeartbeat({
+    plotId,
+    resolvedAt: heartbeatAt,
+    updateMany: (update) => client.alert.updateMany(update),
+  });
+}
+
 export async function scanOfflineDevices({
   now,
   sendNotifications = true,
@@ -240,7 +294,7 @@ export async function scanOfflineDevices({
         // Suggestions are optional; alert creation must continue without one.
       }
 
-      const message = buildOfflineMessage(device, elapsedMs);
+      const message = buildOfflineMessage(device);
       const result = await deps.runInTransaction((transaction) =>
         processOfflineIncident({
           transaction,
@@ -372,11 +426,7 @@ async function processOfflineIncident({
     }
   }
 
-  const needsRefresh =
-    alert.severity !== severity ||
-    alert.message !== message ||
-    alert.suggestionTitle !== (suggestion?.title ?? null) ||
-    !sameSteps(alert.suggestionSteps, suggestion?.steps ?? []);
+  const needsRefresh = alert.severity !== severity;
 
   if (!needsRefresh) {
     return {
@@ -395,8 +445,6 @@ async function processOfflineIncident({
     alertId: alert.id,
     plotId: device.plotId,
     severity,
-    message,
-    suggestion,
   });
 
   return {
@@ -409,38 +457,8 @@ async function processOfflineIncident({
   };
 }
 
-function buildOfflineMessage(
-  device: OfflineDeviceCandidate,
-  elapsedMs: number
-): string {
-  return `Device ${device.deviceCode} has not reported readings for ${formatElapsed(
-    elapsedMs
-  )}. Check that the device has power, is within WiFi range, and the WiFi network is 2.4GHz.`;
-}
-
-function formatElapsed(ms: number): string {
-  const minutes = Math.round(ms / (60 * 1000));
-  if (minutes < 60) {
-    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-  }
-  // Floor to a tenth of an hour rather than rounding to a whole one. This
-  // string goes into the SMS body and onto the dashboard, so it must never
-  // claim a device has been silent longer than it actually has — rounding
-  // turned 90 minutes into "2 hours". Flooring can understate by up to six
-  // minutes, which is the safe direction for a monitoring system.
-  const tenthsOfAnHour = Math.floor(minutes / 6);
-  const hours = tenthsOfAnHour / 10;
-  // A whole number drops the decimal ("2 hours", not "2.0 hours"); only a
-  // fractional value carries one decimal place ("1.5 hours").
-  const value = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
-  return `${value} hour${hours === 1 ? "" : "s"}`;
-}
-
-function sameSteps(left: string[], right: string[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((step, index) => step === right[index])
-  );
+function buildOfflineMessage(device: OfflineDeviceCandidate): string {
+  return `Device ${device.deviceCode} has not reported for at least 1 hour. Check that the device has power, is within WiFi range, and the WiFi network is 2.4GHz.`;
 }
 
 function getErrorCode(error: unknown): string {
@@ -566,8 +584,6 @@ async function createProductionDependencies(): Promise<DeviceOfflineScanDependen
             alertId,
             plotId,
             severity,
-            message,
-            suggestion,
           }) => {
             const result = await client.alert.updateMany({
               where: {
@@ -578,9 +594,6 @@ async function createProductionDependencies(): Promise<DeviceOfflineScanDependen
               },
               data: {
                 severity,
-                message,
-                suggestionTitle: suggestion?.title ?? null,
-                suggestionSteps: suggestion?.steps ?? [],
               },
             });
             return result.count;

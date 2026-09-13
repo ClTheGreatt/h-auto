@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DeviceStatus, PlotStatus } from "@prisma/client";
+import { NextRequest } from "next/server";
+import { POST as ingestSensorReading } from "@/app/api/sensors/ingest/route";
+import { getPrisma } from "@/lib/prisma";
 import {
   getOfflinePolicyDecision,
+  recordAuthenticatedDeviceHeartbeat,
   resolveDeviceOfflineForHeartbeat,
+  resolveDeviceOfflineForPowerOff,
   scanOfflineDevices,
   type DeviceOfflineIncidentTransaction,
   type DeviceOfflineScanDependencies,
@@ -26,7 +31,7 @@ function candidate(
     deviceCode: "DEVICE-001",
     plotId: "plot-1",
     status: "ONLINE",
-    lastSeenAt: ago(30 * 60 * 1000),
+    lastSeenAt: ago(60 * 60 * 1000),
     ...deviceOverrides,
     plot: {
       name: plotOverrides?.name ?? "Plot 1",
@@ -184,9 +189,6 @@ function createFakeDependencies({
           if (!state.openAlert || state.openAlert.resolved) return 0;
           state.refreshCalls++;
           state.openAlert.severity = input.severity;
-          state.openAlert.message = input.message;
-          state.openAlert.suggestionTitle = input.suggestion?.title ?? null;
-          state.openAlert.suggestionSteps = input.suggestion?.steps ?? [];
           return 1;
         },
       };
@@ -236,9 +238,9 @@ test("offline policy uses the approved time boundaries", () => {
   const cases = [
     { elapsedMs: 14 * 60 * 1000 + 59 * 1000, eligible: false },
     { elapsedMs: 15 * 60 * 1000, eligible: false },
-    { elapsedMs: 29 * 60 * 1000 + 59 * 1000, eligible: false },
+    { elapsedMs: 59 * 60 * 1000 + 59 * 1000, eligible: false },
     {
-      elapsedMs: 30 * 60 * 1000,
+      elapsedMs: 60 * 60 * 1000,
       eligible: true,
       severity: "WARNING",
     },
@@ -292,7 +294,7 @@ test("null timestamps and excluded plot/device states are skipped", () => {
     assert.equal(
       getOfflinePolicyDecision({
         now: NOW,
-        lastSeenAt: ago(31 * 60 * 1000),
+        lastSeenAt: ago(61 * 60 * 1000),
         deviceStatus: "ONLINE",
         plotStatus,
       }).eligible,
@@ -304,7 +306,7 @@ test("null timestamps and excluded plot/device states are skipped", () => {
     assert.equal(
       getOfflinePolicyDecision({
         now: NOW,
-        lastSeenAt: ago(31 * 60 * 1000),
+        lastSeenAt: ago(61 * 60 * 1000),
         deviceStatus,
         plotStatus: "PLANTED",
       }).eligible,
@@ -322,13 +324,40 @@ test("all operational plot states remain eligible", () => {
     assert.equal(
       getOfflinePolicyDecision({
         now: NOW,
-        lastSeenAt: ago(30 * 60 * 1000),
+        lastSeenAt: ago(60 * 60 * 1000),
         deviceStatus: "OFFLINE",
         plotStatus,
       }).eligible,
       true
     );
   }
+});
+
+test("an operational device at exactly 60 minutes creates an incident", async () => {
+  const { dependencies, state } = createFakeDependencies({
+    devices: [candidate({ lastSeenAt: ago(60 * 60 * 1000) })],
+  });
+
+  const summary = await scanOfflineDevices({ now: NOW, dependencies });
+
+  assert.equal(summary.createdAlerts, 1);
+  assert.equal(state.openAlert?.resolved, false);
+});
+
+test("a powered-off device cannot create a new incident", async () => {
+  const { dependencies, state } = createFakeDependencies({
+    devices: [
+      candidate({
+        status: "MAINTENANCE",
+        lastSeenAt: ago(61 * 60 * 1000),
+      }),
+    ],
+  });
+
+  const summary = await scanOfflineDevices({ now: NOW, dependencies });
+
+  assert.equal(summary.createdAlerts, 0);
+  assert.equal(state.createCalls, 0);
 });
 
 test("a zero-row conditional update skips alert creation", async () => {
@@ -381,6 +410,29 @@ test("a new incident notifies once and repeated scans do not resend", async () =
   assert.deepEqual(state.notificationCommitCounts, [1]);
 });
 
+test("repeated scans preserve the incident message and suggestions", async () => {
+  const { dependencies, state } = createFakeDependencies();
+
+  await scanOfflineDevices({ now: NOW, dependencies });
+  const originalMessage = state.openAlert?.message;
+  const originalSuggestionTitle = state.openAlert?.suggestionTitle;
+  const originalSuggestionSteps = state.openAlert?.suggestionSteps;
+
+  await scanOfflineDevices({
+    now: new Date(NOW.getTime() + 45 * 60 * 1000),
+    dependencies,
+  });
+
+  assert.equal(
+    originalMessage,
+    "Device DEVICE-001 has not reported for at least 1 hour. Check that the device has power, is within WiFi range, and the WiFi network is 2.4GHz."
+  );
+  assert.equal(state.openAlert?.message, originalMessage);
+  assert.equal(state.openAlert?.suggestionTitle, originalSuggestionTitle);
+  assert.deepEqual(state.openAlert?.suggestionSteps, originalSuggestionSteps);
+  assert.equal(state.refreshCalls, 0);
+});
+
 test("a failed transaction rolls back and sends no notification", async () => {
   const { dependencies, state } = createFakeDependencies();
   state.commitFailureDeviceIds.add("device-1");
@@ -400,7 +452,11 @@ test("a failed transaction rolls back and sends no notification", async () => {
 
 test("an existing Warning escalates after two hours without changing createdAt", async () => {
   const createdAt = new Date("2026-07-30T08:00:00.000Z");
-  const existing = alertRecord({ createdAt });
+  const existing = alertRecord({
+    createdAt,
+    suggestionTitle: "Original suggestion",
+    suggestionSteps: ["Original step"],
+  });
   const oldDevice = candidate({
     lastSeenAt: ago(121 * 60 * 1000),
   });
@@ -416,6 +472,9 @@ test("an existing Warning escalates after two hours without changing createdAt",
   assert.equal(summary.notificationAttempts, 0);
   assert.equal(state.notifications, 0);
   assert.equal(state.openAlert?.severity, "CRITICAL");
+  assert.equal(state.openAlert?.message, "Original message");
+  assert.equal(state.openAlert?.suggestionTitle, "Original suggestion");
+  assert.deepEqual(state.openAlert?.suggestionSteps, ["Original step"]);
   assert.equal(state.openAlert?.createdAt.getTime(), createdAt.getTime());
 });
 
@@ -512,6 +571,181 @@ test("heartbeat recovery is synchronous and idempotent", async () => {
   assert.equal(state.resolvedAt?.getTime(), NOW.getTime());
 });
 
+test("powering off resolves only the open DEVICE_OFFLINE alert", async () => {
+  const alerts = [
+    {
+      plotId: "plot-1",
+      type: "DEVICE_OFFLINE",
+      resolved: false,
+      resolvedAt: null as Date | null,
+    },
+    {
+      plotId: "plot-1",
+      type: "LOW_TEMPERATURE",
+      resolved: false,
+      resolvedAt: null as Date | null,
+    },
+    {
+      plotId: "plot-2",
+      type: "DEVICE_OFFLINE",
+      resolved: false,
+      resolvedAt: null as Date | null,
+    },
+  ];
+
+  const resolved = await resolveDeviceOfflineForPowerOff({
+    plotId: "plot-1",
+    resolvedAt: NOW,
+    updateMany: async ({ where, data }) => {
+      let count = 0;
+      for (const alert of alerts) {
+        if (
+          alert.plotId === where.plotId &&
+          alert.type === where.type &&
+          alert.resolved === where.resolved
+        ) {
+          alert.resolved = data.resolved;
+          alert.resolvedAt = data.resolvedAt;
+          count++;
+        }
+      }
+      return { count };
+    },
+  });
+
+  assert.equal(resolved, 1);
+  assert.equal(alerts[0].resolved, true);
+  assert.equal(alerts[0].resolvedAt?.getTime(), NOW.getTime());
+  assert.equal(alerts[1].resolved, false);
+  assert.equal(alerts[1].resolvedAt, null);
+  assert.equal(alerts[2].resolved, false);
+  assert.equal(alerts[2].resolvedAt, null);
+});
+
+test("authenticated heartbeat uses one instant for liveness and recovery", async () => {
+  const heartbeatState: {
+    lastSeenAt: Date | null;
+    resolvedAt: Date | null;
+  } = { lastSeenAt: null, resolvedAt: null };
+
+  const resolved = await recordAuthenticatedDeviceHeartbeat({
+    deviceId: "device-1",
+    plotId: "plot-1",
+    heartbeatAt: NOW,
+    client: {
+      device: {
+        update: async ({ data }) => {
+          assert.equal(data.status, "ONLINE");
+          heartbeatState.lastSeenAt = data.lastSeenAt;
+        },
+      },
+      alert: {
+        updateMany: async ({ data }) => {
+          heartbeatState.resolvedAt = data.resolvedAt;
+          return { count: 1 };
+        },
+      },
+    },
+  });
+
+  assert.equal(resolved, 1);
+  assert.equal(heartbeatState.lastSeenAt, NOW);
+  assert.equal(heartbeatState.resolvedAt, NOW);
+});
+
+test("authenticated malformed payload recovers liveness without storing a reading", async () => {
+  const productionClient = getPrisma();
+  const originalDeviceFindUnique = productionClient.device.findUnique;
+  const originalPlotFindUnique = productionClient.plot.findUnique;
+  const originalTransaction = productionClient.$transaction;
+
+  const heartbeatState: {
+    lastSeenAt: Date | null;
+    resolvedAt: Date | null;
+  } = { lastSeenAt: null, resolvedAt: null };
+  let storedReadings = 0;
+
+  const transactionClient = {
+    device: {
+      update: async ({ data }: { data: { status: "ONLINE"; lastSeenAt: Date } }) => {
+        assert.equal(data.status, "ONLINE");
+        heartbeatState.lastSeenAt = data.lastSeenAt;
+        return {};
+      },
+    },
+    alert: {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { type: "DEVICE_OFFLINE"; resolved: false };
+        data: { resolved: true; resolvedAt: Date };
+      }) => {
+        assert.equal(where.type, "DEVICE_OFFLINE");
+        assert.equal(where.resolved, false);
+        heartbeatState.resolvedAt = data.resolvedAt;
+        return { count: 1 };
+      },
+    },
+    sensorReading: {
+      create: async () => {
+        storedReadings++;
+        return { id: "reading-1" };
+      },
+    },
+  };
+
+  Object.defineProperty(productionClient.device, "findUnique", {
+    configurable: true,
+    value: async () => ({
+      id: "device-1",
+      plotId: "plot-1",
+      status: "OFFLINE",
+    }),
+  });
+  Object.defineProperty(productionClient.plot, "findUnique", {
+    configurable: true,
+    value: async () => ({ status: "PLANTED" }),
+  });
+  Object.defineProperty(productionClient, "$transaction", {
+    configurable: true,
+    value: async (
+      operation: (client: typeof transactionClient) => Promise<unknown>
+    ) => operation(transactionClient),
+  });
+
+  try {
+    const response = await ingestSensorReading(
+      new NextRequest("http://localhost/api/sensors/ingest", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": "test-api-key",
+        },
+        body: "{}",
+      })
+    );
+
+    assert.equal(response.status, 400);
+    assert.ok(heartbeatState.lastSeenAt instanceof Date);
+    assert.equal(heartbeatState.resolvedAt, heartbeatState.lastSeenAt);
+    assert.equal(storedReadings, 0);
+  } finally {
+    Object.defineProperty(productionClient.device, "findUnique", {
+      configurable: true,
+      value: originalDeviceFindUnique,
+    });
+    Object.defineProperty(productionClient.plot, "findUnique", {
+      configurable: true,
+      value: originalPlotFindUnique,
+    });
+    Object.defineProperty(productionClient, "$transaction", {
+      configurable: true,
+      value: originalTransaction,
+    });
+  }
+});
+
 test("a later outage creates a new incident only after confirmed recovery", async () => {
   const recoveryAt = new Date("2026-07-30T11:00:00.000Z");
   const previous = alertRecord();
@@ -536,7 +770,7 @@ test("a later outage creates a new incident only after confirmed recovery", asyn
     },
   });
 
-  const later = new Date(recoveryAt.getTime() + 31 * 60 * 1000);
+  const later = new Date(recoveryAt.getTime() + 61 * 60 * 1000);
   const summary = await scanOfflineDevices({
     now: later,
     dependencies,

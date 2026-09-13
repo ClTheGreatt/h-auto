@@ -9,6 +9,7 @@ import { hashApiKey } from "@/lib/devices/hash-key";
 import { ADMIN_SETTABLE_DEVICE_STATUSES } from "@/lib/utils/device-status";
 import type { DeviceStatus } from "@prisma/client";
 import { canLinkDeviceToPlot } from "@/lib/devices/plot-eligibility";
+import { resolveDeviceOfflineForPowerOff } from "@/lib/alerts/device-offline";
 
 function generateApiKey(): string {
   return "h-auto_" + randomBytes(24).toString("hex");
@@ -137,17 +138,34 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
     nextStatus = parsed.data.status;
   }
 
-  await prisma.device.update({
-    where: { id },
-    data: {
-      deviceCode: parsed.data.deviceCode,
-      plotId: parsed.data.plotId,
-      firmwareVersion: parsed.data.firmwareVersion || null,
-      status: nextStatus,
-    },
+  const statusChangedToPoweredOff =
+    existing.status !== "MAINTENANCE" && nextStatus === "MAINTENANCE";
+  const updatedAt = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.device.update({
+      where: { id },
+      data: {
+        deviceCode: parsed.data.deviceCode,
+        plotId: parsed.data.plotId,
+        firmwareVersion: parsed.data.firmwareVersion || null,
+        status: nextStatus,
+      },
+    });
+
+    if (statusChangedToPoweredOff) {
+      await resolveDeviceOfflineForPowerOff({
+        plotId: existing.plotId,
+        resolvedAt: updatedAt,
+        updateMany: (update) => tx.alert.updateMany(update),
+      });
+    }
   });
 
   revalidatePath("/dashboard/devices");
+  if (statusChangedToPoweredOff) {
+    revalidatePath("/dashboard/alerts");
+  }
   return { success: true };
 }
 

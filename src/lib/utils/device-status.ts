@@ -31,7 +31,7 @@ export const ADMIN_SETTABLE_DEVICE_STATUSES: DeviceStatus[] = ["MAINTENANCE"];
 
 export const EXPECTED_REPORTING_INTERVAL_MS = 5 * 60 * 1000;
 export const DEVICE_STALE_THRESHOLD_MS = 15 * 60 * 1000;
-export const DEVICE_OFFLINE_THRESHOLD_MS = 30 * 60 * 1000;
+export const DEVICE_OFFLINE_THRESHOLD_MS = 60 * 60 * 1000;
 export const ACTIVE_MONITORING_PLOT_STATUSES: PlotStatus[] = [
   ...OPERATIONAL_PLOT_STATUSES,
 ];
@@ -76,7 +76,7 @@ export function getDeviceFreshness(
 }
 
 /**
- * Compatibility helper: stale devices remain online until the 30-minute
+ * Compatibility helper: stale devices remain online until the 60-minute
  * offline boundary, matching the existing mobile `deviceOnline` contract.
  */
 export function isDeviceOnline(

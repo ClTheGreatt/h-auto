@@ -2,7 +2,7 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sensorReadingSchema } from "@/lib/validations/device";
 import { hashApiKey } from "@/lib/devices/hash-key";
-import { resolveDeviceOfflineForHeartbeat } from "@/lib/alerts/device-offline";
+import { recordAuthenticatedDeviceHeartbeat } from "@/lib/alerts/device-offline";
 import { isHistoricalPlotStatus } from "@/lib/plots/lifecycle";
 
 export async function POST(request: NextRequest) {
@@ -47,11 +47,18 @@ export async function POST(request: NextRequest) {
   // malformed/rejected payload from showing stale/offline on the
   // dashboard. Deliberately not inside the transaction below: this is the
   // one and only status/lastSeenAt write for this request now, whichever
-  // path it takes from here.
-  await prisma.device.update({
-    where: { id: device.id },
-    data: { status: "ONLINE", lastSeenAt: new Date() },
-  });
+  // path it takes from here. The same instant resolves DEVICE_OFFLINE so a
+  // malformed sensor payload cannot leave a reachable device with an open
+  // connectivity incident.
+  const heartbeatAt = new Date();
+  await prisma.$transaction((client) =>
+    recordAuthenticatedDeviceHeartbeat({
+      deviceId: device.id,
+      plotId: device.plotId,
+      heartbeatAt,
+      client,
+    })
+  );
 
   const plot = await prisma.plot.findUnique({
     where: { id: device.plotId },
@@ -99,15 +106,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Device status/lastSeenAt is already handled above, before this
-    // transaction — not repeated here, to avoid writing it twice on the
-    // happy path.
-    await resolveDeviceOfflineForHeartbeat({
-      plotId: device.plotId,
-      resolvedAt: acceptedAt,
-      updateMany: (update) => tx.alert.updateMany(update),
-    });
-
+    // Device liveness and offline recovery are already handled above, before
+    // payload validation, so they are not repeated on the happy path.
     return created;
   });
 
