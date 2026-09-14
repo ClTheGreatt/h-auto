@@ -1,19 +1,31 @@
-import type { AlertSeverity, AlertType, CropStage, SensorReading } from "@prisma/client";
+import type {
+  AlertSeverity,
+  AlertType,
+  CropStage,
+  SensorReading,
+} from "@prisma/client";
+import {
+  getThresholdStatus,
+  type SensorReadingValues,
+  type ThresholdEvaluation,
+} from "@/lib/sensors/threshold-status";
+import { isWithinLightEvaluationWindow } from "./light-evaluation";
 
 export type ThresholdAlertType = Exclude<AlertType, "DEVICE_OFFLINE">;
+export type ThresholdSensorField = keyof SensorReadingValues;
 
 export type Violation = {
   type: ThresholdAlertType;
   severity: AlertSeverity;
   message: string;
-  field: string;
+  field: ThresholdSensorField;
   value: number;
   min: number;
   max: number;
 };
 
 type Check = {
-  field: keyof SensorReading;
+  field: ThresholdSensorField;
   minField: keyof CropStage;
   maxField: keyof CropStage;
   lowType: ThresholdAlertType;
@@ -32,85 +44,117 @@ const CHECKS = [
   { field: "potassium", minField: "minPotassium", maxField: "maxPotassium", lowType: "LOW_POTASSIUM", highType: "HIGH_POTASSIUM", label: "potassium", unit: "mg/kg" },
 ] as const satisfies readonly Check[];
 
-type ThresholdReading = Pick<
-  SensorReading,
-  (typeof CHECKS)[number]["field"]
->;
+export type ThresholdReading = Pick<SensorReading, ThresholdSensorField>;
 
-export type ThresholdEvaluationPolicy = {
-  evaluateLight: boolean;
+export type CurrentSensorEvaluation = {
+  status: ThresholdEvaluation | "not-evaluated";
+  evaluated: boolean;
 };
 
-function shouldEvaluate(
-  check: Check,
-  policy: ThresholdEvaluationPolicy
-): boolean {
-  return check.field !== "lightIntensity" || policy.evaluateLight;
-}
+export type CurrentReadingEvaluation = {
+  evaluatedSensorCount: number;
+  sensors: Record<ThresholdSensorField, CurrentSensorEvaluation>;
+  violations: Violation[];
+  highestSeverity: AlertSeverity | null;
+  evaluatedAlertTypes: Set<ThresholdAlertType>;
+};
 
-export function getEvaluatedThresholdAlertTypes(
-  reading: ThresholdReading,
-  policy: ThresholdEvaluationPolicy
-): Set<AlertType> {
-  const evaluatedTypes = new Set<AlertType>();
-
-  for (const check of CHECKS) {
-    if (!shouldEvaluate(check, policy)) continue;
-
-    if (reading[check.field] !== null && reading[check.field] !== undefined) {
-      evaluatedTypes.add(check.lowType);
-      evaluatedTypes.add(check.highType);
-    }
-  }
-
-  return evaluatedTypes;
-}
+export type CurrentReadingCondition =
+  | "CURRENT_CRITICAL"
+  | "CURRENT_WARNING"
+  | "CURRENT_IN_RANGE"
+  | "NO_EVALUABLE_DATA";
 
 function severityFor(deviation: number): AlertSeverity {
-  if (deviation > 0.2) return "CRITICAL";
-  return "WARNING";
+  return deviation > 0.2 ? "CRITICAL" : "WARNING";
 }
 
-export function checkThresholds(
-  reading: SensorReading,
+/**
+ * Authoritative current-reading policy shared by alert persistence and the
+ * Dashboard. It owns threshold boundaries, severity, null/invalid handling,
+ * and Manila daylight eligibility so those consumers cannot drift apart.
+ */
+export function evaluateCurrentReading(
+  reading: ThresholdReading,
   stage: CropStage,
-  policy: ThresholdEvaluationPolicy
-): Violation[] {
+  recordedAt: Date
+): CurrentReadingEvaluation {
+  const sensors = {} as Record<
+    ThresholdSensorField,
+    CurrentSensorEvaluation
+  >;
   const violations: Violation[] = [];
+  const evaluatedAlertTypes = new Set<ThresholdAlertType>();
+  let evaluatedSensorCount = 0;
+  let highestSeverity: AlertSeverity | null = null;
+  const evaluateLight = isWithinLightEvaluationWindow(recordedAt);
 
   for (const check of CHECKS) {
-    if (!shouldEvaluate(check, policy)) continue;
-
-    const value = reading[check.field] as number | null;
-    if (value == null) continue;
+    const value = reading[check.field];
+    if (
+      value === null ||
+      value === undefined ||
+      (check.field === "lightIntensity" && !evaluateLight)
+    ) {
+      sensors[check.field] = { status: "not-evaluated", evaluated: false };
+      continue;
+    }
 
     const min = stage[check.minField] as number;
     const max = stage[check.maxField] as number;
-
-    if (value < min) {
-      const deviation = min === 0 ? 1 : (min - value) / min;
-      violations.push({
-        type: check.lowType,
-        severity: severityFor(deviation),
-        message: `Low ${check.label}: ${value}${check.unit} (ideal ${min}-${max}${check.unit})`,
-        field: check.field as string,
-        value,
-        min,
-        max,
-      });
-    } else if (value > max) {
-      const deviation = max === 0 ? 1 : (value - max) / max;
-      violations.push({
-        type: check.highType,
-        severity: severityFor(deviation),
-        message: `High ${check.label}: ${value}${check.unit} (ideal ${min}-${max}${check.unit})`,
-        field: check.field as string,
-        value,
-        min,
-        max,
-      });
+    const status = getThresholdStatus(value, min, max);
+    if (status === "invalid-range" || status === "invalid-reading") {
+      sensors[check.field] = { status, evaluated: false };
+      continue;
     }
+
+    sensors[check.field] = { status, evaluated: true };
+    evaluatedSensorCount++;
+    evaluatedAlertTypes.add(check.lowType);
+    evaluatedAlertTypes.add(check.highType);
+
+    if (status === "optimal") continue;
+
+    const isLow = status === "low";
+    const deviation = isLow
+      ? min === 0
+        ? 1
+        : (min - value) / min
+      : max === 0
+        ? 1
+        : (value - max) / max;
+    const severity = severityFor(deviation);
+    if (severity === "CRITICAL" || highestSeverity === null) {
+      highestSeverity = severity;
+    }
+
+    violations.push({
+      type: isLow ? check.lowType : check.highType,
+      severity,
+      message: `${isLow ? "Low" : "High"} ${check.label}: ${value}${check.unit} (ideal ${min}-${max}${check.unit})`,
+      field: check.field,
+      value,
+      min,
+      max,
+    });
   }
 
-  return violations;
+  return {
+    evaluatedSensorCount,
+    sensors,
+    violations,
+    highestSeverity,
+    evaluatedAlertTypes,
+  };
+}
+
+export function getCurrentReadingCondition(
+  evaluation: CurrentReadingEvaluation | null
+): CurrentReadingCondition {
+  if (!evaluation || evaluation.evaluatedSensorCount === 0) {
+    return "NO_EVALUABLE_DATA";
+  }
+  if (evaluation.highestSeverity === "CRITICAL") return "CURRENT_CRITICAL";
+  if (evaluation.highestSeverity === "WARNING") return "CURRENT_WARNING";
+  return "CURRENT_IN_RANGE";
 }

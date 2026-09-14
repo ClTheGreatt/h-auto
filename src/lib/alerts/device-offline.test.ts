@@ -7,9 +7,11 @@ import { getPrisma } from "@/lib/prisma";
 import {
   getOfflinePolicyDecision,
   recordAuthenticatedDeviceHeartbeat,
+  resolveDeviceOfflineForDeviceDeparture,
   resolveDeviceOfflineForHeartbeat,
   resolveDeviceOfflineForPowerOff,
   scanOfflineDevices,
+  shouldResolvePreviousDeviceOffline,
   type DeviceOfflineIncidentTransaction,
   type DeviceOfflineScanDependencies,
   type OfflineAlertRecord,
@@ -620,6 +622,78 @@ test("powering off resolves only the open DEVICE_OFFLINE alert", async () => {
   assert.equal(alerts[1].resolvedAt, null);
   assert.equal(alerts[2].resolved, false);
   assert.equal(alerts[2].resolvedAt, null);
+});
+
+test("moving a device closes only the old plot DEVICE_OFFLINE incident", async () => {
+  const alerts = [
+    { plotId: "plot-a", type: "DEVICE_OFFLINE", resolved: false },
+    { plotId: "plot-a", type: "LOW_HUMIDITY", resolved: false },
+    { plotId: "plot-b", type: "DEVICE_OFFLINE", resolved: false },
+  ];
+
+  const shouldResolve = shouldResolvePreviousDeviceOffline({
+    previousPlotId: "plot-a",
+    nextPlotId: "plot-b",
+    previousStatus: "ONLINE",
+    nextStatus: "ONLINE",
+  });
+  assert.equal(shouldResolve, true);
+
+  await resolveDeviceOfflineForDeviceDeparture({
+    plotId: "plot-a",
+    resolvedAt: NOW,
+    updateMany: async ({ where }) => {
+      let count = 0;
+      for (const alert of alerts) {
+        if (
+          alert.plotId === where.plotId &&
+          alert.type === where.type &&
+          alert.resolved === where.resolved
+        ) {
+          alert.resolved = true;
+          count++;
+        }
+      }
+      return { count };
+    },
+  });
+
+  assert.equal(alerts[0].resolved, true);
+  assert.equal(alerts[1].resolved, false);
+  assert.equal(alerts[2].resolved, false);
+});
+
+test("no plot move does not close an offline incident", () => {
+  assert.equal(
+    shouldResolvePreviousDeviceOffline({
+      previousPlotId: "plot-a",
+      nextPlotId: "plot-a",
+      previousStatus: "ONLINE",
+      nextStatus: "ONLINE",
+    }),
+    false
+  );
+});
+
+test("move plus power off still requests one old-plot cleanup", () => {
+  assert.equal(
+    shouldResolvePreviousDeviceOffline({
+      previousPlotId: "plot-a",
+      nextPlotId: "plot-b",
+      previousStatus: "ONLINE",
+      nextStatus: "MAINTENANCE",
+    }),
+    true
+  );
+  assert.equal(
+    shouldResolvePreviousDeviceOffline({
+      previousPlotId: "plot-a",
+      nextPlotId: null,
+      previousStatus: "OFFLINE",
+      nextStatus: "OFFLINE",
+    }),
+    true
+  );
 });
 
 test("authenticated heartbeat uses one instant for liveness and recovery", async () => {

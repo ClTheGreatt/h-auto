@@ -1,10 +1,7 @@
-// Shared by every "reading vs. ideal range" display site (currently
-// latest-readings.tsx; see also src/lib/alerts/threshold-checker.ts and
-// src/lib/analytics/aggregator.ts, which independently re-derive the same
-// per-field min/max comparison for alert generation and the health gauge
-// respectively — this file does NOT replace those, it's for new UI-side
-// consumers so a fourth/fifth copy of the same field list never needs to
-// exist).
+// Primitive reading-vs-range helpers and the shared UI field list.
+// Environmental alerting and Dashboard current-condition presentation both
+// use alerts/threshold-checker.ts as their authoritative policy; analytics
+// intentionally remains a sampled percentage calculation.
 
 export type SensorType =
   | "SOIL_MOISTURE"

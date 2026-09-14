@@ -150,6 +150,23 @@ export type RecordAuthenticatedHeartbeatClient = {
   };
 };
 
+export function shouldResolvePreviousDeviceOffline({
+  previousPlotId,
+  nextPlotId,
+  previousStatus,
+  nextStatus,
+}: {
+  previousPlotId: string;
+  nextPlotId: string | null;
+  previousStatus: DeviceStatus;
+  nextStatus: DeviceStatus;
+}): boolean {
+  const plotChanged = previousPlotId !== nextPlotId;
+  const poweredOff =
+    previousStatus !== "MAINTENANCE" && nextStatus === "MAINTENANCE";
+  return plotChanged || poweredOff;
+}
+
 export function getOfflinePolicyDecision({
   now,
   lastSeenAt,
@@ -212,7 +229,7 @@ export async function resolveDeviceOfflineForHeartbeat({
   return result.count;
 }
 
-export async function resolveDeviceOfflineForPowerOff({
+export async function resolveDeviceOfflineForDeviceDeparture({
   plotId,
   resolvedAt,
   updateMany,
@@ -223,6 +240,11 @@ export async function resolveDeviceOfflineForPowerOff({
 }): Promise<number> {
   return resolveDeviceOfflineForHeartbeat({ plotId, resolvedAt, updateMany });
 }
+
+// Backward-compatible name for callers/tests that describe the powered-off
+// subset of the broader "device left automatic monitoring on this plot" case.
+export const resolveDeviceOfflineForPowerOff =
+  resolveDeviceOfflineForDeviceDeparture;
 
 export async function recordAuthenticatedDeviceHeartbeat({
   deviceId,

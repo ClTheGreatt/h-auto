@@ -1,14 +1,9 @@
-import type { AlertSeverity, AlertType } from "@prisma/client";
+import type { AlertSeverity } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendSMS } from "@/lib/sms/semaphore";
 import { sendEmail } from "@/lib/email/send-email";
 import { sendExpoPush } from "@/lib/push/expo";
-import {
-  checkThresholds,
-  getEvaluatedThresholdAlertTypes,
-} from "./threshold-checker";
-import { isWithinLightEvaluationWindow } from "./light-evaluation";
-import { buildAlertSuggestion, type AlertSuggestion } from "./suggestions";
+import type { AlertSuggestion } from "./suggestions";
 import {
   createOpenAlertIfAbsent,
   refreshOpenThresholdAlert,
@@ -17,7 +12,10 @@ import {
   getEligibleAlertRecipients,
   type AlertNotificationRecipient,
 } from "./recipients";
-import { isOperationalPlotStatus } from "@/lib/plots/lifecycle";
+import {
+  processEnvironmentalReading,
+  type EnvironmentalProcessorDependencies,
+} from "./environmental-processor";
 
 export async function processSensorReading(
   readingId: string,
@@ -53,91 +51,68 @@ export async function processSensorReading(
     });
   }
 
-  if (!isOperationalPlotStatus(reading.plot.status)) return;
-  if (!reading.plot.currentStage) return;
+  return processEnvironmentalReading(reading, productionEnvironmentalDependencies);
+}
 
-  const thresholdEvaluationPolicy = {
-    evaluateLight: isWithinLightEvaluationWindow(reading.recordedAt),
-  };
-  const violations = checkThresholds(
-    reading,
-    reading.plot.currentStage,
-    thresholdEvaluationPolicy
-  );
-
-  // === Process new violations ===
-  for (const v of violations) {
-    let suggestion: AlertSuggestion | null = null;
-    try {
-      suggestion = buildAlertSuggestion({
-        type: v.type,
-        currentValue: v.value,
-        threshold: v.type.startsWith("LOW_") ? v.min : v.max,
-      });
-    } catch (err) {
-      console.warn("[processSensorReading] suggestion builder failed:", err);
-    }
-
+const productionEnvironmentalDependencies: EnvironmentalProcessorDependencies = {
+  persistViolation: async ({ reading, violation, suggestion }) => {
     const { alert, created } = await createOpenAlertIfAbsent({
       plotId: reading.plotId,
-      type: v.type,
+      type: violation.type,
       data: {
         readingId: reading.id,
-        severity: v.severity,
-        message: v.message,
+        severity: violation.severity,
+        message: violation.message,
         suggestionTitle: suggestion?.title ?? null,
         suggestionSteps: suggestion?.steps ?? [],
       },
     });
+
     if (!created) {
       await refreshOpenThresholdAlert({
         alertId: alert.id,
         plotId: reading.plotId,
-        type: v.type,
+        type: violation.type,
         incomingReadingId: reading.id,
         incomingRecordedAt: reading.recordedAt,
-        severity: v.severity,
-        message: v.message,
+        severity: violation.severity,
+        message: violation.message,
         suggestionTitle: suggestion?.title ?? null,
         suggestionSteps: suggestion?.steps ?? [],
       });
-      continue;
     }
 
+    return { alert, created };
+  },
+  findOpenAlerts: (plotId) =>
+    prisma.alert.findMany({
+      where: { plotId, resolved: false },
+      select: { id: true, type: true },
+    }),
+  resolveAlert: async (alertId, resolvedAt) => {
+    await prisma.alert.update({
+      where: { id: alertId },
+      data: { resolved: true, resolvedAt },
+    });
+  },
+  notifyNewAlert: async ({ alert, reading, violation, suggestion }) => {
     const recipients = await getEligibleAlertRecipients(reading.plotId);
     await sendAlertNotifications(alert, recipients, {
       plotId: reading.plotId,
       plotName: reading.plot.name,
-      alertType: v.type,
-      severity: v.severity,
-      message: v.message,
+      alertType: violation.type,
+      severity: violation.severity,
+      message: violation.message,
       suggestion,
     });
-  }
-
-  // === Auto-resolve alerts no longer violating ===
-  const activeAlerts = await prisma.alert.findMany({
-    where: { plotId: reading.plotId, resolved: false },
-  });
-  const evaluatedAlertTypes = getEvaluatedThresholdAlertTypes(
-    reading,
-    thresholdEvaluationPolicy
-  );
-  const stillViolatingTypes = new Set<AlertType>(
-    violations.map((v) => v.type)
-  );
-  for (const alert of activeAlerts) {
-    if (
-      evaluatedAlertTypes.has(alert.type) &&
-      !stillViolatingTypes.has(alert.type)
-    ) {
-      await prisma.alert.update({
-        where: { id: alert.id },
-        data: { resolved: true, resolvedAt: new Date() },
-      });
-    }
-  }
-}
+  },
+  logNotificationFailure: ({ alertId, plotId, error }) => {
+    console.error(
+      `[processSensorReading] Notification delivery failed for alert ${alertId} on plot ${plotId}:`,
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  },
+};
 
 // Sends the 4-channel notification set (IN_APP, SMS, EMAIL, PUSH) for one
 // alert to a list of recipients. Shared by processSensorReading (threshold

@@ -28,9 +28,17 @@ import {
 } from "@/lib/utils/device-status";
 import {
   formatSensorValue,
-  getThresholdStatus,
   SENSOR_FIELDS,
 } from "@/lib/sensors/threshold-status";
+import {
+  isCurrentSensorEvidence,
+  isHistoricalSensorEvidence,
+} from "@/lib/sensors/reading-evidence";
+import {
+  evaluateCurrentReading,
+  getCurrentReadingCondition,
+  type CurrentReadingEvaluation,
+} from "@/lib/alerts/threshold-checker";
 import { NeedsActionList, type NeedsActionAlert } from "@/components/dashboard/needs-action-list";
 import { RestartTourButton } from "@/components/tour/restart-tour-button";
 import type { AlertSeverity, AlertType } from "@prisma/client";
@@ -80,9 +88,10 @@ type PlotCondition =
   | "OFFLINE"
   | "STALE"
   | "MISSING_STAGE"
-  | "CRITICAL"
-  | "WARNING"
-  | "ALL_IN_RANGE"
+  | "CURRENT_CRITICAL"
+  | "CURRENT_WARNING"
+  | "CURRENT_IN_RANGE"
+  | "NO_EVALUABLE_DATA"
   | "PREPARING";
 
 const CONDITION_LABEL: Record<PlotCondition, string> = {
@@ -92,9 +101,10 @@ const CONDITION_LABEL: Record<PlotCondition, string> = {
   OFFLINE: "Offline",
   STALE: "Delayed",
   MISSING_STAGE: "Setup needed",
-  CRITICAL: "Critical",
-  WARNING: "Warning",
-  ALL_IN_RANGE: "All in range",
+  CURRENT_CRITICAL: "Current: Critical",
+  CURRENT_WARNING: "Current: Warning",
+  CURRENT_IN_RANGE: "Current readings in range",
+  NO_EVALUABLE_DATA: "No evaluable data",
   PREPARING: "Preparing",
 };
 
@@ -105,9 +115,10 @@ const CONDITION_TEXT_CLASS: Record<PlotCondition, string> = {
   OFFLINE: "text-danger-text",
   STALE: "text-warning-text",
   MISSING_STAGE: "text-warning-text",
-  CRITICAL: "text-danger-text",
-  WARNING: "text-warning-text",
-  ALL_IN_RANGE: "text-success-text",
+  CURRENT_CRITICAL: "text-danger-text",
+  CURRENT_WARNING: "text-warning-text",
+  CURRENT_IN_RANGE: "text-success-text",
+  NO_EVALUABLE_DATA: "text-muted-foreground",
   PREPARING: "text-muted-foreground",
 };
 
@@ -118,9 +129,10 @@ const CONDITION_BORDER_CLASS: Record<PlotCondition, string> = {
   OFFLINE: "border-l-danger-border",
   STALE: "border-l-warning-border",
   MISSING_STAGE: "border-l-warning-border",
-  CRITICAL: "border-l-danger-border",
-  WARNING: "border-l-warning-border",
-  ALL_IN_RANGE: "border-l-success-border",
+  CURRENT_CRITICAL: "border-l-danger-border",
+  CURRENT_WARNING: "border-l-warning-border",
+  CURRENT_IN_RANGE: "border-l-success-border",
+  NO_EVALUABLE_DATA: "border-l-border",
   PREPARING: "border-l-border",
 };
 
@@ -135,9 +147,10 @@ const CONDITION_ICON: Record<PlotCondition, React.ComponentType<{ className?: st
   OFFLINE: WifiOff,
   STALE: Clock,
   MISSING_STAGE: AlertTriangle,
-  CRITICAL: AlertCircle,
-  WARNING: AlertTriangle,
-  ALL_IN_RANGE: CheckCircle2,
+  CURRENT_CRITICAL: AlertCircle,
+  CURRENT_WARNING: AlertTriangle,
+  CURRENT_IN_RANGE: CheckCircle2,
+  NO_EVALUABLE_DATA: Clock,
   PREPARING: Clock,
 };
 
@@ -192,36 +205,6 @@ function formatStaleDuration(ms: number): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"}`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"}`;
-}
-
-function shouldTreatSensorEvidenceAsHistorical({
-  readingRecordedAt,
-  freshness,
-  condition,
-}: {
-  readingRecordedAt: Date | null;
-  freshness: DeviceFreshness;
-  condition: PlotCondition;
-}): boolean {
-  const freshnessIsHistorical =
-    freshness.state === "STALE" ||
-    freshness.state === "OFFLINE" ||
-    freshness.state === "NEVER_REPORTED";
-  const plotPresentsHistoricalEvidence =
-    condition === "STALE" ||
-    condition === "OFFLINE" ||
-    condition === "NEVER_REPORTED" ||
-    condition === "MAINTENANCE";
-
-  // The AND with freshnessIsHistorical is deliberate: age of the data
-  // decides "historical", not the maintenance flag. A device switched to
-  // maintenance moments ago still has genuinely fresh readings, and those
-  // stay live-coloured rather than being greyed out as last-known.
-  return (
-    readingRecordedAt !== null &&
-    freshnessIsHistorical &&
-    plotPresentsHistoricalEvidence
-  );
 }
 
 function formatFleetSummary({
@@ -373,14 +356,9 @@ export default async function DashboardPage() {
 
   const moreLogsThisWeek = Math.max(0, recentLogCount - recentLogs.length);
 
-  // Single source of truth for "does this plot need attention" — shared by
-  // the card badge, the attention summary, and the counts strip so all
-  // three agree. A plot the system can't currently monitor (no stage, no
-  // device, or a device that's offline / has never reported) counts as
-  // needing attention just as much as one with a real open alert — it isn't
-  // "in range", it's blind — UNLESS it's still PREPARING, where that same
-  // gap is expected setup state, not a problem (see OPERATIONAL_PLOT_STATUSES
-  // above).
+  // Build current-reading state independently from persisted incidents.
+  // The badge reflects current sensor evidence; alert rows remain the source
+  // for incident counts/history and separately contribute to attention.
   const plotsWithCondition = plots.map((plot) => {
     const monitoringRequired = OPERATIONAL_PLOT_STATUSES.includes(plot.status);
     const reading = plot.sensorReadings[0] ?? null;
@@ -388,18 +366,33 @@ export default async function DashboardPage() {
       plot.device?.lastSeenAt,
       now
     );
+    const readingFreshness: DeviceFreshness = getDeviceFreshness(
+      reading?.recordedAt,
+      now
+    );
+    const devicePaused =
+      plot.device?.status === "MAINTENANCE" ||
+      plot.device?.status === "RETIRED";
+    const readingIsCurrentEvidence = isCurrentSensorEvidence({
+      readingDeviceId: reading?.deviceId ?? null,
+      linkedDeviceId: plot.device?.id ?? null,
+      readingFreshness,
+      deviceFreshness: freshness,
+      devicePaused,
+    });
     const hasCritical = plot.alerts.some((a) => a.severity === "CRITICAL");
     const hasWarning = plot.alerts.some((a) => a.severity === "WARNING");
+    const currentEvaluation: CurrentReadingEvaluation | null =
+      readingIsCurrentEvidence && reading && plot.currentStage
+        ? evaluateCurrentReading(reading, plot.currentStage, reading.recordedAt)
+        : null;
 
     let condition: PlotCondition;
     if (!monitoringRequired) {
       condition = "PREPARING";
     } else if (!plot.device) {
       condition = "MISSING_DEVICE";
-    } else if (
-      plot.device.status === "MAINTENANCE" ||
-      plot.device.status === "RETIRED"
-    ) {
+    } else if (devicePaused) {
       // A device under manual control reads as "in maintenance" regardless
       // of how long it has been silent — that's the entire point of taking
       // it out of automatic tracking. This branch must sit above the
@@ -415,18 +408,14 @@ export default async function DashboardPage() {
       condition = "STALE";
     } else if (!plot.currentStage) {
       condition = "MISSING_STAGE";
-    } else if (hasCritical) {
-      condition = "CRITICAL";
-    } else if (hasWarning) {
-      condition = "WARNING";
     } else {
-      condition = "ALL_IN_RANGE";
+      condition = getCurrentReadingCondition(currentEvaluation);
     }
 
-    const sensorEvidenceIsHistorical = shouldTreatSensorEvidenceAsHistorical({
+    const sensorEvidenceIsHistorical = isHistoricalSensorEvidence({
       readingRecordedAt: reading?.recordedAt ?? null,
-      freshness,
-      condition,
+      currentEvidence: readingIsCurrentEvidence,
+      devicePaused,
     });
     const alertsForToday = monitoringRequired
       ? plot.alerts.map((alert) => ({
@@ -441,6 +430,10 @@ export default async function DashboardPage() {
       alerts: alertsForToday,
       condition,
       freshness,
+      readingFreshness,
+      currentEvaluation,
+      hasCritical,
+      hasWarning,
       sensorEvidenceIsHistorical,
     };
   });
@@ -525,20 +518,20 @@ export default async function DashboardPage() {
     maintenanceDeviceCount,
   });
 
-  // DENYLIST, not an allowlist: every condition counts as needing attention
-  // unless it is excused here, so a newly added PlotCondition opts itself in
-  // by default. Two are excused. PREPARING has nothing to monitor yet.
-  // MAINTENANCE is excused because this deployment's ESP32 is not
-  // continuously deployed — it runs during observation periods and is
-  // powered off otherwise, so "powered off" is an expected operating state
-  // rather than a deviation. Flagging it every time would train the reader
-  // to ignore the banner. The plot stays fully visible on its card with its
-  // amber "Powered off" badge; only the attention count excuses it.
+  // Current violations and persisted incidents independently require
+  // attention. PREPARING has nothing to monitor yet; MAINTENANCE remains an
+  // intentional pause. No-evaluable-data is neutral unless a persisted
+  // Warning/Critical incident is still open.
   const attentionPlots = plotsWithCondition.filter(
     (p) =>
-      p.condition !== "ALL_IN_RANGE" &&
-      p.condition !== "PREPARING" &&
-      p.condition !== "MAINTENANCE"
+      p.hasCritical ||
+      p.hasWarning ||
+      ![
+        "CURRENT_IN_RANGE",
+        "NO_EVALUABLE_DATA",
+        "PREPARING",
+        "MAINTENANCE",
+      ].includes(p.condition)
   );
   // Counted off plotsWithCondition — the same array attentionPlots derives
   // from — so the banner's two numbers always come from one source. This is
@@ -550,8 +543,21 @@ export default async function DashboardPage() {
     (p) => p.condition === "MAINTENANCE"
   ).length;
   const hasCriticalAttention = attentionPlots.some(
-    (p) => p.condition === "CRITICAL" || p.condition === "OFFLINE"
+    (p) =>
+      p.condition === "CURRENT_CRITICAL" ||
+      p.condition === "OFFLINE" ||
+      p.hasCritical
   );
+  const unevaluablePlotCount = plotsWithCondition.filter(
+    (p) => p.condition === "NO_EVALUABLE_DATA"
+  ).length;
+  const allCurrentReadingsProvenInRange =
+    monitoredPlots.length > 0 &&
+    monitoredPlots.every(
+      (p) =>
+        p.condition === "CURRENT_IN_RANGE" || p.condition === "MAINTENANCE"
+    ) &&
+    monitoredPlots.some((p) => p.condition === "CURRENT_IN_RANGE");
 
   function attentionVerdict(p: (typeof attentionPlots)[number]): string {
     const alertCount = p.alerts.length;
@@ -582,6 +588,18 @@ export default async function DashboardPage() {
     }
     if (p.condition === "MISSING_STAGE") {
       return `${p.name} has no growth stage set${alertSuffix}`;
+    }
+
+    if (
+      p.condition === "CURRENT_CRITICAL" ||
+      p.condition === "CURRENT_WARNING"
+    ) {
+      const worstCurrent = [...(p.currentEvaluation?.violations ?? [])].sort(
+        (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+      )[0];
+      if (worstCurrent) {
+        return `${p.name} ${ALERT_TYPE_VERDICT[worstCurrent.type]}${alertSuffix}`;
+      }
     }
 
     const worst = [...p.alerts].sort(
@@ -672,32 +690,36 @@ export default async function DashboardPage() {
         className={cn(
           "border rounded-md bg-card border-l-4 p-4",
           hasCriticalAttention
-            ? CONDITION_BORDER_CLASS.CRITICAL
+            ? CONDITION_BORDER_CLASS.CURRENT_CRITICAL
             : attentionPlots.length > 0
-            ? CONDITION_BORDER_CLASS.WARNING
-            : // Nothing needs attention, but a powered-off plot was excused
-              // from the judgement rather than judged healthy — so this is
-              // not an all-clear. PREPARING's neutral rail is the same
-              // "excused, nothing to do" signal.
-              maintenancePlotCount > 0
+            ? CONDITION_BORDER_CLASS.CURRENT_WARNING
+            : !allCurrentReadingsProvenInRange
               ? CONDITION_BORDER_CLASS.PREPARING
-              : CONDITION_BORDER_CLASS.ALL_IN_RANGE
+              : CONDITION_BORDER_CLASS.CURRENT_IN_RANGE
         )}
       >
-        {/* "monitored" is load-bearing: it tells the reader a plot was left
-            out of the judgement. A powered-off plot has no current readings,
-            so the system cannot know whether it is in range — claiming it is
-            would contradict that plot's own card below. */}
-        {attentionPlots.length === 0 && maintenancePlotCount > 0 && (
+        {attentionPlots.length === 0 && allCurrentReadingsProvenInRange && (
           <p className="text-sm font-semibold text-foreground">
-            {`All monitored plots are in range · ${maintenancePlotCount} plot${
-              maintenancePlotCount === 1 ? "" : "s"
-            } powered off`}
+            All current monitored readings are in range
+            {maintenancePlotCount > 0 &&
+              ` · ${maintenancePlotCount} plot${
+                maintenancePlotCount === 1 ? "" : "s"
+              } powered off`}
           </p>
         )}
 
-        {attentionPlots.length === 0 && maintenancePlotCount === 0 && (
-          <p className="text-sm font-semibold text-success-text">All plots are in range</p>
+        {attentionPlots.length === 0 && !allCurrentReadingsProvenInRange && (
+          <p className="text-sm font-semibold text-foreground">
+            No current warnings or critical conditions
+            {unevaluablePlotCount > 0 &&
+              ` · ${unevaluablePlotCount} plot${
+                unevaluablePlotCount === 1 ? " has" : "s have"
+              } no evaluable data`}
+            {maintenancePlotCount > 0 &&
+              ` · ${maintenancePlotCount} plot${
+                maintenancePlotCount === 1 ? "" : "s"
+              } powered off`}
+          </p>
         )}
 
         {attentionPlots.length > 0 && (
@@ -895,19 +917,16 @@ export default async function DashboardPage() {
                             {SENSOR_FIELDS.map((field) => {
                               const value = reading[field.key];
                               if (value == null) return null;
-                              const status = plot.currentStage
-                                ? getThresholdStatus(
-                                    value,
-                                    plot.currentStage[field.minField],
-                                    plot.currentStage[field.maxField]
-                                  )
-                                : null;
+                              const sensorEvaluation =
+                                plot.currentEvaluation?.sensors[field.key];
+                              const status = sensorEvaluation?.status ?? null;
                               return (
                                 <span
                                   key={field.key}
                                   className={
                                     readingsAreHistorical ||
                                     status == null ||
+                                    status === "not-evaluated" ||
                                     status === "invalid-range" ||
                                     status === "invalid-reading"
                                       ? "text-muted-foreground"
@@ -933,12 +952,16 @@ export default async function DashboardPage() {
                         {historicalThresholdAlert &&
                           `Last known: ${historicalThresholdAlert.message} · `}
                         Last reading{" "}
-                        {formatStaleDuration(plot.freshness.elapsedMs ?? 0)} ago
+                        {formatStaleDuration(
+                          plot.readingFreshness.elapsedMs ?? 0
+                        )} ago
                         {" · "}
                         {formatDateTime(reading.recordedAt)}
                       </p>
                     )}
-                    {plot.alerts.length > 0 && (
+                    {(plot.alerts.length > 0 ||
+                      condition === "CURRENT_WARNING" ||
+                      condition === "CURRENT_CRITICAL") && (
                       <p className="text-xs text-muted-foreground mt-1">
                         {plot.alerts.length} open alert
                         {plot.alerts.length === 1 ? "" : "s"}
@@ -978,7 +1001,7 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 {recentlyResolvedAlert?.resolvedAt
                   ? `Last alert resolved ${daysAgoLabel(recentlyResolvedAlert.resolvedAt, nowMs)}`
-                  : "All plots within optimal range."}
+                  : "No unresolved alert incidents."}
               </p>
               <div className="mt-3 text-right">
                 <Link

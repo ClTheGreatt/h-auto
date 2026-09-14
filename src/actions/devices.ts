@@ -9,7 +9,10 @@ import { hashApiKey } from "@/lib/devices/hash-key";
 import { ADMIN_SETTABLE_DEVICE_STATUSES } from "@/lib/utils/device-status";
 import type { DeviceStatus } from "@prisma/client";
 import { canLinkDeviceToPlot } from "@/lib/devices/plot-eligibility";
-import { resolveDeviceOfflineForPowerOff } from "@/lib/alerts/device-offline";
+import {
+  resolveDeviceOfflineForDeviceDeparture,
+  shouldResolvePreviousDeviceOffline,
+} from "@/lib/alerts/device-offline";
 
 function generateApiKey(): string {
   return "h-auto_" + randomBytes(24).toString("hex");
@@ -138,8 +141,12 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
     nextStatus = parsed.data.status;
   }
 
-  const statusChangedToPoweredOff =
-    existing.status !== "MAINTENANCE" && nextStatus === "MAINTENANCE";
+  const shouldResolveOldOffline = shouldResolvePreviousDeviceOffline({
+    previousPlotId: existing.plotId,
+    nextPlotId: parsed.data.plotId,
+    previousStatus: existing.status,
+    nextStatus,
+  });
   const updatedAt = new Date();
 
   await prisma.$transaction(async (tx) => {
@@ -153,8 +160,8 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
       },
     });
 
-    if (statusChangedToPoweredOff) {
-      await resolveDeviceOfflineForPowerOff({
+    if (shouldResolveOldOffline) {
+      await resolveDeviceOfflineForDeviceDeparture({
         plotId: existing.plotId,
         resolvedAt: updatedAt,
         updateMany: (update) => tx.alert.updateMany(update),
@@ -163,7 +170,7 @@ export async function updateDevice(id: string, input: DeviceFormValues) {
   });
 
   revalidatePath("/dashboard/devices");
-  if (statusChangedToPoweredOff) {
+  if (shouldResolveOldOffline) {
     revalidatePath("/dashboard/alerts");
   }
   return { success: true };
