@@ -33,7 +33,10 @@ export function AssignmentPlotFilter({
 
   return (
     <Select value={current ?? "all"} onValueChange={handleChange}>
-      <SelectTrigger className="w-40">
+      <SelectTrigger
+        aria-label="Filter assignments by plot"
+        className="w-full sm:w-40"
+      >
         <SelectValue placeholder="All plots" />
       </SelectTrigger>
       <SelectContent>

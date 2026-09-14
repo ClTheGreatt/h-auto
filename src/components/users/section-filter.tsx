@@ -8,15 +8,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export function SectionFilter({
   current,
   options,
   disabled,
+  ariaLabel = "Filter by section",
+  className,
 }: {
   current?: string;
   options: string[];
   disabled?: boolean;
+  ariaLabel?: string;
+  className?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -36,7 +41,7 @@ export function SectionFilter({
 
   return (
     <Select value={current ?? "all"} onValueChange={handleChange} disabled={disabled}>
-      <SelectTrigger className="w-40">
+      <SelectTrigger aria-label={ariaLabel} className={cn("w-40", className)}>
         <SelectValue placeholder="All sections" />
       </SelectTrigger>
       <SelectContent>

@@ -8,26 +8,46 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import { formatDate } from "@/lib/format-date";
-import { AssignmentPlotFilter } from "@/components/assignments/assignment-plot-filter";
+import { AssignmentFiltersToolbar } from "@/components/assignments/assignment-filters-toolbar";
 import { AssignStudentDialog } from "@/components/assignments/assign-student-dialog";
 import { RemoveAssignmentDialog } from "@/components/plots/remove-assignment-dialog";
+import {
+  buildAssignmentListWhere,
+  candidateSections,
+} from "@/lib/assignments/assignment-filters";
+
+type SearchParam = string | string[] | undefined;
+
+function firstSearchParam(value: SearchParam): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 export default async function AssignmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plotId?: string }>;
+  searchParams: Promise<{
+    search?: SearchParam;
+    section?: SearchParam;
+    plotId?: SearchParam;
+  }>;
 }) {
   const session = await requireAuth();
   const role = session.user.role;
   const sp = await searchParams;
-  const plotId = sp.plotId;
-
-  const where =
-    role === "STUDENT_FARMER"
-      ? { studentId: session.user.id, status: "ACTIVE" as const, ...(plotId && { plotId }) }
-      : role === "FACULTY"
-      ? { facultyId: session.user.id, status: "ACTIVE" as const, ...(plotId && { plotId }) }
-      : { status: "ACTIVE" as const, ...(plotId && { plotId }) };
+  const canManageAssignments = role !== "STUDENT_FARMER";
+  const search = firstSearchParam(sp.search)?.trim() || undefined;
+  const section = firstSearchParam(sp.section)?.trim() || undefined;
+  const plotId = firstSearchParam(sp.plotId)?.trim() || undefined;
+  const actor = { role, userId: session.user.id };
+  const filters = {
+    plotId,
+    ...(canManageAssignments ? { search, section } : {}),
+  };
+  const where = buildAssignmentListWhere(actor, filters);
+  const unfilteredWhere = buildAssignmentListWhere(actor);
+  const filtersActive = Boolean(
+    plotId || (canManageAssignments && (search || section))
+  );
 
   // Plot list for filter dropdown, scoped the same way the page's own
   // role-aware where is (students/faculty only see their own plots).
@@ -69,7 +89,33 @@ export default async function AssignmentsPage({
         }
       : { id: { in: [] } };
 
-  const [assignments, plotsForFilter, assignablePlots] = await Promise.all([
+  const sectionRowsPromise =
+    role === "FACULTY"
+      ? prisma.facultySectionAdvisory.findMany({
+          where: { facultyId: session.user.id },
+          orderBy: { section: "asc" },
+          select: { section: true },
+        })
+      : canManageAssignments
+        ? prisma.user.findMany({
+            where: {
+              role: "STUDENT_FARMER",
+              section: { not: null },
+              studentAssignments: { some: unfilteredWhere },
+            },
+            distinct: ["section"],
+            orderBy: { section: "asc" },
+            select: { section: true },
+          })
+        : Promise.resolve([] as { section: string | null }[]);
+
+  const [
+    assignments,
+    plotsForFilter,
+    assignablePlots,
+    sectionRows,
+    unfilteredAssignment,
+  ] = await Promise.all([
     prisma.plotAssignment.findMany({
       where,
       orderBy: [{ plot: { name: "asc" } }, { assignedAt: "desc" }],
@@ -105,7 +151,17 @@ export default async function AssignmentsPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    sectionRowsPromise,
+    filtersActive
+      ? prisma.plotAssignment.findFirst({
+          where: unfilteredWhere,
+          select: { id: true },
+        })
+      : Promise.resolve(null),
   ]);
+  const sectionOptions = candidateSections(sectionRows);
+  const filtersHaveNoMatches =
+    assignments.length === 0 && filtersActive && Boolean(unfilteredAssignment);
 
   return (
     <div className="space-y-6">
@@ -115,15 +171,24 @@ export default async function AssignmentsPage({
           {role === "STUDENT_FARMER"
             ? "Plots assigned to you for monitoring."
             : role === "FACULTY"
-            ? "Plots you've assigned to your students."
+            ? "Active student assignments for plots you currently advise."
             : "All active plot assignments in the system."}
         </p>
       </div>
 
-      <div className="flex gap-2 flex-wrap items-center justify-between">
-        <AssignmentPlotFilter plots={plotsForFilter} current={plotId} />
-        {role !== "STUDENT_FARMER" && (
-          <AssignStudentDialog plots={assignablePlots} />
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <AssignmentFiltersToolbar
+          plots={plotsForFilter}
+          currentPlotId={plotId}
+          sections={sectionOptions}
+          currentSection={section}
+          canManageAssignments={canManageAssignments}
+          showClearFilters={filtersHaveNoMatches}
+        />
+        {canManageAssignments && (
+          <div className="sm:ml-auto">
+            <AssignStudentDialog plots={assignablePlots} role={role} />
+          </div>
         )}
       </div>
 
@@ -133,14 +198,14 @@ export default async function AssignmentsPage({
           className="text-center py-12 text-sm text-muted-foreground border border-dashed rounded-md"
         >
           <ClipboardList className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-          No active assignments yet.
-          {(role === "FACULTY" ||
-            role === "ADMIN" ||
-            role === "SUPER_ADMIN") && (
+          {filtersHaveNoMatches
+            ? "No assignments match these filters."
+            : "No active assignments yet."}
+          {!filtersHaveNoMatches && canManageAssignments ? (
             <div className="mt-2">
               Use &ldquo;Assign student&rdquo; above to get started.
             </div>
-          )}
+          ) : null}
         </div>
       ) : (
         <div data-tour="assignments.list" className="grid grid-cols-1 md:grid-cols-2 gap-3">

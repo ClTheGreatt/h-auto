@@ -7,6 +7,7 @@ import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
 import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
 import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
+import { assignmentRequestError } from "@/lib/assignments/assignment-filters";
 
 export async function assignStudent(
   plotId: string,
@@ -40,31 +41,26 @@ export async function assignStudent(
   }
 
   const student = await prisma.user.findUnique({ where: { id: studentId } });
-  if (!student || student.role !== "STUDENT_FARMER") {
-    return { error: "Selected user is not a student farmer" };
-  }
-  if (student.graduatedAt) {
-    return { error: "Cannot assign a graduated student to a plot." };
-  }
-
-  // The real security boundary — the picker's own section filter
-  // (availableStudents in plots/[id]/page.tsx) is UI convenience only.
-  const canAssign = await assertFacultyCanAssignStudent(
-    session.user.role,
-    session.user.id,
-    student.section
-  );
-  if (!canAssign) {
-    return {
-      error: "You are not authorized to assign a student from this section.",
-    };
-  }
-
-  const existing = await prisma.plotAssignment.findFirst({
-    where: { plotId, studentId, status: "ACTIVE" },
+  const [canAssign, existing] = await Promise.all([
+    // The picker's section filter is UI convenience only. A missing or
+    // sectionless student remains denied for Faculty; admins retain their
+    // existing broader section scope.
+    assertFacultyCanAssignStudent(
+      session.user.role,
+      session.user.id,
+      student?.section ?? null
+    ),
+    prisma.plotAssignment.findFirst({
+      where: { plotId, studentId, status: "ACTIVE" },
+    }),
+  ]);
+  const requestError = assignmentRequestError({
+    student,
+    sectionAuthorized: canAssign,
+    hasActiveAssignment: Boolean(existing),
   });
-  if (existing) {
-    return { error: "This student is already assigned to this plot" };
+  if (requestError) {
+    return { error: requestError };
   }
 
   await prisma.plotAssignment.create({
@@ -120,6 +116,7 @@ export async function getAssignableStudentsForPlot(
         id: string;
         firstName: string;
         lastName: string;
+        idNumber: string | null;
         email: string;
         course: string | null;
         yearLevel: string | null;
@@ -165,6 +162,7 @@ export async function getAssignableStudentsForPlot(
         id: true,
         firstName: true,
         lastName: true,
+        idNumber: true,
         email: true,
         course: true,
         yearLevel: true,

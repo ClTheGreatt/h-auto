@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { UserRole } from "@prisma/client";
 import { toast } from "sonner";
 import { UserPlus, MapPinned, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,50 +25,74 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { assignStudent, getAssignableStudentsForPlot } from "@/actions/assignments";
+import {
+  candidateSearchKeywords,
+  candidateSections,
+  candidatesInSection,
+  defaultCandidateSection,
+  shouldClearSelectedStudent,
+  type AssignmentCandidate,
+} from "@/lib/assignments/assignment-filters";
 
 type Plot = { id: string; name: string };
 
-type Student = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  course: string | null;
-  yearLevel: string | null;
-  section: string | null;
-};
-
 const COURSE_TRUNCATE_LENGTH = 24;
+const ALL_SECTIONS = "__all_sections__";
 
-// Same label logic as plot-assignments.tsx's studentOptionLabel — mirrored
-// rather than shared since that one is local/unexported to that file.
-function studentOptionLabel(s: Student): { label: string; full: string } {
+// Keep the existing name/year/section context and add the student number
+// when present so similarly named candidates remain distinguishable.
+function studentOptionLabel(s: AssignmentCandidate): string {
   const name = `${s.firstName} ${s.lastName}`;
-  if (s.yearLevel && s.section) {
-    return { label: `${name} · ${s.yearLevel} · ${s.section}`, full: s.course ?? name };
-  }
-  if (s.course) {
+  const details = [s.yearLevel, s.section, s.idNumber].filter(Boolean);
+  if (details.length === 0 && s.course) {
     const short =
       s.course.length > COURSE_TRUNCATE_LENGTH
         ? `${s.course.slice(0, COURSE_TRUNCATE_LENGTH)}…`
         : s.course;
-    return { label: `${name} · ${short}`, full: s.course };
+    details.push(short);
   }
-  return { label: name, full: name };
+  return details.length > 0 ? `${name} · ${details.join(" · ")}` : name;
 }
 
-export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
+export function AssignStudentDialog({
+  plots,
+  role,
+}: {
+  plots: Plot[];
+  role: UserRole;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedPlot, setSelectedPlot] = useState("");
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<AssignmentCandidate[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const studentRequestIdRef = useRef(0);
   const [studentsError, setStudentsError] = useState<string | null>(null);
+  const [selectedSection, setSelectedSection] = useState(ALL_SECTIONS);
+  const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const sections = useMemo(() => candidateSections(students), [students]);
+  const visibleStudents = useMemo(
+    () =>
+      candidatesInSection(
+        students,
+        selectedSection === ALL_SECTIONS ? undefined : selectedSection
+      ),
+    [selectedSection, students]
+  );
+  const studentOptions = useMemo(
+    () =>
+      visibleStudents.map((student) => ({
+        value: student.id,
+        label: studentOptionLabel(student),
+        searchKeywords: candidateSearchKeywords(student),
+      })),
+    [visibleStudents]
+  );
 
   function reset() {
     studentRequestIdRef.current += 1;
@@ -75,6 +100,8 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
     setStudents([]);
     setLoadingStudents(false);
     setStudentsError(null);
+    setSelectedSection(ALL_SECTIONS);
+    setStudentSearch("");
     setSelectedStudent("");
     setNotes("");
   }
@@ -88,6 +115,8 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
     const requestId = ++studentRequestIdRef.current;
 
     setSelectedPlot(plotId);
+    setSelectedSection(ALL_SECTIONS);
+    setStudentSearch("");
     setSelectedStudent("");
     setStudents([]);
     setStudentsError(null);
@@ -103,6 +132,10 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
         return;
       }
       setStudents(result.students);
+      const nextSections = candidateSections(result.students);
+      setSelectedSection(
+        defaultCandidateSection(role, nextSections) ?? ALL_SECTIONS
+      );
     } catch {
       if (requestId === studentRequestIdRef.current) {
         setStudentsError("Something went wrong. Please try again.");
@@ -112,6 +145,14 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
         setLoadingStudents(false);
       }
     }
+  }
+
+  function handleSectionChange(nextSection: string) {
+    const section = nextSection === ALL_SECTIONS ? undefined : nextSection;
+    if (shouldClearSelectedStudent(students, selectedStudent, section)) {
+      setSelectedStudent("");
+    }
+    setSelectedSection(nextSection);
   }
 
   async function handleAssign() {
@@ -182,10 +223,11 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
           </div>
 
           {selectedPlot && (
-            <div>
-              <Label htmlFor="assign-student-select">Student</Label>
+            <div className="space-y-4">
               {studentsError ? (
-                <p className="text-sm text-destructive mt-1">{studentsError}</p>
+                <p className="text-sm text-destructive" role="alert">
+                  {studentsError}
+                </p>
               ) : !loadingStudents && students.length === 0 ? (
                 <EmptyState
                   compact
@@ -194,32 +236,54 @@ export function AssignStudentDialog({ plots }: { plots: Plot[] }) {
                   description="Only active, non-graduated student farmers can be assigned — and for faculty, only those in a section you advise. No one currently matches for this plot."
                 />
               ) : (
-                <Select
-                  value={selectedStudent}
-                  onValueChange={setSelectedStudent}
-                  disabled={loadingStudents}
-                >
-                  <SelectTrigger id="assign-student-select">
-                    <SelectValue
-                      placeholder={loadingStudents ? "Loading..." : "Select a student"}
+                <>
+                  {!loadingStudents && students.length > 0 && (
+                    <div>
+                      <Label htmlFor="assign-section-select">Section</Label>
+                      <Select
+                        value={selectedSection}
+                        onValueChange={handleSectionChange}
+                      >
+                        <SelectTrigger id="assign-section-select">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL_SECTIONS}>
+                            {role === "FACULTY"
+                              ? "All authorized sections"
+                              : "All sections"}
+                          </SelectItem>
+                          {sections.map((section) => (
+                            <SelectItem key={section} value={section}>
+                              {section}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label htmlFor="assign-student-select">Student</Label>
+                    <SearchableSelect
+                      options={studentOptions}
+                      value={selectedStudent || undefined}
+                      onChange={(value) => setSelectedStudent(value ?? "")}
+                      allLabel={
+                        loadingStudents ? "Loading..." : "Select a student"
+                      }
+                      searchPlaceholder="Search name, email, or student number..."
+                      emptyText="No eligible students found."
+                      width="w-full"
+                      disabled={loadingStudents}
+                      allowEmptySelection={false}
+                      triggerId="assign-student-select"
+                      ariaLabel="Select an eligible student"
+                      searchValue={studentSearch}
+                      onSearchValueChange={setStudentSearch}
                     />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((s) => {
-                      const { label, full } = studentOptionLabel(s);
-                      return (
-                        <SelectItem
-                          key={s.id}
-                          value={s.id}
-                          title={full}
-                          className="max-w-full"
-                        >
-                          <span className="truncate">{label}</span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </>
               )}
             </div>
           )}
