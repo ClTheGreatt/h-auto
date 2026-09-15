@@ -9,6 +9,21 @@ import {
 import { BRANDING } from "./branding";
 import type { ReportBrandingAssets } from "./branding-assets";
 import { formatDate, formatDateTime } from "@/lib/format-date";
+import {
+  getReportExportMetadata,
+  type ReportExportContext,
+} from "./export-context";
+import {
+  summarizeActivity,
+  summarizeAlerts,
+  summarizeGrowthLogs,
+  summarizePlotPerformance,
+  summarizeSensorReadings,
+  summarizeStudentActivity,
+  type ReportSummary,
+} from "./summaries";
+import { MAX_GROWTH_LOG_PHOTOS, type GrowthLogPhotoEvidence } from "./growth-log-media";
+import type { AlertReportRow } from "./alert-notifications";
 
 const styles = StyleSheet.create({
   page: {
@@ -182,6 +197,34 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     marginTop: 8,
   },
+  summary: { marginBottom: 10 },
+  summaryTitle: {
+    fontSize: 9,
+    fontWeight: "bold",
+    color: BRANDING.primaryColor,
+    marginBottom: 5,
+  },
+  summaryItems: { flexDirection: "row", flexWrap: "wrap" },
+  summaryItem: { width: "50%", flexDirection: "row", marginBottom: 3 },
+  summaryLabel: { fontSize: 7.5, fontWeight: "bold", color: "#374151" },
+  summaryValue: { fontSize: 7.5, color: "#4b5563", marginLeft: 4, flex: 1 },
+  summaryTable: { marginTop: 5 },
+  summaryTableRow: {
+    flexDirection: "row",
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e5e7eb",
+  },
+  summaryTableHeading: { backgroundColor: "#e8f3eb" },
+  summaryTableCell: { fontSize: 7.5, color: "#374151" },
+  detailTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+    color: "#374151",
+    marginTop: 4,
+    marginBottom: 2,
+  },
   // Growth log entry
   logEntry: {
     borderWidth: 0.5,
@@ -198,6 +241,20 @@ const styles = StyleSheet.create({
   },
   logMeta: { fontSize: 8, color: "#6b7280", marginBottom: 4 },
   logBody: { fontSize: 8 },
+  logPhotoLabel: { fontSize: 8, fontWeight: "bold", color: "#374151", marginBottom: 4 },
+  logPhotoRow: { flexDirection: "row", gap: 6, marginBottom: 4 },
+  logPhotoFrame: {
+    width: "31%",
+    height: 92,
+    borderWidth: 0.5,
+    borderColor: "#d1d5db",
+    backgroundColor: "#f9fafb",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logPhotoImage: { width: "100%", height: "100%", objectFit: "contain" },
+  logPhotoUnavailable: { fontSize: 7.5, color: "#6b7280", textAlign: "center" },
+  logMorePhotos: { fontSize: 7.5, color: "#6b7280", textAlign: "right", marginBottom: 5 },
   // Severity colors
   badgeCritical: { backgroundColor: "#fee2e2", color: "#991b1b" },
   badgeWarning: { backgroundColor: "#fef3c7", color: "#92400e" },
@@ -217,6 +274,56 @@ type ReportMetadata = {
 };
 
 type TableColumn = { label: string; width: string };
+
+function ReportSummaryBlock({ summary }: { summary: ReportSummary }) {
+  const table = summary.table;
+  const columnWidths =
+    table?.headers.length === 5
+      ? ["28%", "12%", "20%", "20%", "20%"]
+      : ["70%", "30%"];
+  return (
+    <View style={styles.summary} wrap={false}>
+      <Text style={styles.summaryTitle}>REPORT SUMMARY</Text>
+      <View style={styles.summaryItems}>
+        {summary.items.map((item) => (
+          <View key={item.label} style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>{item.label}:</Text>
+            <Text style={styles.summaryValue}>{String(item.value)}</Text>
+          </View>
+        ))}
+      </View>
+      {table && table.rows.length > 0 && (
+        <View style={styles.summaryTable}>
+          <View style={[styles.summaryTableRow, styles.summaryTableHeading]}>
+            {table.headers.map((header, index) => (
+              <Text
+                key={header}
+                style={[
+                  styles.summaryTableCell,
+                  { width: columnWidths[index], fontWeight: "bold" },
+                ]}
+              >
+                {header}
+              </Text>
+            ))}
+          </View>
+          {table.rows.map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.summaryTableRow}>
+              {row.map((value, index) => (
+                <Text
+                  key={index}
+                  style={[styles.summaryTableCell, { width: columnWidths[index] }]}
+                >
+                  {String(value)}
+                </Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
 function TableHeader({ columns }: { columns: TableColumn[] }) {
   return (
@@ -350,6 +457,7 @@ export function SensorReadingsPDF({
   rangeLabel,
   plotName,
   assets,
+  exportContext,
 }: {
   data: Array<{
     recordedAt: Date;
@@ -366,6 +474,7 @@ export function SensorReadingsPDF({
   rangeLabel: string;
   plotName?: string;
   assets: ReportBrandingAssets;
+  exportContext: ReportExportContext;
 }) {
   const meta = [
     { label: "Time Range", value: rangeLabel },
@@ -380,7 +489,7 @@ export function SensorReadingsPDF({
           },
         ]
       : []),
-    { label: "Generated", value: formatDateTime(new Date()) },
+    ...getReportExportMetadata(exportContext),
   ] satisfies ReportMetadata[];
 
   // Header widths
@@ -406,6 +515,8 @@ export function SensorReadingsPDF({
           meta={meta}
           assets={assets}
         />
+        <ReportSummaryBlock summary={summarizeSensorReadings(data)} />
+        <Text style={styles.detailTitle}>DETAILED DATA</Text>
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -482,6 +593,7 @@ export function PlotPerformancePDF({
   data,
   rangeLabel,
   assets,
+  exportContext,
 }: {
   data: Array<{
     plotName: string;
@@ -502,24 +614,26 @@ export function PlotPerformancePDF({
   }>;
   rangeLabel: string;
   assets: ReportBrandingAssets;
+  exportContext: ReportExportContext;
 }) {
   const meta = [
     { label: "Time Range", value: rangeLabel },
     { label: "Total Plots", value: String(data.length) },
-    { label: "Generated", value: formatDateTime(new Date()) },
+    ...getReportExportMetadata(exportContext),
   ] satisfies ReportMetadata[];
 
   const cols = [
     { label: "Plot", width: "8%" },
     { label: "Crop / Variety", width: "12%" },
-    { label: "Stage", width: "10%" },
-    { label: "Status", width: "10%" },
+    { label: "Stage", width: "8%" },
+    { label: "Status", width: "8%" },
     { label: "Planted", width: "10%" },
     { label: "Harvest", width: "10%" },
     { label: "Readings", width: "8%" },
     { label: "Logs", width: "6%" },
-    { label: "Alerts (open / total)", width: "14%" },
-    { label: "Latest H/L", width: "12%" },
+    { label: "Alerts (range)", width: "10%" },
+    { label: "Open (current)", width: "10%" },
+    { label: "Latest H/L", width: "10%" },
   ];
 
   return (
@@ -531,6 +645,8 @@ export function PlotPerformancePDF({
           meta={meta}
           assets={assets}
         />
+        <ReportSummaryBlock summary={summarizePlotPerformance(data)} />
+        <Text style={styles.detailTitle}>DETAILED DATA</Text>
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>No plot data available.</Text>
@@ -549,10 +665,10 @@ export function PlotPerformancePDF({
                 <Text style={[styles.tableCell, { width: "12%" }]}>
                   {row.crop} / {row.variety}
                 </Text>
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text style={[styles.tableCell, { width: "8%" }]}>
                   {row.stage}
                 </Text>
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text style={[styles.tableCell, { width: "8%" }]}>
                   {row.status}
                 </Text>
                 <Text style={[styles.tableCell, { width: "10%" }]}>
@@ -572,12 +688,17 @@ export function PlotPerformancePDF({
                   {row.logCount}
                 </Text>
                 <Text
-                  style={[styles.tableCell, styles.numericCell, { width: "14%" }]}
+                  style={[styles.tableCell, styles.numericCell, { width: "10%" }]}
                 >
-                  {row.openAlertCount} / {row.alertCount}
+                  {row.alertCount}
                 </Text>
                 <Text
-                  style={[styles.tableCell, styles.numericCell, { width: "12%" }]}
+                  style={[styles.tableCell, styles.numericCell, { width: "10%" }]}
+                >
+                  {row.openAlertCount}
+                </Text>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "10%" }]}
                 >
                   {row.latestHeight != null ? `${row.latestHeight}cm` : "-"}
                   {row.latestLeafCount != null
@@ -591,7 +712,8 @@ export function PlotPerformancePDF({
 
         {data.length > 0 && (
           <Text style={styles.scopeNote}>
-            Lifetime (not time-range-scoped): open alert count, Latest H/L.
+            Current snapshot (not time-range-scoped): crop, stage, status,
+            planting and harvest dates, open alerts, latest height and leaf count.
           </Text>
         )}
 
@@ -609,6 +731,7 @@ export function GrowthLogPDF({
   rangeLabel,
   plotName,
   assets,
+  exportContext,
 }: {
   data: Array<{
     createdAt: Date;
@@ -620,16 +743,19 @@ export function GrowthLogPDF({
     observations: string;
     notes: string;
     imageCount: number;
+    imageUrls?: string[];
+    photoEvidence?: GrowthLogPhotoEvidence[];
   }>;
   rangeLabel: string;
   plotName?: string;
   assets: ReportBrandingAssets;
+  exportContext: ReportExportContext;
 }) {
   const meta = [
     { label: "Time Range", value: rangeLabel },
     { label: "Plot Filter", value: plotName ?? "All plots" },
     { label: "Total Entries", value: String(data.length) },
-    { label: "Generated", value: formatDateTime(new Date()) },
+    ...getReportExportMetadata(exportContext),
   ] satisfies ReportMetadata[];
 
   return (
@@ -637,6 +763,8 @@ export function GrowthLogPDF({
       <Page size="A4" style={styles.page}>
         <ReportPageChrome title="Growth Log Report" />
         <ReportHeader title="Growth Log Report" meta={meta} assets={assets} />
+        <ReportSummaryBlock summary={summarizeGrowthLogs(data)} />
+        <Text style={styles.detailTitle}>DETAILED DATA</Text>
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -644,19 +772,50 @@ export function GrowthLogPDF({
           </Text>
         ) : (
           data.map((log, i) => (
-            <View key={i} style={styles.logEntry} wrap={false}>
-              <View style={styles.logHeader}>
-                <Text style={{ fontWeight: "bold" }}>
-                  {log.plotName} | {log.stageName}
+            <View key={i} style={styles.logEntry}>
+              <View wrap={false}>
+                <View style={styles.logHeader}>
+                  <Text style={{ fontWeight: "bold" }}>
+                    {log.plotName} | {log.stageName}
+                  </Text>
+                  <Text>{formatDateTime(log.createdAt)}</Text>
+                </View>
+                <Text style={styles.logMeta}>
+                  By {log.authorName}
+                  {log.plantHeightCm != null && ` | Height: ${log.plantHeightCm} cm`}
+                  {log.leafCount != null && ` | Leaves: ${log.leafCount}`}
+                  {log.imageCount > 0 && ` | Photos: ${log.imageCount}`}
                 </Text>
-                <Text>{formatDateTime(log.createdAt)}</Text>
+                {log.imageCount > 0 && (
+                  <View>
+                    <Text style={styles.logPhotoLabel}>
+                      {log.imageCount === 1 ? "Photo" : "Photos"}
+                    </Text>
+                    <View style={styles.logPhotoRow} wrap={false}>
+                      {Array.from({ length: Math.min(log.imageCount, MAX_GROWTH_LOG_PHOTOS) }, (_, index) => (
+                        <View key={index} style={styles.logPhotoFrame} wrap={false}>
+                          {log.photoEvidence?.[index]?.src ? (
+                            /* React PDF Image does not expose an alt prop. */
+                            // eslint-disable-next-line jsx-a11y/alt-text
+                            <Image src={log.photoEvidence[index].src} style={styles.logPhotoImage} />
+                          ) : (
+                            <Text style={styles.logPhotoUnavailable}>
+                              {log.photoEvidence?.[index]?.omittedFromPdfLimit
+                                ? "Photo omitted from PDF export limit"
+                                : "Photo unavailable"}
+                            </Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                    {log.imageCount > MAX_GROWTH_LOG_PHOTOS && (
+                      <Text style={styles.logMorePhotos}>
+                        +{log.imageCount - MAX_GROWTH_LOG_PHOTOS} more photos
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
-              <Text style={styles.logMeta}>
-                By {log.authorName}
-                {log.plantHeightCm != null && ` | Height: ${log.plantHeightCm} cm`}
-                {log.leafCount != null && ` | Leaves: ${log.leafCount}`}
-                {log.imageCount > 0 && ` | Photos: ${log.imageCount}`}
-              </Text>
               {log.observations && (
                 <Text style={styles.logBody}>
                   <Text style={{ fontWeight: "bold" }}>Observations: </Text>
@@ -687,22 +846,13 @@ export function AlertsPDF({
   rangeLabel,
   plotName,
   assets,
+  exportContext,
 }: {
-  data: Array<{
-    createdAt: Date;
-    plotName: string;
-    type: string;
-    severity: string;
-    message: string;
-    resolved: boolean;
-    resolvedAt: Date | null;
-    notificationsSent: number;
-    notificationsFailed: number;
-    recipients: string;
-  }>;
+  data: AlertReportRow[];
   rangeLabel: string;
   plotName?: string;
   assets: ReportBrandingAssets;
+  exportContext: ReportExportContext;
 }) {
   const meta = [
     { label: "Time Range", value: rangeLabel },
@@ -710,7 +860,7 @@ export function AlertsPDF({
     { label: "Total Alerts", value: String(data.length) },
     { label: "Open", value: String(data.filter((a) => !a.resolved).length) },
     { label: "Resolved", value: String(data.filter((a) => a.resolved).length) },
-    { label: "Generated", value: formatDateTime(new Date()) },
+    ...getReportExportMetadata(exportContext),
   ] satisfies ReportMetadata[];
 
   const cols = [
@@ -719,8 +869,8 @@ export function AlertsPDF({
     { label: "Severity", width: "10%" },
     { label: "Message", width: "32%" },
     { label: "Status", width: "10%" },
-    { label: "SMS Sent", width: "10%" },
-    { label: "Recipients", width: "14%" },
+    { label: "Notifications", width: "14%" },
+    { label: "Recipient Users", width: "10%" },
   ];
 
   return (
@@ -728,6 +878,8 @@ export function AlertsPDF({
       <Page size="A4" orientation="landscape" style={styles.page}>
         <ReportPageChrome title="Alerts Report" columns={cols} />
         <ReportHeader title="Alerts Report" meta={meta} assets={assets} />
+        <ReportSummaryBlock summary={summarizeAlerts(data)} />
+        <Text style={styles.detailTitle}>DETAILED DATA</Text>
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -758,14 +910,12 @@ export function AlertsPDF({
                   {row.resolved ? "Resolved" : "Open"}
                 </Text>
                 <Text
-                  style={[styles.tableCell, styles.numericCell, { width: "10%" }]}
+                  style={[styles.tableCell, { width: "14%" }]}
                 >
-                  {row.notificationsSent}
-                  {row.notificationsFailed > 0 &&
-                    ` (${row.notificationsFailed} failed)`}
+                  {`${row.sentNotificationRecords} sent / ${row.failedNotificationRecords} failed`}
                 </Text>
-                <Text style={[styles.tableCell, { width: "14%" }]}>
-                  {row.recipients || "-"}
+                <Text style={[styles.tableCell, styles.numericCell, { width: "10%" }]}>
+                  {row.recipientUsers}
                 </Text>
               </View>
             ))}
@@ -785,6 +935,7 @@ export function ActivityPDF({
   data,
   rangeLabel,
   assets,
+  exportContext,
 }: {
   data: Array<{
     timestamp: Date;
@@ -794,6 +945,7 @@ export function ActivityPDF({
   }> & { truncated: boolean };
   rangeLabel: string;
   assets: ReportBrandingAssets;
+  exportContext: ReportExportContext;
 }) {
   const meta = [
     { label: "Time Range", value: rangeLabel },
@@ -806,7 +958,7 @@ export function ActivityPDF({
           },
         ]
       : []),
-    { label: "Generated", value: formatDateTime(new Date()) },
+    ...getReportExportMetadata(exportContext),
   ] satisfies ReportMetadata[];
 
   const cols = [
@@ -825,10 +977,12 @@ export function ActivityPDF({
           meta={meta}
           assets={assets}
         />
+        <ReportSummaryBlock summary={summarizeActivity(data)} />
+        <Text style={styles.detailTitle}>DETAILED DATA</Text>
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
-            No system activity found for the selected time range.
+            No events included for the selected scope.
           </Text>
         ) : (
           <View style={styles.table}>
@@ -869,6 +1023,7 @@ export function StudentActivityPDF({
   data,
   rangeLabel,
   assets,
+  exportContext,
 }: {
   data: Array<{
     studentName: string;
@@ -882,18 +1037,19 @@ export function StudentActivityPDF({
   }>;
   rangeLabel: string;
   assets: ReportBrandingAssets;
+  exportContext: ReportExportContext;
 }) {
   const meta = [
     { label: "Time Range", value: rangeLabel },
     { label: "Total Students", value: String(data.length) },
-    { label: "Generated", value: formatDateTime(new Date()) },
+    ...getReportExportMetadata(exportContext),
   ] satisfies ReportMetadata[];
 
   const cols = [
     { label: "Student", width: "18%" },
     { label: "ID Number", width: "14%" },
     { label: "Section", width: "9%" },
-    { label: "Plots", width: "8%" },
+    { label: "Active plots", width: "8%" },
     { label: "Logs (range)", width: "13%" },
     { label: "Total Logs", width: "12%" },
     { label: "Photos (range)", width: "13%" },
@@ -909,6 +1065,8 @@ export function StudentActivityPDF({
           meta={meta}
           assets={assets}
         />
+        <ReportSummaryBlock summary={summarizeStudentActivity(data)} />
+        <Text style={styles.detailTitle}>DETAILED DATA</Text>
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -962,7 +1120,8 @@ export function StudentActivityPDF({
 
         {data.length > 0 && (
           <Text style={styles.scopeNote}>
-            Lifetime (not time-range-scoped): Plots, Total Logs, Last Log.
+            Current active assignments are not time-range-scoped.
+            Total logs and last log are lifetime within report access.
           </Text>
         )}
 

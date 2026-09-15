@@ -8,6 +8,8 @@ import {
   StudentActivityPDF,
 } from "./pdf-generators";
 import { loadReportBrandingAssets } from "./branding-assets";
+import type { ReportExportContext } from "./export-context";
+import { prepareGrowthLogPhotoEvidence } from "./growth-log-media";
 
 // Types for the data each renderer accepts
 type SensorReadingsData = Parameters<typeof SensorReadingsPDF>[0]["data"];
@@ -20,7 +22,8 @@ type StudentActivityData = Parameters<typeof StudentActivityPDF>[0]["data"];
 export async function renderSensorReadingsPDF(
   data: SensorReadingsData,
   rangeLabel: string,
-  plotName?: string
+  plotName: string | undefined,
+  exportContext: ReportExportContext
 ): Promise<Buffer> {
   const assets = await loadReportBrandingAssets();
   return await renderToBuffer(
@@ -28,6 +31,7 @@ export async function renderSensorReadingsPDF(
       data={data}
       rangeLabel={rangeLabel}
       plotName={plotName}
+      exportContext={exportContext}
       assets={assets}
     />
   );
@@ -35,25 +39,37 @@ export async function renderSensorReadingsPDF(
 
 export async function renderPlotPerformancePDF(
   data: PlotPerformanceData,
-  rangeLabel: string
+  rangeLabel: string,
+  exportContext: ReportExportContext
 ): Promise<Buffer> {
   const assets = await loadReportBrandingAssets();
   return await renderToBuffer(
-    <PlotPerformancePDF data={data} rangeLabel={rangeLabel} assets={assets} />
+    <PlotPerformancePDF
+      data={data}
+      rangeLabel={rangeLabel}
+      assets={assets}
+      exportContext={exportContext}
+    />
   );
 }
 
 export async function renderGrowthLogPDF(
   data: GrowthLogData,
   rangeLabel: string,
-  plotName?: string
+  plotName: string | undefined,
+  exportContext: ReportExportContext,
+  mediaOptions: Parameters<typeof prepareGrowthLogPhotoEvidence>[1] = {}
 ): Promise<Buffer> {
-  const assets = await loadReportBrandingAssets();
+  const [assets, photoEvidence] = await Promise.all([
+    loadReportBrandingAssets(),
+    prepareGrowthLogPhotoEvidence(data, mediaOptions),
+  ]);
   return await renderToBuffer(
     <GrowthLogPDF
-      data={data}
+      data={data.map((row, index) => ({ ...row, photoEvidence: photoEvidence[index] }))}
       rangeLabel={rangeLabel}
       plotName={plotName}
+      exportContext={exportContext}
       assets={assets}
     />
   );
@@ -62,7 +78,8 @@ export async function renderGrowthLogPDF(
 export async function renderAlertsPDF(
   data: AlertsData,
   rangeLabel: string,
-  plotName?: string
+  plotName: string | undefined,
+  exportContext: ReportExportContext
 ): Promise<Buffer> {
   const assets = await loadReportBrandingAssets();
   return await renderToBuffer(
@@ -70,6 +87,7 @@ export async function renderAlertsPDF(
       data={data}
       rangeLabel={rangeLabel}
       plotName={plotName}
+      exportContext={exportContext}
       assets={assets}
     />
   );
@@ -77,20 +95,32 @@ export async function renderAlertsPDF(
 
 export async function renderActivityPDF(
   data: ActivityData,
-  rangeLabel: string
+  rangeLabel: string,
+  exportContext: ReportExportContext
 ): Promise<Buffer> {
   const assets = await loadReportBrandingAssets();
   return await renderToBuffer(
-    <ActivityPDF data={data} rangeLabel={rangeLabel} assets={assets} />
+    <ActivityPDF
+      data={data}
+      rangeLabel={rangeLabel}
+      assets={assets}
+      exportContext={exportContext}
+    />
   );
 }
 
 export async function renderStudentActivityPDF(
   data: StudentActivityData,
-  rangeLabel: string
+  rangeLabel: string,
+  exportContext: ReportExportContext
 ): Promise<Buffer> {
   const assets = await loadReportBrandingAssets();
   return await renderToBuffer(
-    <StudentActivityPDF data={data} rangeLabel={rangeLabel} assets={assets} />
+    <StudentActivityPDF
+      data={data}
+      rangeLabel={rangeLabel}
+      assets={assets}
+      exportContext={exportContext}
+    />
   );
 }

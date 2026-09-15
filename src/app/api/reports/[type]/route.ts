@@ -14,6 +14,7 @@ import {
   buildReportPlotWhere,
 } from "@/lib/reports/data-fetchers";
 import { getManilaDateKey } from "@/lib/analytics/manila-dates";
+import { buildReportExportContext } from "@/lib/reports/export-context";
 import {
   renderSensorReadingsPDF,
   renderPlotPerformancePDF,
@@ -114,10 +115,31 @@ export async function GET(
   }
 
   try {
+    const storedExporter = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        firstName: true,
+        middleName: true,
+        lastName: true,
+        role: true,
+        section: true,
+        status: true,
+        graduatedAt: true,
+      },
+    });
+    if (
+      !storedExporter ||
+      storedExporter.status !== "ACTIVE" ||
+      storedExporter.graduatedAt ||
+      storedExporter.role !== session.user.role
+    ) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const exportContext = buildReportExportContext(storedExporter, new Date());
     let buffer: Buffer;
     let mimeType: string;
     let filename: string;
-    const timestamp = getManilaDateKey(new Date());
+    const timestamp = getManilaDateKey(exportContext.generatedAt);
 
     switch (type) {
       case "sensor-readings": {
@@ -128,11 +150,11 @@ export async function GET(
           userId: session.user.id,
         });
         if (format === "excel") {
-          buffer = await generateSensorReadingsExcel(data, rangeLabel, plotName);
+          buffer = await generateSensorReadingsExcel(data, rangeLabel, plotName, exportContext);
           mimeType = EXCEL_MIME;
           filename = `sensor-readings-${timestamp}.xlsx`;
         } else {
-          buffer = await renderSensorReadingsPDF(data, rangeLabel, plotName);
+          buffer = await renderSensorReadingsPDF(data, rangeLabel, plotName, exportContext);
           mimeType = "application/pdf";
           filename = `sensor-readings-${timestamp}.pdf`;
         }
@@ -145,11 +167,11 @@ export async function GET(
           userId: session.user.id,
         });
         if (format === "excel") {
-          buffer = await generatePlotPerformanceExcel(data, rangeLabel);
+          buffer = await generatePlotPerformanceExcel(data, rangeLabel, exportContext);
           mimeType = EXCEL_MIME;
           filename = `plot-performance-${timestamp}.xlsx`;
         } else {
-          buffer = await renderPlotPerformancePDF(data, rangeLabel);
+          buffer = await renderPlotPerformancePDF(data, rangeLabel, exportContext);
           mimeType = "application/pdf";
           filename = `plot-performance-${timestamp}.pdf`;
         }
@@ -163,11 +185,11 @@ export async function GET(
           userId: session.user.id,
         });
         if (format === "excel") {
-          buffer = await generateGrowthLogExcel(data, rangeLabel, plotName);
+          buffer = await generateGrowthLogExcel(data, rangeLabel, plotName, exportContext);
           mimeType = EXCEL_MIME;
           filename = `growth-log-${timestamp}.xlsx`;
         } else {
-          buffer = await renderGrowthLogPDF(data, rangeLabel, plotName);
+          buffer = await renderGrowthLogPDF(data, rangeLabel, plotName, exportContext);
           mimeType = "application/pdf";
           filename = `growth-log-${timestamp}.pdf`;
         }
@@ -181,11 +203,11 @@ export async function GET(
           userId: session.user.id,
         });
         if (format === "excel") {
-          buffer = await generateAlertsExcel(data, rangeLabel, plotName);
+          buffer = await generateAlertsExcel(data, rangeLabel, plotName, exportContext);
           mimeType = EXCEL_MIME;
           filename = `alerts-${timestamp}.xlsx`;
         } else {
-          buffer = await renderAlertsPDF(data, rangeLabel, plotName);
+          buffer = await renderAlertsPDF(data, rangeLabel, plotName, exportContext);
           mimeType = "application/pdf";
           filename = `alerts-${timestamp}.pdf`;
         }
@@ -194,11 +216,11 @@ export async function GET(
       case "activity": {
         const data = await fetchActivityData({ range });
         if (format === "excel") {
-          buffer = await generateActivityExcel(data, rangeLabel);
+          buffer = await generateActivityExcel(data, rangeLabel, exportContext);
           mimeType = EXCEL_MIME;
           filename = `system-activity-${timestamp}.xlsx`;
         } else {
-          buffer = await renderActivityPDF(data, rangeLabel);
+          buffer = await renderActivityPDF(data, rangeLabel, exportContext);
           mimeType = "application/pdf";
           filename = `system-activity-${timestamp}.pdf`;
         }
@@ -211,11 +233,11 @@ export async function GET(
           userId: session.user.id,
         });
         if (format === "excel") {
-          buffer = await generateStudentActivityExcel(data, rangeLabel);
+          buffer = await generateStudentActivityExcel(data, rangeLabel, exportContext);
           mimeType = EXCEL_MIME;
           filename = `student-activity-${timestamp}.xlsx`;
         } else {
-          buffer = await renderStudentActivityPDF(data, rangeLabel);
+          buffer = await renderStudentActivityPDF(data, rangeLabel, exportContext);
           mimeType = "application/pdf";
           filename = `student-activity-${timestamp}.pdf`;
         }

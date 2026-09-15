@@ -5,16 +5,31 @@ import {
   type ReportBrandingAssets,
 } from "./branding-assets";
 import { formatDate, formatDateTime } from "@/lib/format-date";
+import {
+  getReportExportMetadata,
+  type ReportExportContext,
+} from "./export-context";
+import {
+  summarizeActivity,
+  summarizeAlerts,
+  summarizeGrowthLogs,
+  summarizePlotPerformance,
+  summarizeSensorReadings,
+  summarizeStudentActivity,
+  type ReportSummary,
+} from "./summaries";
+import { trustedCloudinaryUrl } from "./growth-log-media";
+import type { AlertReportRow } from "./alert-notifications";
 
 // =============================================================
 // SHARED HELPERS
 // =============================================================
 
-function applyBranding(workbook: ExcelJS.Workbook) {
+function applyBranding(workbook: ExcelJS.Workbook, generatedAt: Date) {
   workbook.creator = BRANDING.systemName;
   workbook.lastModifiedBy = BRANDING.systemName;
-  workbook.created = new Date();
-  workbook.modified = new Date();
+  workbook.created = generatedAt;
+  workbook.modified = generatedAt;
 }
 
 function styleHeaderRow(row: ExcelJS.Row) {
@@ -44,7 +59,8 @@ function addTitleRows(
   reportTitle: string,
   meta: string[],
   reportColumnCount: number,
-  assets: ReportBrandingAssets
+  assets: ReportBrandingAssets,
+  summary: ReportSummary
 ) {
   const brandingWidth = Math.max(8, reportColumnCount);
   const centerStartColumn = 2;
@@ -135,6 +151,55 @@ function addTitleRows(
     row++;
   }
 
+  sheet.mergeCells(row, 1, row, brandingWidth);
+  const summaryTitle = sheet.getCell(row, 1);
+  summaryTitle.value = "REPORT SUMMARY";
+  summaryTitle.font = {
+    bold: true,
+    size: 10,
+    color: { argb: "FF166534" },
+  };
+  summaryTitle.border = {
+    top: { style: "thin", color: { argb: "FF166534" } },
+  };
+  sheet.getRow(row).height = 20;
+  row++;
+
+  for (const item of summary.items) {
+    sheet.mergeCells(row, 1, row, 3);
+    sheet.mergeCells(row, 4, row, brandingWidth);
+    const labelCell = sheet.getCell(row, 1);
+    labelCell.value = item.label;
+    labelCell.font = { bold: true, size: 9, color: { argb: "FF374151" } };
+    const valueCell = sheet.getCell(row, 4);
+    valueCell.value = item.value;
+    valueCell.font = { size: 9, color: { argb: "FF4B5563" } };
+    valueCell.alignment = { horizontal: "left", vertical: "middle" };
+    sheet.getRow(row).height = 18;
+    row++;
+  }
+
+  if (summary.table && summary.table.rows.length > 0) {
+    const { headers, rows } = summary.table;
+    sheet.getRow(row).values = headers;
+    for (let column = 1; column <= headers.length; column++) {
+      const cell = sheet.getCell(row, column);
+      cell.font = { bold: true, size: 9, color: { argb: "FF166534" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE8F3EB" },
+      };
+    }
+    sheet.getRow(row).height = 20;
+    row++;
+    for (const values of rows) {
+      sheet.getRow(row).values = values;
+      sheet.getRow(row).height = 17;
+      row++;
+    }
+  }
+
   sheet.getRow(row).height = 8; // spacer
   return row + 1; // first row for headers
 }
@@ -193,10 +258,11 @@ export async function generateSensorReadingsExcel(
     potassium: number | null;
   }> & { truncated: boolean },
   rangeLabel: string,
-  plotName?: string
+  plotName: string | undefined,
+  exportContext: ReportExportContext
 ) {
   const wb = new ExcelJS.Workbook();
-  applyBranding(wb);
+  applyBranding(wb, exportContext.generatedAt);
   const sheet = wb.addWorksheet("Sensor Readings");
   const assets = await loadReportBrandingAssets();
 
@@ -207,7 +273,7 @@ export async function generateSensorReadingsExcel(
     ...(data.truncated
       ? ["Most recent 5,000 records shown; additional matching records omitted."]
       : []),
-    `Generated: ${formatDateTime(new Date())}`,
+    ...getReportExportMetadata(exportContext).map((item) => `${item.label}: ${item.value}`),
   ];
 
   const headers = [
@@ -229,7 +295,8 @@ export async function generateSensorReadingsExcel(
     "Sensor Readings Report",
     meta,
     headers.length,
-    assets
+    assets,
+    summarizeSensorReadings(data)
   );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
@@ -301,17 +368,18 @@ export async function generatePlotPerformanceExcel(
     latestHeight: number | null;
     latestLeafCount: number | null;
   }>,
-  rangeLabel: string
+  rangeLabel: string,
+  exportContext: ReportExportContext
 ) {
   const wb = new ExcelJS.Workbook();
-  applyBranding(wb);
+  applyBranding(wb, exportContext.generatedAt);
   const sheet = wb.addWorksheet("Plot Performance");
   const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
     `Total plots: ${data.length}`,
-    `Generated: ${formatDateTime(new Date())}`,
+    ...getReportExportMetadata(exportContext).map((item) => `${item.label}: ${item.value}`),
   ];
 
   const headers = [
@@ -325,9 +393,9 @@ export async function generatePlotPerformanceExcel(
     "Expected Harvest",
     "Sensor Readings",
     "Growth Logs",
-    "Total Alerts",
-    "Open Alerts",
-    "Active Assignments",
+    "Alerts (range)",
+    "Current Open Alerts",
+    "Current Active Assignments",
     "Latest Height (cm)",
     "Latest Leaf Count",
   ];
@@ -337,7 +405,8 @@ export async function generatePlotPerformanceExcel(
     "Plot Performance Report",
     meta,
     headers.length,
-    assets
+    assets,
+    summarizePlotPerformance(data)
   );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
@@ -394,7 +463,7 @@ export async function generatePlotPerformanceExcel(
     sheet.mergeCells(row, 1, row, 15);
     const noteCell = sheet.getCell(row, 1);
     noteCell.value =
-      "Lifetime (not time-range-scoped): Open Alerts, Active Assignments, Latest Height, Latest Leaf Count.";
+      "Current snapshot (not time-range-scoped): Crop, Variety, Stage, Status, Planting and Harvest Dates, Open Alerts, Active Assignments, Latest Height, Latest Leaf Count.";
     noteCell.font = { size: 9, color: { argb: "FF6B7280" } };
   }
 
@@ -417,12 +486,14 @@ export async function generateGrowthLogExcel(
     observations: string;
     notes: string;
     imageCount: number;
+    imageUrls?: string[];
   }>,
   rangeLabel: string,
-  plotName?: string
+  plotName: string | undefined,
+  exportContext: ReportExportContext
 ) {
   const wb = new ExcelJS.Workbook();
-  applyBranding(wb);
+  applyBranding(wb, exportContext.generatedAt);
   const sheet = wb.addWorksheet("Growth Log");
   const assets = await loadReportBrandingAssets();
 
@@ -430,7 +501,7 @@ export async function generateGrowthLogExcel(
     `Time range: ${rangeLabel}`,
     `Plot filter: ${plotName ?? "All plots"}`,
     `Total entries: ${data.length}`,
-    `Generated: ${formatDateTime(new Date())}`,
+    ...getReportExportMetadata(exportContext).map((item) => `${item.label}: ${item.value}`),
   ];
 
   const headers = [
@@ -442,7 +513,8 @@ export async function generateGrowthLogExcel(
     "Leaf Count",
     "Observations",
     "Notes",
-    "Photos",
+    "Photo Count",
+    "Photo",
   ];
   const headerRowIndex = addTitleRows(
     wb,
@@ -450,7 +522,8 @@ export async function generateGrowthLogExcel(
     "Growth Log Report",
     meta,
     headers.length,
-    assets
+    assets,
+    summarizeGrowthLogs(data)
   );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
@@ -465,10 +538,12 @@ export async function generateGrowthLogExcel(
     { width: 50 },
     { width: 40 },
     { width: 10 },
+    { width: 19 },
   ];
 
   let row = headerRowIndex + 1;
   for (const r of data) {
+    const trustedFirstPhoto = trustedCloudinaryUrl(r.imageUrls?.[0]);
     sheet.getRow(row).values = [
       formatDateTime(r.createdAt),
       r.plotName,
@@ -479,7 +554,18 @@ export async function generateGrowthLogExcel(
       r.observations,
       r.notes,
       r.imageCount,
+      r.imageCount === 0
+        ? "—"
+        : trustedFirstPhoto
+          ? { text: r.imageCount === 1 ? "View photo" : "View first photo", hyperlink: trustedFirstPhoto }
+          : "Unavailable",
     ];
+    if (trustedFirstPhoto && r.imageCount > 0) {
+      sheet.getCell(row, 10).font = {
+        color: { argb: "FF0563C1" },
+        underline: true,
+      };
+    }
     sheet.getRow(row).alignment = { vertical: "top", wrapText: true };
     if (row % 2 === 0) {
       sheet.getRow(row).fill = {
@@ -499,24 +585,63 @@ export async function generateGrowthLogExcel(
 // REPORT 4: ALERTS
 // =============================================================
 
+function addAlertNotificationsSheet(wb: ExcelJS.Workbook, data: AlertReportRow[]) {
+  const detail = wb.addWorksheet("Alert Notifications");
+  const detailHeaders = [
+    "Alert Date",
+    "Plot",
+    "Alert Type",
+    "Severity",
+    "Recipient",
+    "Channel",
+    "Status",
+  ];
+  detail.mergeCells(1, 1, 1, detailHeaders.length);
+  const detailTitle = detail.getCell(1, 1);
+  detailTitle.value = "ALERT NOTIFICATIONS";
+  detailTitle.font = { bold: true, size: 13, color: { argb: "FF166534" } };
+  detailTitle.alignment = { vertical: "middle" };
+  detail.getRow(1).height = 26;
+  const detailHeaderRow = 2;
+  detail.getRow(detailHeaderRow).values = detailHeaders;
+  styleHeaderRow(detail.getRow(detailHeaderRow));
+  detail.columns = [
+    { width: 22 },
+    { width: 14 },
+    { width: 24 },
+    { width: 12 },
+    { width: 26 },
+    { width: 12 },
+    { width: 14 },
+  ];
+
+  let detailRow = detailHeaderRow + 1;
+  for (const alert of data) {
+    for (const notification of alert.notificationDetails) {
+      detail.getRow(detailRow).values = [
+        formatDateTime(alert.createdAt),
+        alert.plotName,
+        alert.type,
+        alert.severity,
+        notification.recipient,
+        notification.channel,
+        notification.status,
+      ];
+      detail.getRow(detailRow).alignment = { vertical: "top", wrapText: true };
+      detailRow++;
+    }
+  }
+  configureWorksheet(detail, detailHeaderRow, detailHeaders.length, "landscape");
+}
+
 export async function generateAlertsExcel(
-  data: Array<{
-    createdAt: Date;
-    plotName: string;
-    type: string;
-    severity: string;
-    message: string;
-    resolved: boolean;
-    resolvedAt: Date | null;
-    notificationsSent: number;
-    notificationsFailed: number;
-    recipients: string;
-  }>,
+  data: AlertReportRow[],
   rangeLabel: string,
-  plotName?: string
+  plotName: string | undefined,
+  exportContext: ReportExportContext
 ) {
   const wb = new ExcelJS.Workbook();
-  applyBranding(wb);
+  applyBranding(wb, exportContext.generatedAt);
   const sheet = wb.addWorksheet("Alerts");
   const assets = await loadReportBrandingAssets();
 
@@ -526,7 +651,7 @@ export async function generateAlertsExcel(
     `Total alerts: ${data.length}`,
     `Open: ${data.filter((a) => !a.resolved).length}`,
     `Resolved: ${data.filter((a) => a.resolved).length}`,
-    `Generated: ${formatDateTime(new Date())}`,
+    ...getReportExportMetadata(exportContext).map((item) => `${item.label}: ${item.value}`),
   ];
 
   const headers = [
@@ -537,9 +662,9 @@ export async function generateAlertsExcel(
     "Message",
     "Status",
     "Resolved At",
-    "SMS Sent",
-    "SMS Failed",
-    "Recipients",
+    "Sent Records",
+    "Failed Records",
+    "Recipient Users",
   ];
   const headerRowIndex = addTitleRows(
     wb,
@@ -547,7 +672,8 @@ export async function generateAlertsExcel(
     "Alerts Report",
     meta,
     headers.length,
-    assets
+    assets,
+    summarizeAlerts(data)
   );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
@@ -560,9 +686,9 @@ export async function generateAlertsExcel(
     { width: 50 },
     { width: 12 },
     { width: 22 },
-    { width: 12 },
-    { width: 12 },
-    { width: 30 },
+    { width: 14 },
+    { width: 14 },
+    { width: 16 },
   ];
 
   let row = headerRowIndex + 1;
@@ -575,9 +701,9 @@ export async function generateAlertsExcel(
       r.message,
       r.resolved ? "Resolved" : "Open",
       formatDateTime(r.resolvedAt),
-      r.notificationsSent,
-      r.notificationsFailed,
-      r.recipients,
+      r.sentNotificationRecords,
+      r.failedNotificationRecords,
+      r.recipientUsers,
     ];
 
     // Color severity cell
@@ -603,6 +729,7 @@ export async function generateAlertsExcel(
   }
 
   configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
+  addAlertNotificationsSheet(wb, data);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -617,10 +744,11 @@ export async function generateActivityExcel(
     description: string;
     actor: string;
   }> & { truncated: boolean },
-  rangeLabel: string
+  rangeLabel: string,
+  exportContext: ReportExportContext
 ) {
   const wb = new ExcelJS.Workbook();
-  applyBranding(wb);
+  applyBranding(wb, exportContext.generatedAt);
   const sheet = wb.addWorksheet("System Activity");
   const assets = await loadReportBrandingAssets();
 
@@ -630,7 +758,7 @@ export async function generateActivityExcel(
     ...(data.truncated
       ? ["Showing only the most recent 100 records per event type."]
       : []),
-    `Generated: ${formatDateTime(new Date())}`,
+    ...getReportExportMetadata(exportContext).map((item) => `${item.label}: ${item.value}`),
   ];
 
   const headers = ["Timestamp", "Event Type", "Description", "Actor"];
@@ -640,7 +768,8 @@ export async function generateActivityExcel(
     "System Activity Report",
     meta,
     headers.length,
-    assets
+    assets,
+    summarizeActivity(data)
   );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
@@ -690,24 +819,25 @@ export async function generateStudentActivityExcel(
     photoCount: number;
     lastLogAt: Date | null;
   }>,
-  rangeLabel: string
+  rangeLabel: string,
+  exportContext: ReportExportContext
 ) {
   const wb = new ExcelJS.Workbook();
-  applyBranding(wb);
+  applyBranding(wb, exportContext.generatedAt);
   const sheet = wb.addWorksheet("Student Activity");
   const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
     `Total students: ${data.length}`,
-    `Generated: ${formatDateTime(new Date())}`,
+    ...getReportExportMetadata(exportContext).map((item) => `${item.label}: ${item.value}`),
   ];
 
   const headers = [
     "Student",
     "ID Number",
     "Section",
-    "Plots Assigned",
+    "Current Active Assignments",
     "Observations (range)",
     "Total Observations",
     "Photos (range)",
@@ -719,7 +849,8 @@ export async function generateStudentActivityExcel(
     "Student Activity Report",
     meta,
     headers.length,
-    assets
+    assets,
+    summarizeStudentActivity(data)
   );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
@@ -761,10 +892,11 @@ export async function generateStudentActivityExcel(
     sheet.mergeCells(row, 1, row, 8);
     const noteCell = sheet.getCell(row, 1);
     noteCell.value =
-      "Lifetime (not time-range-scoped): Plots Assigned, Total Observations, Last Log.";
+      "Current active assignments are not time-range-scoped. Total observations and last log are lifetime within report access.";
     noteCell.font = { size: 9, color: { argb: "FF6B7280" } };
   }
 
   configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
+
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

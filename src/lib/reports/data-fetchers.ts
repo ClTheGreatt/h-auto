@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, UserRole } from "@prisma/client";
 import { getDateFromRange, type TimeRange } from "@/lib/analytics/time-range";
 import { buildAccessiblePlotWhere } from "@/lib/alerts/scope";
+import { summarizeAlertNotifications } from "./alert-notifications";
 
 export type ReportFilters = {
   range: TimeRange;
@@ -185,7 +186,10 @@ export async function fetchGrowthLogData(filters: ScopedReportFilters) {
       plot: { select: { name: true } },
       stage: { select: { name: true } },
       user: { select: { firstName: true, lastName: true } },
-      images: { select: { imageUrl: true } },
+      images: {
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { imageUrl: true },
+      },
     },
   });
 
@@ -199,6 +203,7 @@ export async function fetchGrowthLogData(filters: ScopedReportFilters) {
     observations: log.observations ?? "",
     notes: log.notes ?? "",
     imageCount: log.images.length,
+    imageUrls: log.images.map((image) => image.imageUrl),
   }));
 }
 
@@ -233,11 +238,7 @@ export async function fetchAlertsData(filters: ScopedReportFilters) {
     message: a.message,
     resolved: a.resolved,
     resolvedAt: a.resolvedAt,
-    notificationsSent: a.notifications.filter((n) => n.status === "SENT").length,
-    notificationsFailed: a.notifications.filter((n) => n.status === "FAILED").length,
-    recipients: a.notifications
-      .map((n) => `${n.user.firstName} ${n.user.lastName}`)
-      .join(", "),
+    ...summarizeAlertNotifications(a.notifications),
   }));
 }
 
