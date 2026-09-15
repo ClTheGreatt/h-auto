@@ -3,38 +3,132 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
 } from "@react-pdf/renderer";
 import { BRANDING } from "./branding";
+import type { ReportBrandingAssets } from "./branding-assets";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 9, fontFamily: "Helvetica" },
+  page: {
+    paddingTop: 64,
+    paddingHorizontal: 36,
+    paddingBottom: 44,
+    fontSize: 9,
+    fontFamily: "Helvetica",
+  },
   // Header
   header: {
-    borderBottomWidth: 2,
+    marginTop: 0,
+    borderBottomWidth: 1.5,
     borderBottomColor: BRANDING.primaryColor,
-    paddingBottom: 12,
-    marginBottom: 16,
+    paddingBottom: 10,
+    marginBottom: 12,
   },
-  schoolName: { fontSize: 11, fontWeight: "bold", color: "#374151" },
-  campus: { fontSize: 9, color: "#6b7280", marginTop: 2 },
+  institutionalRow: {
+    minHeight: 62,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  logoSlot: {
+    width: 62,
+    height: 62,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sealLogo: { width: 42, height: 56, objectFit: "contain" },
+  agricultureLogo: { width: 56, height: 56, objectFit: "contain" },
+  institutionalText: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  universityName: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#1f2937",
+    textAlign: "center",
+    textTransform: "uppercase",
+  },
+  campusName: { fontSize: 9, color: "#374151", marginTop: 2 },
+  collegeName: { fontSize: 9, color: "#374151", marginTop: 1 },
   systemName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "bold",
     color: BRANDING.primaryColor,
-    marginTop: 6,
+    marginTop: 7,
+    textTransform: "uppercase",
   },
-  tagline: { fontSize: 8, color: "#6b7280", marginTop: 2 },
+  systemSubtitle: {
+    fontSize: 7.5,
+    color: "#4b5563",
+    marginTop: 2,
+    textAlign: "center",
+  },
   // Title
-  reportTitle: { fontSize: 16, fontWeight: "bold", marginTop: 14, marginBottom: 6 },
-  metaRow: {
+  reportTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    marginTop: 10,
+    marginBottom: 7,
+    color: "#111827",
+    textTransform: "uppercase",
+  },
+  metaGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 12,
-    fontSize: 9,
+    marginHorizontal: -4,
+  },
+  metaItem: {
+    width: "50%",
+    flexDirection: "row",
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  metaLabel: {
+    width: 72,
+    fontSize: 8,
+    fontWeight: "bold",
+    color: "#374151",
+  },
+  metaValue: { flex: 1, fontSize: 8, color: "#4b5563" },
+  metaNote: {
+    width: "100%",
+    paddingHorizontal: 4,
+    marginTop: 1,
+    fontSize: 7.5,
     color: "#6b7280",
+  },
+  continuationHeader: {
+    position: "absolute",
+    top: 9,
+    left: 36,
+    right: 36,
+    height: 29,
+  },
+  continuationHeaderContent: {
+    height: 29,
+    borderBottomWidth: 1,
+    borderBottomColor: BRANDING.primaryColor,
+    alignItems: "center",
+  },
+  continuationUniversity: {
+    fontSize: 7,
+    fontWeight: "bold",
+    color: "#374151",
+  },
+  continuationTitle: {
+    fontSize: 8,
+    fontWeight: "bold",
+    color: BRANDING.primaryColor,
+    marginTop: 2,
+  },
+  continuationTableHeader: {
+    position: "absolute",
+    top: 40,
+    left: 36,
+    right: 36,
   },
   // Table
   table: { width: "100%", marginTop: 8 },
@@ -54,12 +148,13 @@ const styles = StyleSheet.create({
   },
   tableRowAlt: { backgroundColor: "#f9fafb" },
   tableCell: { fontSize: 8 },
+  numericCell: { textAlign: "center" },
   // Footer
   footer: {
     position: "absolute",
     bottom: 20,
-    left: 40,
-    right: 40,
+    left: 36,
+    right: 36,
     flexDirection: "row",
     justifyContent: "space-between",
     fontSize: 7,
@@ -115,22 +210,115 @@ const styles = StyleSheet.create({
 // REUSABLE COMPONENTS
 // ============================================================================
 
-function ReportHeader({ title, meta }: { title: string; meta: string[] }) {
+type ReportMetadata = {
+  label?: string;
+  value: string;
+  note?: boolean;
+};
+
+type TableColumn = { label: string; width: string };
+
+function TableHeader({ columns }: { columns: TableColumn[] }) {
   return (
-    <View style={styles.header} fixed>
-      <Text style={styles.schoolName}>{BRANDING.schoolName}</Text>
-      <Text style={styles.campus}>
-        {BRANDING.campus} | {BRANDING.department}
-      </Text>
-      <Text style={styles.systemName}>{BRANDING.systemName}</Text>
-      <Text style={styles.tagline}>{BRANDING.tagline}</Text>
+    <View style={styles.tableHeader}>
+      {columns.map((column) => (
+        <Text
+          key={column.label}
+          style={[styles.tableHeaderCell, { width: column.width }]}
+        >
+          {column.label}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function ReportHeader({
+  title,
+  meta,
+  assets,
+}: {
+  title: string;
+  meta: ReportMetadata[];
+  assets: ReportBrandingAssets;
+}) {
+  return (
+    <View style={styles.header} wrap={false}>
+      <View style={styles.institutionalRow}>
+        <View style={styles.logoSlot}>
+          {/* React-PDF Image does not expose the DOM alt attribute. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <Image src={assets.bpsuSeal} style={styles.sealLogo} />
+        </View>
+        <View style={styles.institutionalText}>
+          <Text style={styles.universityName}>{BRANDING.universityName}</Text>
+          <Text style={styles.campusName}>{BRANDING.campusName}</Text>
+          <Text style={styles.collegeName}>{BRANDING.collegeName}</Text>
+          <Text style={styles.systemName}>{BRANDING.systemName}</Text>
+          <Text style={styles.systemSubtitle}>{BRANDING.systemSubtitle}</Text>
+        </View>
+        <View style={styles.logoSlot}>
+          {/* React-PDF Image does not expose the DOM alt attribute. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <Image
+            src={assets.agricultureEmblem}
+            style={styles.agricultureLogo}
+          />
+        </View>
+      </View>
       <Text style={styles.reportTitle}>{title}</Text>
-      <View style={styles.metaRow}>
-        {meta.map((m, i) => (
-          <Text key={i}>{m}</Text>
-        ))}
+      <View style={styles.metaGrid}>
+        {meta.map((item) =>
+          item.note ? (
+            <Text key={item.value} style={styles.metaNote}>
+              {item.value}
+            </Text>
+          ) : (
+            <View key={`${item.label}-${item.value}`} style={styles.metaItem}>
+              <Text style={styles.metaLabel}>{item.label}</Text>
+              <Text style={styles.metaValue}>{item.value}</Text>
+            </View>
+          )
+        )}
       </View>
     </View>
+  );
+}
+
+function ReportPageChrome({
+  title,
+  columns,
+}: {
+  title: string;
+  columns?: TableColumn[];
+}) {
+  return (
+    <>
+      <View
+        fixed
+        style={styles.continuationHeader}
+        render={({ pageNumber }) =>
+          pageNumber > 1 ? (
+            <View style={styles.continuationHeaderContent}>
+              <Text style={styles.continuationUniversity}>
+                {BRANDING.universityName} | {BRANDING.systemName}
+              </Text>
+              <Text style={styles.continuationTitle}>{title}</Text>
+            </View>
+          ) : null
+        }
+      />
+      {columns ? (
+        <View
+          fixed
+          style={styles.continuationTableHeader}
+          render={({ pageNumber }) =>
+            pageNumber > 1 ? <TableHeader columns={columns} /> : null
+          }
+        />
+      ) : null}
+      <ReportFooter />
+    </>
   );
 }
 
@@ -139,6 +327,7 @@ function ReportFooter() {
     <View style={styles.footer} fixed>
       <Text>{BRANDING.systemName} | Confidential Report</Text>
       <Text
+        style={{ width: 60, textAlign: "right" }}
         render={({ pageNumber, totalPages }) =>
           `Page ${pageNumber} of ${totalPages}`
         }
@@ -160,6 +349,7 @@ export function SensorReadingsPDF({
   data,
   rangeLabel,
   plotName,
+  assets,
 }: {
   data: Array<{
     recordedAt: Date;
@@ -175,16 +365,23 @@ export function SensorReadingsPDF({
   }> & { truncated: boolean };
   rangeLabel: string;
   plotName?: string;
+  assets: ReportBrandingAssets;
 }) {
   const meta = [
-    `Time range: ${rangeLabel}`,
-    `Plot filter: ${plotName ?? "All plots"}`,
-    `Included readings: ${data.length}`,
+    { label: "Time Range", value: rangeLabel },
+    { label: "Plot Filter", value: plotName ?? "All plots" },
+    { label: "Included readings", value: String(data.length) },
     ...(data.truncated
-      ? ["Most recent 5,000 records shown; additional matching records omitted."]
+      ? [
+          {
+            value:
+              "Most recent 5,000 records shown; additional matching records omitted.",
+            note: true,
+          },
+        ]
       : []),
-    `Generated: ${formatDateTime(new Date())}`,
-  ];
+    { label: "Generated", value: formatDateTime(new Date()) },
+  ] satisfies ReportMetadata[];
 
   // Header widths
   const cols = [
@@ -203,7 +400,12 @@ export function SensorReadingsPDF({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <ReportHeader title="Sensor Readings Report" meta={meta} />
+        <ReportPageChrome title="Sensor Readings Report" columns={cols} />
+        <ReportHeader
+          title="Sensor Readings Report"
+          meta={meta}
+          assets={assets}
+        />
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -211,19 +413,11 @@ export function SensorReadingsPDF({
           </Text>
         ) : (
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              {cols.map((c, i) => (
-                <Text
-                  key={i}
-                  style={[styles.tableHeaderCell, { width: c.width }]}
-                >
-                  {c.label}
-                </Text>
-              ))}
-            </View>
+            <TableHeader columns={cols} />
             {data.map((row, i) => (
               <View
                 key={i}
+                wrap={false}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
                 <Text style={[styles.tableCell, { width: "16%" }]}>
@@ -232,25 +426,39 @@ export function SensorReadingsPDF({
                 <Text style={[styles.tableCell, { width: "10%" }]}>
                   {row.plotName}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {fmt(row.soilMoisture)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "9%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "9%" }]}
+                >
                   {fmt(row.temperature)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {fmt(row.humidity)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "10%" }]}
+                >
                   {fmt(row.lightIntensity, 0)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {fmt(row.nitrogen, 0)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {fmt(row.phosphorus, 0)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {fmt(row.potassium, 0)}
                 </Text>
                 <Text style={[styles.tableCell, { width: "15%" }]}>
@@ -261,7 +469,6 @@ export function SensorReadingsPDF({
           </View>
         )}
 
-        <ReportFooter />
       </Page>
     </Document>
   );
@@ -274,6 +481,7 @@ export function SensorReadingsPDF({
 export function PlotPerformancePDF({
   data,
   rangeLabel,
+  assets,
 }: {
   data: Array<{
     plotName: string;
@@ -293,12 +501,13 @@ export function PlotPerformancePDF({
     latestLeafCount: number | null;
   }>;
   rangeLabel: string;
+  assets: ReportBrandingAssets;
 }) {
   const meta = [
-    `Time range: ${rangeLabel}`,
-    `Total plots: ${data.length}`,
-    `Generated: ${formatDateTime(new Date())}`,
-  ];
+    { label: "Time Range", value: rangeLabel },
+    { label: "Total Plots", value: String(data.length) },
+    { label: "Generated", value: formatDateTime(new Date()) },
+  ] satisfies ReportMetadata[];
 
   const cols = [
     { label: "Plot", width: "8%" },
@@ -316,25 +525,22 @@ export function PlotPerformancePDF({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <ReportHeader title="Plot Performance Report" meta={meta} />
+        <ReportPageChrome title="Plot Performance Report" columns={cols} />
+        <ReportHeader
+          title="Plot Performance Report"
+          meta={meta}
+          assets={assets}
+        />
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>No plot data available.</Text>
         ) : (
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              {cols.map((c, i) => (
-                <Text
-                  key={i}
-                  style={[styles.tableHeaderCell, { width: c.width }]}
-                >
-                  {c.label}
-                </Text>
-              ))}
-            </View>
+            <TableHeader columns={cols} />
             {data.map((row, i) => (
               <View
                 key={i}
+                wrap={false}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
                 <Text style={[styles.tableCell, { width: "8%" }]}>
@@ -355,16 +561,24 @@ export function PlotPerformancePDF({
                 <Text style={[styles.tableCell, { width: "10%" }]}>
                   {formatDate(row.expectedHarvest)}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {row.readingCount}
                 </Text>
-                <Text style={[styles.tableCell, { width: "6%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "6%" }]}
+                >
                   {row.logCount}
                 </Text>
-                <Text style={[styles.tableCell, { width: "14%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "14%" }]}
+                >
                   {row.openAlertCount} / {row.alertCount}
                 </Text>
-                <Text style={[styles.tableCell, { width: "12%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "12%" }]}
+                >
                   {row.latestHeight != null ? `${row.latestHeight}cm` : "-"}
                   {row.latestLeafCount != null
                     ? ` / ${row.latestLeafCount} leaves`
@@ -381,7 +595,6 @@ export function PlotPerformancePDF({
           </Text>
         )}
 
-        <ReportFooter />
       </Page>
     </Document>
   );
@@ -395,6 +608,7 @@ export function GrowthLogPDF({
   data,
   rangeLabel,
   plotName,
+  assets,
 }: {
   data: Array<{
     createdAt: Date;
@@ -409,18 +623,20 @@ export function GrowthLogPDF({
   }>;
   rangeLabel: string;
   plotName?: string;
+  assets: ReportBrandingAssets;
 }) {
   const meta = [
-    `Time range: ${rangeLabel}`,
-    `Plot filter: ${plotName ?? "All plots"}`,
-    `Total entries: ${data.length}`,
-    `Generated: ${formatDateTime(new Date())}`,
-  ];
+    { label: "Time Range", value: rangeLabel },
+    { label: "Plot Filter", value: plotName ?? "All plots" },
+    { label: "Total Entries", value: String(data.length) },
+    { label: "Generated", value: formatDateTime(new Date()) },
+  ] satisfies ReportMetadata[];
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <ReportHeader title="Growth Log Report" meta={meta} />
+        <ReportPageChrome title="Growth Log Report" />
+        <ReportHeader title="Growth Log Report" meta={meta} assets={assets} />
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -457,7 +673,6 @@ export function GrowthLogPDF({
           ))
         )}
 
-        <ReportFooter />
       </Page>
     </Document>
   );
@@ -471,6 +686,7 @@ export function AlertsPDF({
   data,
   rangeLabel,
   plotName,
+  assets,
 }: {
   data: Array<{
     createdAt: Date;
@@ -486,15 +702,16 @@ export function AlertsPDF({
   }>;
   rangeLabel: string;
   plotName?: string;
+  assets: ReportBrandingAssets;
 }) {
   const meta = [
-    `Time range: ${rangeLabel}`,
-    `Plot filter: ${plotName ?? "All plots"}`,
-    `Total alerts: ${data.length}`,
-    `Open: ${data.filter((a) => !a.resolved).length}`,
-    `Resolved: ${data.filter((a) => a.resolved).length}`,
-    `Generated: ${formatDateTime(new Date())}`,
-  ];
+    { label: "Time Range", value: rangeLabel },
+    { label: "Plot Filter", value: plotName ?? "All plots" },
+    { label: "Total Alerts", value: String(data.length) },
+    { label: "Open", value: String(data.filter((a) => !a.resolved).length) },
+    { label: "Resolved", value: String(data.filter((a) => a.resolved).length) },
+    { label: "Generated", value: formatDateTime(new Date()) },
+  ] satisfies ReportMetadata[];
 
   const cols = [
     { label: "Date", width: "14%" },
@@ -509,7 +726,8 @@ export function AlertsPDF({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <ReportHeader title="Alerts Report" meta={meta} />
+        <ReportPageChrome title="Alerts Report" columns={cols} />
+        <ReportHeader title="Alerts Report" meta={meta} assets={assets} />
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -517,19 +735,11 @@ export function AlertsPDF({
           </Text>
         ) : (
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              {cols.map((c, i) => (
-                <Text
-                  key={i}
-                  style={[styles.tableHeaderCell, { width: c.width }]}
-                >
-                  {c.label}
-                </Text>
-              ))}
-            </View>
+            <TableHeader columns={cols} />
             {data.map((row, i) => (
               <View
                 key={i}
+                wrap={false}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
                 <Text style={[styles.tableCell, { width: "14%" }]}>
@@ -547,7 +757,9 @@ export function AlertsPDF({
                 <Text style={[styles.tableCell, { width: "10%" }]}>
                   {row.resolved ? "Resolved" : "Open"}
                 </Text>
-                <Text style={[styles.tableCell, { width: "10%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "10%" }]}
+                >
                   {row.notificationsSent}
                   {row.notificationsFailed > 0 &&
                     ` (${row.notificationsFailed} failed)`}
@@ -560,7 +772,6 @@ export function AlertsPDF({
           </View>
         )}
 
-        <ReportFooter />
       </Page>
     </Document>
   );
@@ -573,6 +784,7 @@ export function AlertsPDF({
 export function ActivityPDF({
   data,
   rangeLabel,
+  assets,
 }: {
   data: Array<{
     timestamp: Date;
@@ -581,15 +793,21 @@ export function ActivityPDF({
     actor: string;
   }> & { truncated: boolean };
   rangeLabel: string;
+  assets: ReportBrandingAssets;
 }) {
   const meta = [
-    `Time range: ${rangeLabel}`,
-    `Total events: ${data.length}`,
+    { label: "Time Range", value: rangeLabel },
+    { label: "Total Events", value: String(data.length) },
     ...(data.truncated
-      ? ["Showing only the most recent 100 records per event type."]
+      ? [
+          {
+            value: "Showing only the most recent 100 records per event type.",
+            note: true,
+          },
+        ]
       : []),
-    `Generated: ${formatDateTime(new Date())}`,
-  ];
+    { label: "Generated", value: formatDateTime(new Date()) },
+  ] satisfies ReportMetadata[];
 
   const cols = [
     { label: "Timestamp", width: "18%" },
@@ -601,7 +819,12 @@ export function ActivityPDF({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <ReportHeader title="System Activity Report" meta={meta} />
+        <ReportPageChrome title="System Activity Report" columns={cols} />
+        <ReportHeader
+          title="System Activity Report"
+          meta={meta}
+          assets={assets}
+        />
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -609,19 +832,11 @@ export function ActivityPDF({
           </Text>
         ) : (
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              {cols.map((c, i) => (
-                <Text
-                  key={i}
-                  style={[styles.tableHeaderCell, { width: c.width }]}
-                >
-                  {c.label}
-                </Text>
-              ))}
-            </View>
+            <TableHeader columns={cols} />
             {data.map((row, i) => (
               <View
                 key={i}
+                wrap={false}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
                 <Text style={[styles.tableCell, { width: "18%" }]}>
@@ -641,7 +856,6 @@ export function ActivityPDF({
           </View>
         )}
 
-        <ReportFooter />
       </Page>
     </Document>
   );
@@ -654,6 +868,7 @@ export function ActivityPDF({
 export function StudentActivityPDF({
   data,
   rangeLabel,
+  assets,
 }: {
   data: Array<{
     studentName: string;
@@ -666,12 +881,13 @@ export function StudentActivityPDF({
     lastLogAt: Date | null;
   }>;
   rangeLabel: string;
+  assets: ReportBrandingAssets;
 }) {
   const meta = [
-    `Time range: ${rangeLabel}`,
-    `Total students: ${data.length}`,
-    `Generated: ${formatDateTime(new Date())}`,
-  ];
+    { label: "Time Range", value: rangeLabel },
+    { label: "Total Students", value: String(data.length) },
+    { label: "Generated", value: formatDateTime(new Date()) },
+  ] satisfies ReportMetadata[];
 
   const cols = [
     { label: "Student", width: "18%" },
@@ -687,7 +903,12 @@ export function StudentActivityPDF({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <ReportHeader title="Student Activity Report" meta={meta} />
+        <ReportPageChrome title="Student Activity Report" columns={cols} />
+        <ReportHeader
+          title="Student Activity Report"
+          meta={meta}
+          assets={assets}
+        />
 
         {data.length === 0 ? (
           <Text style={styles.emptyState}>
@@ -695,19 +916,11 @@ export function StudentActivityPDF({
           </Text>
         ) : (
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              {cols.map((c, i) => (
-                <Text
-                  key={i}
-                  style={[styles.tableHeaderCell, { width: c.width }]}
-                >
-                  {c.label}
-                </Text>
-              ))}
-            </View>
+            <TableHeader columns={cols} />
             {data.map((row, i) => (
               <View
                 key={i}
+                wrap={false}
                 style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
               >
                 <Text style={[styles.tableCell, { width: "18%" }]}>
@@ -719,16 +932,24 @@ export function StudentActivityPDF({
                 <Text style={[styles.tableCell, { width: "9%" }]}>
                   {row.section}
                 </Text>
-                <Text style={[styles.tableCell, { width: "8%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "8%" }]}
+                >
                   {row.plotsAssigned}
                 </Text>
-                <Text style={[styles.tableCell, { width: "13%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "13%" }]}
+                >
                   {row.observationsInRange}
                 </Text>
-                <Text style={[styles.tableCell, { width: "12%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "12%" }]}
+                >
                   {row.totalObservations}
                 </Text>
-                <Text style={[styles.tableCell, { width: "13%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.numericCell, { width: "13%" }]}
+                >
                   {row.photoCount}
                 </Text>
                 <Text style={[styles.tableCell, { width: "13%" }]}>
@@ -745,7 +966,6 @@ export function StudentActivityPDF({
           </Text>
         )}
 
-        <ReportFooter />
       </Page>
     </Document>
   );

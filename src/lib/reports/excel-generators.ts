@@ -1,5 +1,9 @@
 import ExcelJS from "exceljs";
 import { BRANDING } from "./branding";
+import {
+  loadReportBrandingAssets,
+  type ReportBrandingAssets,
+} from "./branding-assets";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 
 // =============================================================
@@ -18,47 +22,156 @@ function styleHeaderRow(row: ExcelJS.Row) {
   row.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FF22C55E" },
+    fgColor: { argb: "FF166534" },
   };
-  row.alignment = { vertical: "middle", horizontal: "center" };
-  row.height = 24;
+  row.alignment = {
+    vertical: "middle",
+    horizontal: "center",
+    wrapText: true,
+  };
+  row.height = 34;
+}
+
+function toExcelImageBuffer(buffer: Buffer): ArrayBuffer {
+  const bytes = new Uint8Array(buffer.byteLength);
+  bytes.set(buffer);
+  return bytes.buffer;
 }
 
 function addTitleRows(
+  workbook: ExcelJS.Workbook,
   sheet: ExcelJS.Worksheet,
   reportTitle: string,
-  meta: string[]
+  meta: string[],
+  reportColumnCount: number,
+  assets: ReportBrandingAssets
 ) {
-  sheet.mergeCells(1, 1, 1, 8);
-  const titleCell = sheet.getCell("A1");
-  titleCell.value = BRANDING.schoolName;
-  titleCell.font = { bold: true, size: 12 };
+  const brandingWidth = Math.max(8, reportColumnCount);
+  const centerStartColumn = 2;
+  const centerEndColumn = brandingWidth - 1;
+  const brandingRows = [
+    {
+      value: BRANDING.universityName.toUpperCase(),
+      font: { bold: true, size: 13, color: { argb: "FF1F2937" } },
+      height: 22,
+    },
+    {
+      value: BRANDING.campusName,
+      font: { size: 10, color: { argb: "FF374151" } },
+      height: 18,
+    },
+    {
+      value: BRANDING.collegeName,
+      font: { size: 10, color: { argb: "FF374151" } },
+      height: 18,
+    },
+    {
+      value: BRANDING.systemName.toUpperCase(),
+      font: { bold: true, size: 13, color: { argb: "FF166534" } },
+      height: 22,
+    },
+    {
+      value: BRANDING.systemSubtitle,
+      font: { italic: true, size: 9, color: { argb: "FF4B5563" } },
+      height: 22,
+    },
+  ] as const;
 
-  sheet.mergeCells(2, 1, 2, 8);
-  const subtitleCell = sheet.getCell("A2");
-  subtitleCell.value = `${BRANDING.campus} | ${BRANDING.department}`;
-  subtitleCell.font = { size: 10, color: { argb: "FF6B7280" } };
+  for (const [index, brandingRow] of brandingRows.entries()) {
+    const rowNumber = index + 1;
+    sheet.mergeCells(
+      rowNumber,
+      centerStartColumn,
+      rowNumber,
+      centerEndColumn
+    );
+    const cell = sheet.getCell(rowNumber, centerStartColumn);
+    cell.value = brandingRow.value;
+    cell.font = brandingRow.font;
+    cell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
+    sheet.getRow(rowNumber).height = brandingRow.height;
+  }
 
-  sheet.mergeCells(3, 1, 3, 8);
-  const systemCell = sheet.getCell("A3");
-  systemCell.value = BRANDING.systemName;
-  systemCell.font = { bold: true, size: 13, color: { argb: "FF22C55E" } };
+  const sealImageId = workbook.addImage({
+    buffer: toExcelImageBuffer(assets.bpsuSeal),
+    extension: "png",
+  });
+  const agricultureImageId = workbook.addImage({
+    buffer: toExcelImageBuffer(assets.agricultureEmblem),
+    extension: "png",
+  });
+  sheet.addImage(sealImageId, {
+    tl: { col: 0.15, row: 1.1 },
+    ext: { width: (60 * 275) / 363, height: 60 },
+    editAs: "oneCell",
+  });
+  sheet.addImage(agricultureImageId, {
+    tl: { col: brandingWidth - 0.95, row: 1.1 },
+    ext: { width: 60, height: 60 },
+    editAs: "oneCell",
+  });
 
-  sheet.mergeCells(4, 1, 4, 8);
-  const titleRow = sheet.getCell("A4");
-  titleRow.value = reportTitle;
-  titleRow.font = { bold: true, size: 14 };
+  const reportTitleRow = 6;
+  sheet.mergeCells(reportTitleRow, 1, reportTitleRow, brandingWidth);
+  const titleCell = sheet.getCell(reportTitleRow, 1);
+  titleCell.value = reportTitle.toUpperCase();
+  titleCell.font = { bold: true, size: 14, color: { argb: "FF111827" } };
+  titleCell.alignment = { vertical: "middle" };
+  titleCell.border = {
+    top: { style: "medium", color: { argb: "FF166534" } },
+  };
+  sheet.getRow(reportTitleRow).height = 25;
 
-  let row = 5;
+  let row = reportTitleRow + 1;
   for (const m of meta) {
-    sheet.mergeCells(row, 1, row, 8);
+    sheet.mergeCells(row, 1, row, brandingWidth);
     sheet.getCell(row, 1).value = m;
     sheet.getCell(row, 1).font = { size: 9, color: { argb: "FF6B7280" } };
+    sheet.getCell(row, 1).alignment = { vertical: "middle", wrapText: true };
     row++;
   }
 
   sheet.getRow(row).height = 8; // spacer
   return row + 1; // first row for headers
+}
+
+function configureWorksheet(
+  sheet: ExcelJS.Worksheet,
+  headerRowIndex: number,
+  reportColumnCount: number,
+  orientation: "landscape" | "portrait"
+) {
+  const lastDataColumn = sheet.getColumn(reportColumnCount).letter;
+  sheet.views = [
+    {
+      state: "frozen",
+      ySplit: headerRowIndex,
+      topLeftCell: `A${headerRowIndex + 1}`,
+      showGridLines: false,
+    },
+  ];
+  sheet.autoFilter = `A${headerRowIndex}:${lastDataColumn}${headerRowIndex}`;
+  sheet.pageSetup = {
+    paperSize: 9,
+    orientation,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true,
+    printTitlesRow: `${headerRowIndex}:${headerRowIndex}`,
+    margins: {
+      left: 0.3,
+      right: 0.3,
+      top: 0.5,
+      bottom: 0.5,
+      header: 0.2,
+      footer: 0.2,
+    },
+  };
 }
 
 // =============================================================
@@ -85,6 +198,7 @@ export async function generateSensorReadingsExcel(
   const wb = new ExcelJS.Workbook();
   applyBranding(wb);
   const sheet = wb.addWorksheet("Sensor Readings");
+  const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
@@ -95,8 +209,6 @@ export async function generateSensorReadingsExcel(
       : []),
     `Generated: ${formatDateTime(new Date())}`,
   ];
-
-  const headerRowIndex = addTitleRows(sheet, "Sensor Readings Report", meta);
 
   const headers = [
     "Date / Time",
@@ -111,6 +223,14 @@ export async function generateSensorReadingsExcel(
     "Phosphorus (mg/kg)",
     "Potassium (mg/kg)",
   ];
+  const headerRowIndex = addTitleRows(
+    wb,
+    sheet,
+    "Sensor Readings Report",
+    meta,
+    headers.length,
+    assets
+  );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
 
@@ -118,7 +238,7 @@ export async function generateSensorReadingsExcel(
   sheet.columns = [
     { width: 22 },
     { width: 14 },
-    { width: 20 },
+    { width: 28 },
     { width: 14 },
     { width: 16 },
     { width: 16 },
@@ -151,9 +271,11 @@ export async function generateSensorReadingsExcel(
         fgColor: { argb: "FFF9FAFB" },
       };
     }
+    sheet.getRow(row).alignment = { vertical: "top", wrapText: true };
     row++;
   }
 
+  configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -184,14 +306,13 @@ export async function generatePlotPerformanceExcel(
   const wb = new ExcelJS.Workbook();
   applyBranding(wb);
   const sheet = wb.addWorksheet("Plot Performance");
+  const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
     `Total plots: ${data.length}`,
     `Generated: ${formatDateTime(new Date())}`,
   ];
-
-  const headerRowIndex = addTitleRows(sheet, "Plot Performance Report", meta);
 
   const headers = [
     "Plot",
@@ -210,6 +331,14 @@ export async function generatePlotPerformanceExcel(
     "Latest Height (cm)",
     "Latest Leaf Count",
   ];
+  const headerRowIndex = addTitleRows(
+    wb,
+    sheet,
+    "Plot Performance Report",
+    meta,
+    headers.length,
+    assets
+  );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
 
@@ -257,6 +386,7 @@ export async function generatePlotPerformanceExcel(
         fgColor: { argb: "FFF9FAFB" },
       };
     }
+    sheet.getRow(row).alignment = { vertical: "top", wrapText: true };
     row++;
   }
 
@@ -268,6 +398,7 @@ export async function generatePlotPerformanceExcel(
     noteCell.font = { size: 9, color: { argb: "FF6B7280" } };
   }
 
+  configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -293,6 +424,7 @@ export async function generateGrowthLogExcel(
   const wb = new ExcelJS.Workbook();
   applyBranding(wb);
   const sheet = wb.addWorksheet("Growth Log");
+  const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
@@ -300,8 +432,6 @@ export async function generateGrowthLogExcel(
     `Total entries: ${data.length}`,
     `Generated: ${formatDateTime(new Date())}`,
   ];
-
-  const headerRowIndex = addTitleRows(sheet, "Growth Log Report", meta);
 
   const headers = [
     "Date / Time",
@@ -314,6 +444,14 @@ export async function generateGrowthLogExcel(
     "Notes",
     "Photos",
   ];
+  const headerRowIndex = addTitleRows(
+    wb,
+    sheet,
+    "Growth Log Report",
+    meta,
+    headers.length,
+    assets
+  );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
 
@@ -353,6 +491,7 @@ export async function generateGrowthLogExcel(
     row++;
   }
 
+  configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -379,6 +518,7 @@ export async function generateAlertsExcel(
   const wb = new ExcelJS.Workbook();
   applyBranding(wb);
   const sheet = wb.addWorksheet("Alerts");
+  const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
@@ -388,8 +528,6 @@ export async function generateAlertsExcel(
     `Resolved: ${data.filter((a) => a.resolved).length}`,
     `Generated: ${formatDateTime(new Date())}`,
   ];
-
-  const headerRowIndex = addTitleRows(sheet, "Alerts Report", meta);
 
   const headers = [
     "Date / Time",
@@ -403,6 +541,14 @@ export async function generateAlertsExcel(
     "SMS Failed",
     "Recipients",
   ];
+  const headerRowIndex = addTitleRows(
+    wb,
+    sheet,
+    "Alerts Report",
+    meta,
+    headers.length,
+    assets
+  );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
 
@@ -456,6 +602,7 @@ export async function generateAlertsExcel(
     row++;
   }
 
+  configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -475,6 +622,7 @@ export async function generateActivityExcel(
   const wb = new ExcelJS.Workbook();
   applyBranding(wb);
   const sheet = wb.addWorksheet("System Activity");
+  const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
@@ -485,9 +633,15 @@ export async function generateActivityExcel(
     `Generated: ${formatDateTime(new Date())}`,
   ];
 
-  const headerRowIndex = addTitleRows(sheet, "System Activity Report", meta);
-
   const headers = ["Timestamp", "Event Type", "Description", "Actor"];
+  const headerRowIndex = addTitleRows(
+    wb,
+    sheet,
+    "System Activity Report",
+    meta,
+    headers.length,
+    assets
+  );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
 
@@ -513,9 +667,11 @@ export async function generateActivityExcel(
         fgColor: { argb: "FFF9FAFB" },
       };
     }
+    sheet.getRow(row).alignment = { vertical: "top", wrapText: true };
     row++;
   }
 
+  configureWorksheet(sheet, headerRowIndex, headers.length, "portrait");
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -539,14 +695,13 @@ export async function generateStudentActivityExcel(
   const wb = new ExcelJS.Workbook();
   applyBranding(wb);
   const sheet = wb.addWorksheet("Student Activity");
+  const assets = await loadReportBrandingAssets();
 
   const meta = [
     `Time range: ${rangeLabel}`,
     `Total students: ${data.length}`,
     `Generated: ${formatDateTime(new Date())}`,
   ];
-
-  const headerRowIndex = addTitleRows(sheet, "Student Activity Report", meta);
 
   const headers = [
     "Student",
@@ -558,6 +713,14 @@ export async function generateStudentActivityExcel(
     "Photos (range)",
     "Last Log",
   ];
+  const headerRowIndex = addTitleRows(
+    wb,
+    sheet,
+    "Student Activity Report",
+    meta,
+    headers.length,
+    assets
+  );
   sheet.getRow(headerRowIndex).values = headers;
   styleHeaderRow(sheet.getRow(headerRowIndex));
 
@@ -602,5 +765,6 @@ export async function generateStudentActivityExcel(
     noteCell.font = { size: 9, color: { argb: "FF6B7280" } };
   }
 
+  configureWorksheet(sheet, headerRowIndex, headers.length, "landscape");
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
