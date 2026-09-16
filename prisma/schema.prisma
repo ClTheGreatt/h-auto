@@ -179,13 +179,16 @@ notifications       AlertNotification[]
 model FacultySectionAdvisory {
   id        String   @id @default(cuid())
   facultyId String
+  // Nullable only so pre-course advisory rows survive migration for review.
+  // New application writes always provide an exact canonical course.
+  course    String?
   section   String
   createdAt DateTime @default(now())
 
   faculty   User     @relation("FacultyAdvisories", fields: [facultyId], references: [id], onDelete: Cascade)
 
-  @@unique([facultyId, section])
-  @@index([section])
+  @@unique([facultyId, course, section])
+  @@index([course, section])
 }
 
 // ============================================================

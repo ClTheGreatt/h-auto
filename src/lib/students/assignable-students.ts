@@ -1,26 +1,37 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, UserRole } from "@prisma/client";
 import { BASE_ASSIGNABLE_STUDENT_WHERE } from "@/lib/students/eligibility";
+import {
+  isCanonicalAcademicProgram,
+  isFacultyCourseCompatible,
+} from "@/lib/academics/cohort-integrity";
 
 export type AssignableStudentsActor = { role: UserRole; userId: string };
 export type AssignableStudentCohort = { course: string | null; section: string };
 
+export function buildFacultyCohortScope(
+  department: string | null,
+  advisories: ReadonlyArray<{ course: string | null; section: string }>
+): Prisma.UserWhereInput {
+  if (!isCanonicalAcademicProgram(department)) return { id: { in: [] } };
+  const resolved = advisories.filter(
+    (advisory): advisory is { course: string; section: string } =>
+      isFacultyCourseCompatible(department, advisory.course)
+  );
+  return resolved.length > 0
+    ? {
+        OR: resolved.map((advisory) => ({
+          course: advisory.course,
+          section: advisory.section,
+        })),
+      }
+    : { id: { in: [] } };
+}
+
 /**
- * The WHERE clause for "students eligible to be assigned to a plot this
- * actor manages" — shared by the web plot detail page and the mobile
- * assignable-students endpoint so the two can't drift.
- *
- * ADMIN/SUPER_ADMIN: unscoped. FACULTY: scoped to their advised sections —
- * the `section: { in: advisedSections } }` filter is applied unconditionally,
- * never skipped for an empty array, so zero advisories means zero eligible
- * students rather than silently falling back to an unscoped list. Any other
- * role: no assignable students (callers are expected to gate before calling,
- * same as the web page's existing ternary; this is a defensive default, not
- * a behavior change for either current caller).
- *
- * Already-assigned-to-this-plot exclusion is deliberately NOT part of this
- * filter — both the web dialog and the mobile picker exclude those
- * client-side from the full candidate list.
+ * Canonical assignment eligibility shared by web and mobile. Faculty scope
+ * is an OR of exact resolved course+section advisories; course=NULL legacy
+ * rows grant no scope. Admin and Super Admin retain the broader base scope.
  */
 export async function buildAssignableStudentsWhere(
   actor: AssignableStudentsActor
@@ -33,25 +44,32 @@ export async function buildAssignableStudentsWhere(
     return { id: { in: [] } };
   }
 
-  const advisedSections =
-    actor.role === "FACULTY"
-      ? (
-          await prisma.facultySectionAdvisory.findMany({
-            where: { facultyId: actor.userId },
-            select: { section: true },
-          })
-        ).map((a) => a.section)
-      : [];
+  if (actor.role !== "FACULTY") return BASE_ASSIGNABLE_STUDENT_WHERE;
+
+  const faculty = await prisma.user.findUnique({
+    where: { id: actor.userId },
+    select: {
+      role: true,
+      department: true,
+      advisories: {
+        where: { course: { not: null } },
+        select: { course: true, section: true },
+      },
+    },
+  });
+  if (!faculty || faculty.role !== "FACULTY") {
+    return { ...BASE_ASSIGNABLE_STUDENT_WHERE, id: { in: [] } };
+  }
 
   return {
     ...BASE_ASSIGNABLE_STUDENT_WHERE,
-    ...(actor.role === "FACULTY" ? { section: { in: advisedSections } } : {}),
+    ...buildFacultyCohortScope(faculty.department, faculty.advisories),
   };
 }
 
-// One actor-scoped cohort source for every web assignment picker. Keeping
-// this beside the canonical eligibility predicate prevents Plot Detail and
-// the Assignments page from independently widening course/section options.
+// One actor-scoped cohort source for the Assignments page, Plot Detail, and
+// mobile candidate endpoint. Keeping this beside the canonical eligibility
+// predicate prevents any caller from independently widening Faculty scope.
 export async function getAssignableStudentCohorts(
   actor: AssignableStudentsActor
 ): Promise<AssignableStudentCohort[]> {

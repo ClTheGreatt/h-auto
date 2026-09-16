@@ -4,7 +4,10 @@ import type { Prisma, UserRole, UserStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, canManageUser } from "@/lib/auth-helpers";
-import { UsersTable } from "@/components/users/users-table";
+import {
+  UsersTable,
+  type AdvisorySummary,
+} from "@/components/users/users-table";
 import { SearchBar } from "@/components/ui/search-bar";
 import { RoleFilter } from "@/components/users/role-filter";
 import { StatusFilter } from "@/components/users/status-filter";
@@ -207,7 +210,7 @@ export default async function UsersPage({
   const courseGroups = groupStudents(studentRows, studentFieldRows);
   const showStudentSection = studentFiltersActive;
 
-  // Faculty group's "Advised sections" column — one query for every faculty
+  // Faculty group's "Advised cohorts" column — one query for every faculty
   // row currently on the page, grouped by facultyId, never per-row.
   const facultyIds = users
     .filter((u) => u.role === "FACULTY")
@@ -216,13 +219,16 @@ export default async function UsersPage({
     facultyIds.length > 0
       ? await prisma.facultySectionAdvisory.findMany({
           where: { facultyId: { in: facultyIds } },
-          select: { facultyId: true, section: true },
-          orderBy: { section: "asc" },
+          select: { facultyId: true, course: true, section: true },
+          orderBy: [{ course: "asc" }, { section: "asc" }],
         })
       : [];
-  const advisoriesByFacultyId: Record<string, string[]> = {};
+  const advisoriesByFacultyId: Record<string, AdvisorySummary[]> = {};
   for (const row of advisoryRows) {
-    (advisoriesByFacultyId[row.facultyId] ??= []).push(row.section);
+    (advisoriesByFacultyId[row.facultyId] ??= []).push({
+      course: row.course,
+      section: row.section,
+    });
   }
 
   // Student Farmers' PLOTS column and "never logged" marker — one pair of

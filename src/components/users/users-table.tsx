@@ -56,6 +56,8 @@ export type UserRow = {
   canManage: boolean;
 };
 
+export type AdvisorySummary = { course: string | null; section: string };
+
 const ROLE_ORDER: UserRole[] = [
   "SUPER_ADMIN",
   "ADMIN",
@@ -128,7 +130,7 @@ export function UsersTable({
   hasFilters: boolean;
   // Faculty only — one section-list per facultyId, fetched in a single
   // query by the page. Absent entirely for every other role's table.
-  advisoriesByFacultyId?: Record<string, string[]>;
+  advisoriesByFacultyId?: Record<string, AdvisorySummary[]>;
   // Student Farmers only — passed through to StudentFarmerSection, never to
   // RoleSection (Admin/Faculty/Super Admin rows have no plots or logs).
   plotNamesByStudentId: Record<string, string[]>;
@@ -186,7 +188,7 @@ function RoleSection({
 }: {
   role: UserRole;
   users: UserRow[];
-  advisoriesByFacultyId?: Record<string, string[]>;
+  advisoriesByFacultyId?: Record<string, AdvisorySummary[]>;
 }) {
   const meta = ROLE_META[role];
   const inactiveCount = users.filter((u) => u.status === "INACTIVE").length;
@@ -259,7 +261,7 @@ export function UserTableHeaderRow({
       <TableHead className="px-4 text-xs">ID number</TableHead>
       {showPlots && <TableHead className="px-4 text-xs">Plots</TableHead>}
       {showAdvisories && (
-        <TableHead className="px-4 text-xs">Advised sections</TableHead>
+        <TableHead className="px-4 text-xs">Advised cohorts</TableHead>
       )}
       <TableHead className="px-3"></TableHead>
     </TableRow>
@@ -268,16 +270,16 @@ export function UserTableHeaderRow({
 
 export function UserTableRow({
   user,
-  advisedSections,
+  advisedCohorts,
   plotNames,
   neverLogged = false,
 }: {
   user: UserRow;
   // Only ever passed by the Faculty section's table. `undefined` (Admin,
   // Super Admin, Student Farmer rows) renders no extra cell at all.
-  advisedSections?: string[];
+  advisedCohorts?: AdvisorySummary[];
   // Only ever passed by the Student Farmers section's table, same
-  // undefined-means-no-cell convention as advisedSections above.
+  // undefined-means-no-cell convention as advisedCohorts above.
   plotNames?: string[];
   // Only ever true when passed by the Student Farmers section's table.
   neverLogged?: boolean;
@@ -341,15 +343,28 @@ export function UserTableRow({
           )}
         </TableCell>
       )}
-      {advisedSections !== undefined && (
+      {advisedCohorts !== undefined && (
         <TableCell className="px-4 py-3">
-          {advisedSections.length === 0 ? (
+          {advisedCohorts.length === 0 ? (
             <span className="text-muted-foreground">—</span>
           ) : (
             <div className="flex flex-wrap gap-1">
-              {advisedSections.map((s) => (
-                <Badge key={s} variant="secondary" className="text-xs">
-                  {s}
+              {advisedCohorts.map((cohort) => (
+                <Badge
+                  key={JSON.stringify([cohort.course, cohort.section])}
+                  variant="secondary"
+                  className="max-w-full text-xs"
+                  title={
+                    cohort.course
+                      ? `${cohort.course} · ${cohort.section}`
+                      : `${cohort.section} · Needs review`
+                  }
+                >
+                  <span className="truncate">
+                    {cohort.course
+                      ? `${cohort.course} · ${cohort.section}`
+                      : `${cohort.section} · Needs review`}
+                  </span>
                 </Badge>
               ))}
             </div>
@@ -429,7 +444,7 @@ export function UserRowsTable({
   advisoriesByFacultyId,
 }: {
   users: UserRow[];
-  advisoriesByFacultyId?: Record<string, string[]>;
+  advisoriesByFacultyId?: Record<string, AdvisorySummary[]>;
 }) {
   const showAdvisories = advisoriesByFacultyId !== undefined;
 
@@ -445,7 +460,7 @@ export function UserRowsTable({
             <UserTableRow
               key={user.id}
               user={user}
-              advisedSections={
+              advisedCohorts={
                 showAdvisories ? advisoriesByFacultyId[user.id] ?? [] : undefined
               }
             />

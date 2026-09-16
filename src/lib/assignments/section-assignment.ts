@@ -40,7 +40,7 @@ export function sectionAssignmentAccessError({
     return "Students can only be assigned while a plot is preparing or operational.";
   }
   if (!sectionAuthorized) {
-    return "You are not authorized to assign students from this section.";
+    return "You are not authorized to assign students from this course and section.";
   }
   return null;
 }

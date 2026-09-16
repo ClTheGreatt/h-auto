@@ -11,7 +11,7 @@ import { StatusBadge, type StatusVariant } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { UserDetailActionsMenu } from "@/components/users/user-detail-actions-menu";
 import { FacultyAdvisories } from "@/components/users/faculty-advisories";
-import { getDistinctStudentSections } from "@/actions/advisories";
+import { getFacultyAdvisoryOptions } from "@/actions/advisories";
 import type { UserRole, UserStatus } from "@prisma/client";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -87,22 +87,22 @@ export default async function UserDetailPage({
   const initials =
     `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
 
-  const [advisories, allStudentSections, advisedPlots] =
+  const [advisories, advisoryOptions, advisedPlots] =
     user.role === "FACULTY"
       ? await Promise.all([
           prisma.facultySectionAdvisory.findMany({
             where: { facultyId: user.id },
-            select: { section: true },
-            orderBy: { section: "asc" },
+            select: { id: true, course: true, section: true },
+            orderBy: [{ course: "asc" }, { section: "asc" }],
           }),
-          getDistinctStudentSections(),
+          getFacultyAdvisoryOptions(user.id),
           prisma.plot.findMany({
             where: { facultyId: user.id, status: { not: "ARCHIVED" } },
             orderBy: { name: "asc" },
             select: { id: true, name: true, crop: { select: { name: true } } },
           }),
         ])
-      : [[], [], []];
+      : [[], { department: null, cohorts: [] }, []];
 
   // Same query shape as /dashboard/assignments (studentId + ACTIVE status,
   // plot+crop included), trimmed to skip the student/faculty includes that
@@ -350,15 +350,16 @@ export default async function UserDetailPage({
         </Card>
       )}
 
-      {/* Advised sections + advised plots (faculty only) */}
+      {/* Advised cohorts + advised plots (faculty only) */}
       {user.role === "FACULTY" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardContent className="pt-6">
               <FacultyAdvisories
                 facultyId={user.id}
-                initialSections={advisories.map((a) => a.section)}
-                allSections={allStudentSections}
+                department={advisoryOptions.department}
+                initialAdvisories={advisories}
+                availableCohorts={advisoryOptions.cohorts}
                 canManageAdvisories={canManageAdvisories}
               />
             </CardContent>

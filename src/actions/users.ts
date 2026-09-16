@@ -17,6 +17,10 @@ import {
   type UpdateUserInput,
 } from "@/lib/validations/user";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
+import {
+  resultingFacultyAdvisoryError,
+  resultingUserAcademicState,
+} from "@/lib/academics/cohort-integrity";
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (adviser
 // request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema. Web
@@ -182,7 +186,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 
   const existingUser = await prisma.user.findUnique({
     where: { id },
-    select: { status: true, email: true, role: true },
+    select: { status: true, email: true, role: true, department: true },
   });
   if (!existingUser) {
     return { error: "User not found" };
@@ -210,12 +214,29 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     };
   }
 
+  const resultingAcademicState = resultingUserAcademicState(existingUser, {
+    role: rest.role,
+    department: rest.department,
+  });
+  if (resultingAcademicState.role === "FACULTY") {
+    const advisories = await prisma.facultySectionAdvisory.findMany({
+      where: { facultyId: id },
+      select: { course: true },
+    });
+    const advisoryError = resultingFacultyAdvisoryError(
+      resultingAcademicState.role,
+      resultingAcademicState.department,
+      advisories
+    );
+    if (advisoryError) return { error: advisoryError };
+  }
+
   const updateData: Record<string, unknown> = {
     ...rest,
     middleName: rest.middleName || null,
     phoneNumber: rest.phoneNumber || null,
     idNumber: rest.idNumber || null,
-    department: rest.department || null,
+    department: resultingAcademicState.department,
     course: rest.course || null,
     yearLevel: rest.yearLevel || null,
     section: rest.section || null,
@@ -284,6 +305,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
   }
 
   revalidatePath("/dashboard/users");
+  revalidatePath(`/dashboard/users/${id}`);
   return { success: true };
 }
 

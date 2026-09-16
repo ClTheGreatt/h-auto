@@ -58,6 +58,7 @@ export async function assignStudent(
     assertFacultyCanAssignStudent(
       session.user.role,
       session.user.id,
+      student?.course ?? null,
       student?.section ?? null
     ),
     prisma.plotAssignment.findFirst({
@@ -179,10 +180,14 @@ export async function getAssignableStudentsForPlot(
   const sectionAuthorized = await assertFacultyCanAssignStudent(
     session.user.role,
     session.user.id,
+    target.course,
     target.section
   );
   if (!sectionAuthorized) {
-    return { error: "You are not authorized to assign a student from this section." };
+    return {
+      error:
+        "You are not authorized to assign a student from this course and section.",
+    };
   }
 
   const [students, activeOnThisPlot] = await Promise.all([
@@ -218,7 +223,7 @@ export async function getAssignableStudentsForPlot(
 async function validateSectionTarget(
   target: SectionAssignmentTarget,
   actor: { role: UserRole; id: string },
-  client: Pick<typeof prisma, "plot" | "facultySectionAdvisory" | "user">
+  client: Pick<typeof prisma, "plot" | "user">
 ) {
   const inputError = sectionAssignmentInputError(target);
   if (inputError) return { error: inputError } as const;
@@ -238,15 +243,14 @@ async function validateSectionTarget(
   });
   if (plotAccessError) return { error: plotAccessError } as const;
 
-  // No section-count or cohort query happens until this authority check.
-  const sectionAuthorized =
-    actor.role !== "FACULTY" ||
-    Boolean(
-      await client.facultySectionAdvisory.findFirst({
-        where: { facultyId: actor.id, section: target.section },
-        select: { id: true },
-      })
-    );
+  // No cohort query happens until this exact course+section authority check.
+  const sectionAuthorized = await assertFacultyCanAssignStudent(
+    actor.role,
+    actor.id,
+    target.course,
+    target.section,
+    client
+  );
   const accessError = sectionAssignmentAccessError({
     role: actor.role,
     actorId: actor.id,

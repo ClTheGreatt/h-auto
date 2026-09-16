@@ -1,37 +1,46 @@
 import { prisma } from "@/lib/prisma";
+import { isCanonicalAcademicProgram } from "@/lib/academics/cohort-integrity";
 import type { UserRole } from "@prisma/client";
 
-// True if this faculty member has an advisory row for this section.
-// A null/empty section (student has none set) never matches — there's
-// nothing to be "advised" for.
-export async function canFacultyAdviseSection(
+type CohortAccessClient = Pick<typeof prisma, "user">;
+
+// Faculty authority is an exact, resolved academic cohort. Requiring both
+// the Faculty department and advisory course to equal the requested course
+// prevents legacy course=NULL rows and incompatible rows from granting scope.
+export async function canFacultyAdviseCohort(
   facultyId: string,
-  section: string | null
+  course: string | null,
+  section: string | null,
+  client: CohortAccessClient = prisma
 ): Promise<boolean> {
-  if (!section) return false;
-  const advisory = await prisma.facultySectionAdvisory.findFirst({
-    where: { facultyId, section },
+  if (!isCanonicalAcademicProgram(course) || !section) return false;
+  const faculty = await client.user.findFirst({
+    where: {
+      id: facultyId,
+      role: "FACULTY",
+      department: course,
+      advisories: { some: { course, section } },
+    },
+    select: { id: true },
   });
-  return !!advisory;
+  return Boolean(faculty);
 }
 
-// True if this actor may assign a student in `studentSection` to a plot.
-// ADMIN/SUPER_ADMIN: unrestricted, no query. FACULTY: only within a
-// section they actually advise. Anything else: denied.
-//
-// No case normalization here on purpose — advisory sections are stored
-// uppercase (Batch 1B normalizes on write) and student sections come
-// from SECTION_REGEX-validated import, so both sides are already
-// uppercase. A mismatch would mean one of those wrote something
-// malformed; that's a data bug to surface, not paper over here.
 export async function assertFacultyCanAssignStudent(
   actorRole: UserRole,
   actorId: string,
-  studentSection: string | null
+  studentCourse: string | null,
+  studentSection: string | null,
+  client: CohortAccessClient = prisma
 ): Promise<boolean> {
   if (actorRole === "SUPER_ADMIN" || actorRole === "ADMIN") return true;
   if (actorRole === "FACULTY") {
-    return canFacultyAdviseSection(actorId, studentSection);
+    return canFacultyAdviseCohort(
+      actorId,
+      studentCourse,
+      studentSection,
+      client
+    );
   }
   return false;
 }

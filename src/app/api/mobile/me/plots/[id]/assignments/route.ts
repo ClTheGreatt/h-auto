@@ -186,12 +186,14 @@ export async function POST(
     const canAssign = await assertFacultyCanAssignStudent(
       user.role,
       user.id,
+      student.course,
       student.section
     );
     if (!canAssign) {
       return NextResponse.json(
         {
-          error: "You are not authorized to assign a student from this section.",
+          error:
+            "You are not authorized to assign a student from this course and section.",
         },
         { status: 403 }
       );
