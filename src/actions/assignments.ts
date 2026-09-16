@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma, type UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireFaculty } from "@/lib/auth-helpers";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
@@ -8,6 +9,16 @@ import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
 import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
 import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 import { assignmentRequestError } from "@/lib/assignments/assignment-filters";
+import { mayBeActivePairUniqueConflict } from "@/lib/assignments/active-pair-conflict";
+import {
+  buildSectionStudentsWhere,
+  classifySectionStudents,
+  finalSectionAssignmentCounts,
+  sectionAssignmentAccessError,
+  sectionAssignmentInputError,
+  sectionAssignmentRows,
+  type SectionAssignmentTarget,
+} from "@/lib/assignments/section-assignment";
 
 export async function assignStudent(
   plotId: string,
@@ -63,16 +74,27 @@ export async function assignStudent(
     return { error: requestError };
   }
 
-  await prisma.plotAssignment.create({
-    data: {
-      plotId,
-      studentId,
-      facultyId: plot.facultyId,
-      assignedById: session.user.id,
-      notes: notes || null,
-      status: "ACTIVE",
-    },
-  });
+  try {
+    await prisma.plotAssignment.create({
+      data: {
+        plotId,
+        studentId,
+        facultyId: plot.facultyId,
+        assignedById: session.user.id,
+        notes: notes || null,
+        status: "ACTIVE",
+      },
+    });
+  } catch (error) {
+    if (mayBeActivePairUniqueConflict(error)) {
+      const activePair = await prisma.plotAssignment.findFirst({
+        where: { plotId, studentId, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (activePair) return { error: "This student is already assigned to this plot" };
+    }
+    throw error;
+  }
 
   revalidatePath(`/dashboard/plots/${plotId}`);
   revalidatePath("/dashboard/assignments");
@@ -181,4 +203,162 @@ export async function getAssignableStudentsForPlot(
 
   const assignedIds = new Set(activeOnThisPlot.map((a) => a.studentId));
   return { students: students.filter((s) => !assignedIds.has(s.id)) };
+}
+
+// The preview and submit deliberately share the same authorization gate.
+// The client supplies a cohort target, never an authoritative student list.
+async function validateSectionTarget(
+  target: SectionAssignmentTarget,
+  actor: { role: UserRole; id: string },
+  client: Pick<typeof prisma, "plot" | "facultySectionAdvisory" | "user">
+) {
+  const inputError = sectionAssignmentInputError(target);
+  if (inputError) return { error: inputError } as const;
+
+  const plot = await client.plot.findUnique({
+    where: { id: target.plotId },
+    select: { facultyId: true, status: true, name: true },
+  });
+  if (!plot) return { error: "Plot not found" } as const;
+
+  const plotAccessError = sectionAssignmentAccessError({
+    role: actor.role,
+    actorId: actor.id,
+    plotFacultyId: plot.facultyId,
+    plotStatus: plot.status,
+    sectionAuthorized: true,
+  });
+  if (plotAccessError) return { error: plotAccessError } as const;
+
+  // No section-count or cohort query happens until this authority check.
+  const sectionAuthorized =
+    actor.role !== "FACULTY" ||
+    Boolean(
+      await client.facultySectionAdvisory.findFirst({
+        where: { facultyId: actor.id, section: target.section },
+        select: { id: true },
+      })
+    );
+  const accessError = sectionAssignmentAccessError({
+    role: actor.role,
+    actorId: actor.id,
+    plotFacultyId: plot.facultyId,
+    plotStatus: plot.status,
+    sectionAuthorized,
+  });
+  if (accessError) return { error: accessError } as const;
+
+  const where = buildSectionStudentsWhere(target);
+  const cohortExists = await client.user.findFirst({
+    where,
+    select: { id: true },
+  });
+  if (!cohortExists) {
+    return { error: "No eligible student farmers match this course and section." } as const;
+  }
+  return { plot, where } as const;
+}
+
+async function withSerializableRetries<T>(operation: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2034" || attempt === 2
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Assignment transaction retry limit reached.");
+}
+
+export async function getSectionAssignmentPreview(target: SectionAssignmentTarget) {
+  const session = await requireFaculty();
+  if (!target) return { error: "Select a plot, course, and section." };
+  const validated = await validateSectionTarget(
+    target,
+    { role: session.user.role, id: session.user.id },
+    prisma
+  );
+  if ("error" in validated) return { error: validated.error };
+
+  const students = await prisma.user.findMany({
+    where: validated.where,
+    select: { id: true },
+  });
+  const active = await prisma.plotAssignment.findMany({
+    where: {
+      plotId: target.plotId,
+      status: "ACTIVE",
+      studentId: { in: students.map((student) => student.id) },
+    },
+    select: { studentId: true },
+  });
+  return {
+    counts: classifySectionStudents(
+      students.map((student) => student.id),
+      active.map((assignment) => assignment.studentId)
+    ).counts,
+  };
+}
+
+export async function assignSectionToPlot(
+  target: SectionAssignmentTarget,
+  notes?: string
+) {
+  const session = await requireFaculty();
+  if (!target) return { error: "Select a plot, course, and section." };
+  const actor = { role: session.user.role, id: session.user.id };
+
+  const result = await withSerializableRetries(() => prisma.$transaction(async (tx) => {
+    // Reload plot/advisory/cohort inside the transaction; preview is never
+    // used as authority or as the source of these counts/IDs.
+    const validated = await validateSectionTarget(target, actor, tx);
+    if ("error" in validated) return { error: validated.error };
+
+    const students = await tx.user.findMany({
+      where: validated.where,
+      select: { id: true },
+    });
+    const studentIds = students.map((student) => student.id);
+    const active = await tx.plotAssignment.findMany({
+      where: {
+        plotId: target.plotId,
+        status: "ACTIVE",
+        studentId: { in: studentIds },
+      },
+      select: { studentId: true },
+    });
+    const { missingIds } = classifySectionStudents(
+      studentIds,
+      active.map((assignment) => assignment.studentId)
+    );
+    const inserted = missingIds.length
+      ? await tx.plotAssignment.createMany({
+          data: sectionAssignmentRows(missingIds, {
+            plotId: target.plotId,
+            facultyId: validated.plot.facultyId!,
+            assignedById: actor.id,
+            notes,
+          }),
+          skipDuplicates: true,
+        })
+      : { count: 0 };
+
+    return {
+      ...finalSectionAssignmentCounts(studentIds.length, inserted.count),
+      plotName: validated.plot.name,
+    };
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    timeout: 15000,
+  }));
+
+  if ("error" in result) return result;
+  revalidatePath(`/dashboard/plots/${target.plotId}`);
+  revalidatePath("/dashboard/assignments");
+  return result;
 }
