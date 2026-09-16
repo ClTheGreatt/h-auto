@@ -31,6 +31,11 @@ const CSP_VALUE = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.54", "localhost", "127.0.0.1"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" },

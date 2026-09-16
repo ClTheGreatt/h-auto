@@ -13,6 +13,9 @@ type CustomPresetSource = {
     name: string;
     durationDays: number;
     description: string | null;
+    expectedAppearance: string | null;
+    observableSigns: string[];
+    facultyGuidance: string | null;
     minSoilMoisture: number;
     maxSoilMoisture: number;
     minTemperature: number;
@@ -44,6 +47,9 @@ export function toCustomPreset(crop: CustomPresetSource): CropPreset {
     stages: crop.stages.map((s) => ({
       name: s.name,
       description: s.description ?? "",
+      expectedAppearance: s.expectedAppearance ?? "",
+      observableSigns: s.observableSigns,
+      facultyGuidance: s.facultyGuidance ?? "",
       durationDays: s.durationDays,
       minSoilMoisture: s.minSoilMoisture,
       maxSoilMoisture: s.maxSoilMoisture,

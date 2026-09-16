@@ -30,6 +30,7 @@ export async function uploadImageToCloudinary(
 ): Promise<{
   success: boolean;
   url?: string;
+  publicId?: string;
   error?: string;
 }> {
   try {
@@ -42,11 +43,34 @@ export async function uploadImageToCloudinary(
       transformation: [{ quality: "auto", fetch_format: "auto" }],
     });
 
-    return { success: true, url: result.secure_url };
+    return { success: true, url: result.secure_url, publicId: result.public_id };
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : "Upload failed",
     };
+  }
+}
+
+export const STAGE_REFERENCE_FOLDER = "h-auto/stage-references";
+
+export function isStageReferencePublicId(publicId: string): boolean {
+  return /^h-auto\/stage-references\/[A-Za-z0-9_-]+$/.test(publicId);
+}
+
+export async function deleteStageReferenceImageFromCloudinary(
+  publicId: string
+): Promise<void> {
+  if (!isStageReferencePublicId(publicId)) {
+    throw new Error("Refusing to delete an asset outside the stage-reference folder");
+  }
+
+  const result = await getCloudinary().uploader.destroy(publicId, {
+    resource_type: "image",
+    invalidate: true,
+  });
+
+  if (result.result !== "ok" && result.result !== "not found") {
+    throw new Error(`Cloudinary deletion failed: ${result.result}`);
   }
 }

@@ -33,6 +33,8 @@ import { LatestReadings } from "@/components/devices/latest-readings";
 import { LiveRefresh } from "@/components/plots/live-refresh";
 import { GrowthTimeline } from "@/components/growth/growth-timeline";
 import { CultivationGuideCard } from "@/components/plots/cultivation-guide-card";
+import { StageReferenceCard } from "@/components/plots/stage-reference-card";
+import { hasStageReferenceGuide } from "@/lib/crops/stage-reference";
 import type { PlotStatus } from "@prisma/client";
 import {
   isActivityPlotStatus,
@@ -389,6 +391,22 @@ export default async function PlotDetailPage({
           page at all; no additional gating (unlike the edit/harvest
           actions above, this is read-only reference content). */}
       {plot.crop && <CultivationGuideCard guide={plot.crop.cultivationGuide} />}
+
+      {plot.crop &&
+      plot.currentStage &&
+      hasStageReferenceGuide(plot.currentStage) ? (
+        <StageReferenceCard
+          cropName={plot.crop.name}
+          stage={{
+            name: plot.currentStage.name,
+            durationDays: plot.currentStage.durationDays,
+            referenceImageUrl: plot.currentStage.referenceImageUrl,
+            expectedAppearance: plot.currentStage.expectedAppearance,
+            observableSigns: plot.currentStage.observableSigns,
+            facultyGuidance: plot.currentStage.facultyGuidance,
+          }}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

@@ -50,6 +50,7 @@ import { Separator } from "@/components/ui/separator";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
 import { createCrop, updateCrop } from "@/actions/crops";
 import { CROP_PRESETS, type CropPreset } from "@/lib/crops/presets";
+import { StageReferenceGuideFields } from "@/components/crops/stage-reference-guide-fields";
 
 type CropFormProps = {
   mode: "create" | "edit";
@@ -61,6 +62,7 @@ type CropFormProps = {
   // Plots currently on one of this crop's stages (edit mode only) — gates
   // the save confirmation below. 0/undefined skips the dialog entirely.
   plotsInUseCount?: number;
+  stageReferenceImages?: Record<string, string>;
 };
 
 const NONE_PRESET = "__none__";
@@ -70,6 +72,9 @@ const emptyStage = {
   orderIndex: 0,
   durationDays: 7,
   description: "",
+  expectedAppearance: "",
+  observableSigns: [],
+  facultyGuidance: "",
   minSoilMoisture: 60,
   maxSoilMoisture: 80,
   minTemperature: 20,
@@ -92,10 +97,16 @@ export function CropForm({
   defaultValues,
   customPresets = [],
   plotsInUseCount = 0,
+  stageReferenceImages = {},
 }: CropFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [imageUrls, setImageUrls] = useState(stageReferenceImages);
+  const [mediaPendingStageIds, setMediaPendingStageIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const hasMediaPending = mediaPendingStageIds.size > 0;
   const needsSaveConfirm = mode === "edit" && plotsInUseCount > 0;
 
   const form = useForm<CropFormValues>({
@@ -140,6 +151,9 @@ export function CropForm({
     replace(
       preset.stages.map((s, i) => ({
         ...s,
+        expectedAppearance: s.expectedAppearance ?? "",
+        observableSigns: s.observableSigns ?? [],
+        facultyGuidance: s.facultyGuidance ?? "",
         orderIndex: i,
       }))
     );
@@ -148,6 +162,10 @@ export function CropForm({
   }
 
   async function onSubmit(values: CropFormValues) {
+    if (hasMediaPending) {
+      toast.info("Finish the image operation before saving the crop.");
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -162,7 +180,14 @@ export function CropForm({
       }
 
       toast.success(mode === "create" ? "Crop created" : "Crop updated");
-      router.push("/dashboard/crops");
+      if ("cleanupWarning" in result && result.cleanupWarning) {
+        toast.warning(result.cleanupWarning);
+      }
+      router.push(
+        mode === "create" && "cropId" in result && result.cropId
+          ? `/dashboard/crops/${result.cropId}/edit`
+          : "/dashboard/crops"
+      );
       router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
@@ -362,6 +387,14 @@ export function CropForm({
                         type="button"
                         variant="ghost"
                         size="sm"
+                        disabled={Boolean(
+                          stage.dbId && mediaPendingStageIds.has(stage.dbId)
+                        )}
+                        title={
+                          stage.dbId && mediaPendingStageIds.has(stage.dbId)
+                            ? "Finish the image operation before removing this stage."
+                            : undefined
+                        }
                         onClick={() => remove(index)}
                         className="text-danger-text hover:text-danger-text ml-2"
                       >
@@ -377,7 +410,34 @@ export function CropForm({
                       deleting and recreating it. Not rendered as a visible
                       field — nothing for the admin to see or edit here. */}
                   <input type="hidden" {...form.register(`stages.${index}.dbId`)} />
-                  <StageBasicFields control={form.control} index={index} />
+                  <div>
+                    <h3 className="text-sm font-medium mb-3">Stage information</h3>
+                    <StageBasicFields control={form.control} index={index} />
+                  </div>
+                  <Separator />
+                  <StageReferenceGuideFields
+                    control={form.control}
+                    index={index}
+                    cropId={cropId}
+                    stageId={stage.dbId}
+                    imageUrl={stage.dbId ? imageUrls[stage.dbId] : undefined}
+                    onImageChange={(stageId, imageUrl) =>
+                      setImageUrls((current) => {
+                        const next = { ...current };
+                        if (imageUrl) next[stageId] = imageUrl;
+                        else delete next[stageId];
+                        return next;
+                      })
+                    }
+                    onMediaPendingChange={(stageId, pending) =>
+                      setMediaPendingStageIds((current) => {
+                        const next = new Set(current);
+                        if (pending) next.add(stageId);
+                        else next.delete(stageId);
+                        return next;
+                      })
+                    }
+                  />
                   <Separator />
                   <StageThresholdFields control={form.control} index={index} />
                 </CardContent>
@@ -386,11 +446,11 @@ export function CropForm({
           </div>
         </div>
 
-        <div className="flex gap-3 sticky bottom-0 bg-muted py-4 border-t">
+        <div className="flex flex-wrap items-center gap-3 sticky bottom-0 bg-muted py-4 border-t">
           {needsSaveConfirm ? (
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogTrigger asChild>
-                <Button type="button" disabled={submitting}>
+                <Button type="button" disabled={submitting || hasMediaPending}>
                   {submitting ? "Saving..." : "Save changes"}
                 </Button>
               </AlertDialogTrigger>
@@ -411,7 +471,7 @@ export function CropForm({
                       use). This is an awareness prompt, not a danger
                       confirm. */}
                   <AlertDialogAction
-                    disabled={submitting}
+                    disabled={submitting || hasMediaPending}
                     onClick={(e) => {
                       e.preventDefault();
                       setConfirmOpen(false);
@@ -424,7 +484,7 @@ export function CropForm({
               </AlertDialogContent>
             </AlertDialog>
           ) : (
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || hasMediaPending}>
               {submitting ? "Saving..." : mode === "create" ? "Create crop" : "Save changes"}
             </Button>
           )}
@@ -435,6 +495,11 @@ export function CropForm({
           >
             Cancel
           </Button>
+          {hasMediaPending ? (
+            <p className="text-sm text-muted-foreground">
+              Finish the image operation before saving the crop.
+            </p>
+          ) : null}
         </div>
       </form>
     </Form>
@@ -507,7 +572,7 @@ function StageThresholdFields({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Environmental thresholds</h3>
+        <h3 className="text-sm font-medium text-foreground mb-2">Environmental thresholds</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <ThresholdPair control={control} index={index} field="SoilMoisture" label="Soil moisture (%)" />
           <ThresholdPair control={control} index={index} field="Temperature" label="Temperature (°C)" />
@@ -517,7 +582,7 @@ function StageThresholdFields({
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Soil nutrients (mg/kg)</h3>
+        <h3 className="text-sm font-medium text-foreground mb-2">Soil nutrients (mg/kg)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <ThresholdPair control={control} index={index} field="Nitrogen" label="Nitrogen (N)" />
           <ThresholdPair control={control} index={index} field="Phosphorus" label="Phosphorus (P)" />

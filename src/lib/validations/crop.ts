@@ -9,6 +9,15 @@ import { isValidThresholdRange } from "@/lib/sensors/threshold-status";
 const STAGE_TEMPERATURE_MIN = -5;
 const STAGE_TEMPERATURE_MAX = 60;
 
+const optionalGuideText = (label: string) =>
+  z.string().trim().max(1500, `${label} must be 1500 characters or fewer`).optional();
+
+const observableSignsSchema = z
+  .array(z.string().trim().max(250, "Each observable sign must be 250 characters or fewer"))
+  .transform((signs) => signs.filter((sign) => sign.length > 0))
+  .pipe(z.array(z.string()).max(10, "Use no more than 10 observable signs"))
+  .optional();
+
 const stageFields = z.object({
   // Present for a stage that already exists in the DB (round-tripped from
   // EditCropPage's defaultValues), absent for one newly appended in the
@@ -19,6 +28,9 @@ const stageFields = z.object({
   orderIndex: z.number().int().min(0),
   durationDays: z.number().int().positive("Duration must be at least 1 day"),
   description: z.string().optional().or(z.literal("")),
+  expectedAppearance: optionalGuideText("Expected appearance"),
+  observableSigns: observableSignsSchema,
+  facultyGuidance: optionalGuideText("Faculty guidance"),
   minSoilMoisture: z.number().min(0).max(100),
   maxSoilMoisture: z.number().min(0).max(100),
   minTemperature: z.number().min(STAGE_TEMPERATURE_MIN).max(STAGE_TEMPERATURE_MAX),

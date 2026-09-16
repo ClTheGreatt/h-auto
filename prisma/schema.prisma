@@ -223,6 +223,11 @@ model CropStage {
   orderIndex   Int
   durationDays Int
   description  String?
+  referenceImageUrl      String?
+  referenceImagePublicId String?
+  expectedAppearance     String?  @db.Text
+  observableSigns        String[] @default([])
+  facultyGuidance        String?  @db.Text
 
   // Ideal thresholds for this stage
   minSoilMoisture  Float

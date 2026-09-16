@@ -1,0 +1,6 @@
+export const MAX_STAGE_REFERENCE_IMAGE_MB = 3;
+export const MAX_STAGE_REFERENCE_IMAGE_BYTES =
+  MAX_STAGE_REFERENCE_IMAGE_MB * 1024 * 1024;
+export const STAGE_REFERENCE_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
+export const STAGE_REFERENCE_IMAGE_SIZE_COPY =
+  `Maximum ${MAX_STAGE_REFERENCE_IMAGE_MB} MB.`;

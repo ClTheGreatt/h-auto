@@ -1,6 +1,9 @@
 export type PresetStage = {
   name: string;
   description: string;
+  expectedAppearance?: string;
+  observableSigns?: string[];
+  facultyGuidance?: string;
   durationDays: number;
   minSoilMoisture: number;
   maxSoilMoisture: number;

@@ -57,6 +57,11 @@ export default async function EditCropPage({
         mode="edit"
         cropId={crop.id}
         plotsInUseCount={plotsInUseCount}
+        stageReferenceImages={Object.fromEntries(
+          crop.stages.flatMap((stage) =>
+            stage.referenceImageUrl ? [[stage.id, stage.referenceImageUrl]] : []
+          )
+        )}
         defaultValues={{
           name: crop.name,
           variety: crop.variety ?? "",
@@ -69,6 +74,9 @@ export default async function EditCropPage({
             orderIndex: s.orderIndex,
             durationDays: s.durationDays,
             description: s.description ?? "",
+            expectedAppearance: s.expectedAppearance ?? "",
+            observableSigns: s.observableSigns,
+            facultyGuidance: s.facultyGuidance ?? "",
             minSoilMoisture: s.minSoilMoisture,
             maxSoilMoisture: s.maxSoilMoisture,
             minTemperature: s.minTemperature,

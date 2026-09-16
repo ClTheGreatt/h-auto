@@ -1,9 +1,21 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
+import {
+  deleteStageReferenceImageFromCloudinary,
+  STAGE_REFERENCE_FOLDER,
+  uploadImageToCloudinary,
+} from "@/lib/cloudinary";
+import {
+  commitStageChangesAndCleanup,
+  removeStageReferenceImage as removeStageReferenceImageWithDependencies,
+  replaceStageReferenceImage,
+  type StageMediaDependencies,
+} from "@/lib/crops/stage-reference-media";
 
 // The CropStage columns a form submission can actually write — explicitly
 // listed (not spread) so a submitted `dbId` can never reach Prisma as a
@@ -13,6 +25,9 @@ function toStageData(s: CropFormValues["stages"][number]) {
     name: s.name,
     durationDays: s.durationDays,
     description: s.description || null,
+    expectedAppearance: s.expectedAppearance || null,
+    observableSigns: s.observableSigns ?? [],
+    facultyGuidance: s.facultyGuidance || null,
     minSoilMoisture: s.minSoilMoisture,
     maxSoilMoisture: s.maxSoilMoisture,
     minTemperature: s.minTemperature,
@@ -48,7 +63,7 @@ export async function createCrop(input: CropFormValues) {
   // A brand-new crop has no existing rows to match against — any submitted
   // dbId (CropForm never sets one in create mode) is ignored regardless,
   // since toStageData() never reads it.
-  await prisma.crop.create({
+  const crop = await prisma.crop.create({
     data: {
       ...cropData,
       variety: cropData.variety || null,
@@ -64,7 +79,7 @@ export async function createCrop(input: CropFormValues) {
   });
 
   revalidatePath("/dashboard/crops");
-  return { success: true };
+  return { success: true, cropId: crop.id };
 }
 
 export async function updateCrop(id: string, input: CropFormValues) {
@@ -134,72 +149,168 @@ export async function updateCrop(id: string, input: CropFormValues) {
 
   // Nothing is written until this point — the checks above run entirely
   // before the transaction opens, so a blocked save leaves the DB untouched.
-  await prisma.$transaction(async (tx) => {
-    if (removedStages.length > 0) {
-      await tx.cropStage.deleteMany({
-        where: { id: { in: removedStages.map((s) => s.id) } },
+  let deletedStageImagePublicIds: string[] = [];
+  const cleanupWarning = await commitStageChangesAndCleanup(
+    async () => {
+      await prisma.$transaction(async (tx) => {
+        if (removedStages.length > 0) {
+          const removedStageIds = removedStages.map((stage) => stage.id);
+          const deletedStages = await tx.$queryRaw<
+            Array<{ referenceImagePublicId: string | null }>
+          >(Prisma.sql`
+            DELETE FROM "CropStage"
+            WHERE "cropId" = ${id}
+              AND "id" IN (${Prisma.join(removedStageIds)})
+            RETURNING "referenceImagePublicId"
+          `);
+          deletedStageImagePublicIds = deletedStages.flatMap((stage) =>
+            stage.referenceImagePublicId ? [stage.referenceImagePublicId] : []
+          );
+        }
+
+        // CropForm now supports reordering (move up/down), so an existing
+        // stage's target orderIndex can be higher OR lower than where it
+        // currently sits — e.g. swapping stage 1 and 2 asks to write stage 2's
+        // row into the slot stage 1's row still occupies. @@unique([cropId,
+        // orderIndex]) is non-deferred, so a single-pass write risks a mid-loop
+        // collision. Two passes avoid that:
+        //
+        // Pass 1 moves every existing (dbId-having) row to a temporary negative
+        // orderIndex (-(arrayIndex+1)). This range is provably disjoint from
+        // both (a) the final target range, which is always 0..stages.length-1
+        // (non-negative, since it's assigned from array position), and (b) any
+        // row not being touched — there is none: every CropStage for this
+        // cropId is either in this update loop or was already deleted above as
+        // a removed stage, so nothing outside this loop can hold a
+        // (cropId, orderIndex) the temp or final writes could collide with.
+        // Distinct array indices map to distinct negative offsets, so the temp
+        // values can't collide with each other either.
+        for (let i = 0; i < stages.length; i++) {
+          const s = stages[i];
+          if (s.dbId) {
+            await tx.cropStage.update({
+              where: { id: s.dbId },
+              data: { orderIndex: -(i + 1) },
+            });
+          }
+        }
+
+        // Pass 2 writes final data and final orderIndex. Every existing row is
+        // now off the 0..N-1 range (moved negative above), and every new
+        // (no-dbId) row doesn't exist in the DB yet, so no target slot in this
+        // pass can already be occupied by a row this loop hasn't gotten to yet.
+        for (let i = 0; i < stages.length; i++) {
+          const s = stages[i];
+          if (s.dbId) {
+            await tx.cropStage.update({
+              where: { id: s.dbId },
+              data: { ...toStageData(s), orderIndex: i },
+            });
+          } else {
+            await tx.cropStage.create({
+              data: { ...toStageData(s), orderIndex: i, cropId: id },
+            });
+          }
+        }
+
+        await tx.crop.update({
+          where: { id },
+          data: {
+            ...cropData,
+            variety: cropData.variety || null,
+            description: cropData.description || null,
+            cultivationGuide: cropData.cultivationGuide || null,
+          },
+        });
       });
-    }
-
-    // CropForm now supports reordering (move up/down), so an existing
-    // stage's target orderIndex can be higher OR lower than where it
-    // currently sits — e.g. swapping stage 1 and 2 asks to write stage 2's
-    // row into the slot stage 1's row still occupies. @@unique([cropId,
-    // orderIndex]) is non-deferred, so a single-pass write risks a mid-loop
-    // collision. Two passes avoid that:
-    //
-    // Pass 1 moves every existing (dbId-having) row to a temporary negative
-    // orderIndex (-(arrayIndex+1)). This range is provably disjoint from
-    // both (a) the final target range, which is always 0..stages.length-1
-    // (non-negative, since it's assigned from array position), and (b) any
-    // row not being touched — there is none: every CropStage for this
-    // cropId is either in this update loop or was already deleted above as
-    // a removed stage, so nothing outside this loop can hold a
-    // (cropId, orderIndex) the temp or final writes could collide with.
-    // Distinct array indices map to distinct negative offsets, so the temp
-    // values can't collide with each other either.
-    for (let i = 0; i < stages.length; i++) {
-      const s = stages[i];
-      if (s.dbId) {
-        await tx.cropStage.update({
-          where: { id: s.dbId },
-          data: { orderIndex: -(i + 1) },
-        });
-      }
-    }
-
-    // Pass 2 writes final data and final orderIndex. Every existing row is
-    // now off the 0..N-1 range (moved negative above), and every new
-    // (no-dbId) row doesn't exist in the DB yet, so no target slot in this
-    // pass can already be occupied by a row this loop hasn't gotten to yet.
-    for (let i = 0; i < stages.length; i++) {
-      const s = stages[i];
-      if (s.dbId) {
-        await tx.cropStage.update({
-          where: { id: s.dbId },
-          data: { ...toStageData(s), orderIndex: i },
-        });
-      } else {
-        await tx.cropStage.create({
-          data: { ...toStageData(s), orderIndex: i, cropId: id },
-        });
-      }
-    }
-
-    await tx.crop.update({
-      where: { id },
-      data: {
-        ...cropData,
-        variety: cropData.variety || null,
-        description: cropData.description || null,
-        cultivationGuide: cropData.cultivationGuide || null,
-      },
-    });
-  });
+    },
+    () => deletedStageImagePublicIds,
+    deleteStageReferenceImageFromCloudinary
+  );
 
   revalidatePath("/dashboard/crops");
   revalidatePath(`/dashboard/crops/${id}/edit`);
-  return { success: true };
+  revalidatePath("/dashboard/plots");
+  return { success: true, cleanupWarning };
+}
+
+function stageMediaDependencies(): StageMediaDependencies {
+  return {
+    authorize: async () => {
+      await requireAdmin();
+    },
+    findStage: (stageId) =>
+      prisma.cropStage.findUnique({
+        where: { id: stageId },
+        select: {
+          id: true,
+          cropId: true,
+          referenceImageUrl: true,
+          referenceImagePublicId: true,
+        },
+      }),
+    upload: async (file) => {
+      const result = await uploadImageToCloudinary(file, STAGE_REFERENCE_FOLDER);
+      if (!result.success || !result.url || !result.publicId) {
+        throw new Error(result.error ?? "Image upload failed");
+      }
+      return { url: result.url, publicId: result.publicId };
+    },
+    updateImageIfCurrent: async (stage, image) => {
+      const result = await prisma.cropStage.updateMany({
+        where: {
+          id: stage.id,
+          cropId: stage.cropId,
+          referenceImageUrl: stage.referenceImageUrl,
+          referenceImagePublicId: stage.referenceImagePublicId,
+        },
+        data: image,
+      });
+      return result.count;
+    },
+    deleteImage: deleteStageReferenceImageFromCloudinary,
+    logCleanupFailure: (message, error) => console.error(message, error),
+  };
+}
+
+export async function uploadStageReferenceImage(
+  cropId: string,
+  stageId: string,
+  formData: FormData
+) {
+  await requireAdmin();
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose an image to upload" };
+  }
+
+  const result = await replaceStageReferenceImage(
+    stageMediaDependencies(),
+    cropId,
+    stageId,
+    file
+  );
+  if (result.success) {
+    revalidatePath(`/dashboard/crops/${cropId}/edit`);
+    revalidatePath("/dashboard/plots");
+  }
+  return result;
+}
+
+export async function removeStageReferenceImage(cropId: string, stageId: string) {
+  await requireAdmin();
+
+  const result = await removeStageReferenceImageWithDependencies(
+    stageMediaDependencies(),
+    cropId,
+    stageId
+  );
+  if (result.success) {
+    revalidatePath(`/dashboard/crops/${cropId}/edit`);
+    revalidatePath("/dashboard/plots");
+  }
+  return result;
 }
 
 // Soft delete: archives the crop instead of a hard `delete`, so historical
