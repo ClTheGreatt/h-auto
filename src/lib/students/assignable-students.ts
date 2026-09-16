@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, UserRole } from "@prisma/client";
-import { BASE_ASSIGNABLE_STUDENT_WHERE } from "@/lib/students/eligibility";
 
 export type AssignableStudentsActor = { role: UserRole; userId: string };
 
@@ -43,7 +42,9 @@ export async function buildAssignableStudentsWhere(
       : [];
 
   return {
-    ...BASE_ASSIGNABLE_STUDENT_WHERE,
+    role: "STUDENT_FARMER",
+    status: "ACTIVE",
+    graduatedAt: null,
     ...(actor.role === "FACULTY" ? { section: { in: advisedSections } } : {}),
   };
 }

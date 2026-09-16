@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { mayBeActivePairUniqueConflict } from "@/lib/assignments/active-pair-conflict";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
@@ -207,33 +206,16 @@ export async function POST(
       );
     }
 
-    let created;
-    try {
-      created = await prisma.plotAssignment.create({
-        data: {
-          plotId,
-          studentId,
-          facultyId: plot.facultyId,
-          assignedById: user.id,
-          notes: notes?.trim() || null,
-          status: "ACTIVE",
-        },
-      });
-    } catch (error) {
-      if (mayBeActivePairUniqueConflict(error)) {
-        const activePair = await prisma.plotAssignment.findFirst({
-          where: { plotId, studentId, status: "ACTIVE" },
-          select: { id: true },
-        });
-        if (activePair) {
-          return NextResponse.json(
-            { error: "Student already assigned to this plot" },
-            { status: 409 }
-          );
-        }
-      }
-      throw error;
-    }
+    const created = await prisma.plotAssignment.create({
+      data: {
+        plotId,
+        studentId,
+        facultyId: plot.facultyId,
+        assignedById: user.id,
+        notes: notes?.trim() || null,
+        status: "ACTIVE",
+      },
+    });
 
     return NextResponse.json(
       {

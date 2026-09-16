@@ -7,7 +7,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
 import { ACTIVITY_PLOT_STATUSES } from "@/lib/plots/lifecycle";
-import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
 import { formatDate } from "@/lib/format-date";
 import { AssignmentFiltersToolbar } from "@/components/assignments/assignment-filters-toolbar";
 import { AssignStudentDialog } from "@/components/assignments/assign-student-dialog";
@@ -110,27 +109,12 @@ export default async function AssignmentsPage({
           })
         : Promise.resolve([] as { section: string | null }[]);
 
-  const bulkCohortsPromise = canManageAssignments
-    ? (async () => {
-        const scope = await buildAssignableStudentsWhere(actor);
-        const rows = await prisma.user.groupBy({
-          where: { AND: [scope, { section: { not: null } }] },
-          by: ["course", "section"],
-        });
-        return rows.filter(
-          (row): row is { course: string | null; section: string } =>
-            Boolean(row.section)
-        );
-      })()
-    : Promise.resolve([] as { course: string | null; section: string }[]);
-
   const [
     assignments,
     plotsForFilter,
     assignablePlots,
     sectionRows,
     unfilteredAssignment,
-    bulkCohorts,
   ] = await Promise.all([
     prisma.plotAssignment.findMany({
       where,
@@ -174,7 +158,6 @@ export default async function AssignmentsPage({
           select: { id: true },
         })
       : Promise.resolve(null),
-    bulkCohortsPromise,
   ]);
   const sectionOptions = candidateSections(sectionRows);
   const filtersHaveNoMatches =
@@ -204,7 +187,7 @@ export default async function AssignmentsPage({
         />
         {canManageAssignments && (
           <div className="sm:ml-auto">
-            <AssignStudentDialog plots={assignablePlots} role={role} bulkCohorts={bulkCohorts} />
+            <AssignStudentDialog plots={assignablePlots} role={role} />
           </div>
         )}
       </div>
