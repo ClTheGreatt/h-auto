@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Prisma, UserRole } from "@prisma/client";
 import {
+  assignmentCandidateRequestKey,
   assignmentRequestError,
   assignmentSearchTokens,
   buildAssignmentListWhere,
@@ -315,5 +316,31 @@ test("27. Clear filters preserves unrelated query parameters", () => {
       "search=Aaron&section=BSA-4D&plotId=plot-a&foo=bar&page=2"
     ),
     "foo=bar&page=2"
+  );
+});
+
+test("28-30. Candidate request identity includes plot, course (including null), and section", () => {
+  const base = {
+    plotId: "plot-a",
+    course: "BS Agriculture - Crop Science",
+    section: "BSA-4D",
+  };
+  const key = assignmentCandidateRequestKey(base);
+
+  assert.notEqual(
+    key,
+    assignmentCandidateRequestKey({ ...base, plotId: "plot-b" })
+  );
+  assert.notEqual(
+    key,
+    assignmentCandidateRequestKey({ ...base, course: "BS Agriculture - Agronomy" })
+  );
+  assert.notEqual(
+    key,
+    assignmentCandidateRequestKey({ ...base, section: "BSA-4E" })
+  );
+  assert.notEqual(
+    key,
+    assignmentCandidateRequestKey({ ...base, course: null })
   );
 });

@@ -204,7 +204,7 @@ export default async function AssignmentsPage({
         />
         {canManageAssignments && (
           <div className="sm:ml-auto">
-            <AssignStudentDialog plots={assignablePlots} role={role} bulkCohorts={bulkCohorts} />
+            <AssignStudentDialog plots={assignablePlots} bulkCohorts={bulkCohorts} />
           </div>
         )}
       </div>

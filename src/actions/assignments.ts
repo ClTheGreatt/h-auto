@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { requireFaculty } from "@/lib/auth-helpers";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
 import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
-import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
 import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 import { assignmentRequestError } from "@/lib/assignments/assignment-filters";
 import { mayBeActivePairUniqueConflict } from "@/lib/assignments/active-pair-conflict";
@@ -124,13 +123,11 @@ export async function removeAssignment(assignmentId: string) {
   return { success: true };
 }
 
-// Assignable students for a plot chosen dynamically (the cross-plot
-// Assignments page) — the web analogue of GET /api/mobile/me/plots/[id]/
-// assignable-students. Plot Detail can compute this inline from its own
-// fixed plotId; a page where the plot is picked reactively needs it as a
-// standalone call.
+// Assignable students for a plot/course/section chosen dynamically on the
+// cross-plot Assignments page. The explicit cohort target keeps same-named
+// sections in different courses separate.
 export async function getAssignableStudentsForPlot(
-  plotId: string
+  target: SectionAssignmentTarget
 ): Promise<
   | { error: string }
   | {
@@ -147,9 +144,12 @@ export async function getAssignableStudentsForPlot(
     }
 > {
   const session = await requireFaculty();
+  if (!target) return { error: "Select a plot, course, and section." };
+  const inputError = sectionAssignmentInputError(target);
+  if (inputError) return { error: inputError };
 
   const plot = await prisma.plot.findUnique({
-    where: { id: plotId },
+    where: { id: target.plotId },
     select: { facultyId: true, status: true },
   });
   if (!plot) return { error: "Plot not found" };
@@ -174,12 +174,20 @@ export async function getAssignableStudentsForPlot(
     return { error: "You don't have access to this plot" };
   }
 
+  // Course narrows an eligible cohort; section remains the Faculty authority
+  // boundary. Check it before returning any candidate metadata.
+  const sectionAuthorized = await assertFacultyCanAssignStudent(
+    session.user.role,
+    session.user.id,
+    target.section
+  );
+  if (!sectionAuthorized) {
+    return { error: "You are not authorized to assign a student from this section." };
+  }
+
   const [students, activeOnThisPlot] = await Promise.all([
     prisma.user.findMany({
-      where: await buildAssignableStudentsWhere({
-        role: session.user.role,
-        userId: session.user.id,
-      }),
+      where: buildSectionStudentsWhere(target),
       select: {
         id: true,
         firstName: true,
@@ -196,7 +204,7 @@ export async function getAssignableStudentsForPlot(
     // plot-assignments.tsx filters its own already-known assignments list
     // client-side, which this page doesn't have for a freshly-picked plot.
     prisma.plotAssignment.findMany({
-      where: { plotId, status: "ACTIVE" },
+      where: { plotId: target.plotId, status: "ACTIVE" },
       select: { studentId: true },
     }),
   ]);

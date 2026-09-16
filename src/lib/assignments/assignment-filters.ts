@@ -32,6 +32,14 @@ export type AssignmentCandidate = {
   section: string | null;
 };
 
+export function assignmentCandidateRequestKey(target: {
+  plotId: string;
+  course: string | null;
+  section: string;
+}): string {
+  return JSON.stringify([target.plotId, target.course, target.section]);
+}
+
 type AssignmentStudent = {
   role: UserRole;
   status: UserStatus;

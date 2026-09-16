@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { UserRole } from "@prisma/client";
 import { toast } from "sonner";
 import { UserPlus, MapPinned, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,13 +31,14 @@ import {
   getAssignableStudentsForPlot,
   getSectionAssignmentPreview,
 } from "@/actions/assignments";
-import { COURSE_NOT_RECORDED, type SectionAssignmentCounts } from "@/lib/assignments/section-assignment";
 import {
+  COURSE_NOT_RECORDED,
+  type SectionAssignmentCounts,
+  type SectionAssignmentTarget,
+} from "@/lib/assignments/section-assignment";
+import {
+  assignmentCandidateRequestKey,
   candidateSearchKeywords,
-  candidateSections,
-  candidatesInSection,
-  defaultCandidateSection,
-  shouldClearSelectedStudent,
   type AssignmentCandidate,
 } from "@/lib/assignments/assignment-filters";
 
@@ -51,7 +51,6 @@ function courseKey(course: string | null): string {
 }
 
 const COURSE_TRUNCATE_LENGTH = 24;
-const ALL_SECTIONS = "__all_sections__";
 
 // Keep the existing name/year/section context and add the student number
 // when present so similarly named candidates remain distinguishable.
@@ -70,11 +69,9 @@ function studentOptionLabel(s: AssignmentCandidate): string {
 
 export function AssignStudentDialog({
   plots,
-  role,
   bulkCohorts,
 }: {
   plots: Plot[];
-  role: UserRole;
   bulkCohorts: BulkCohort[];
 }) {
   const router = useRouter();
@@ -82,7 +79,7 @@ export function AssignStudentDialog({
   const [selectedPlot, setSelectedPlot] = useState("");
   const [mode, setMode] = useState<AssignmentMode>("individual");
   const [selectedCourse, setSelectedCourse] = useState("");
-  const [selectedBulkSection, setSelectedBulkSection] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
   const [preview, setPreview] = useState<SectionAssignmentCounts | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -91,8 +88,8 @@ export function AssignStudentDialog({
   const [students, setStudents] = useState<AssignmentCandidate[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const studentRequestIdRef = useRef(0);
+  const studentRequestKeyRef = useRef("");
   const [studentsError, setStudentsError] = useState<string | null>(null);
-  const [selectedSection, setSelectedSection] = useState(ALL_SECTIONS);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [notes, setNotes] = useState("");
@@ -106,7 +103,7 @@ export function AssignStudentDialog({
     ),
     [bulkCohorts]
   );
-  const bulkSections = useMemo(() => {
+  const sections = useMemo(() => {
     const course = courses.find((value) => courseKey(value) === selectedCourse);
     if (course === undefined && selectedCourse !== courseKey(null)) return [];
     return [...new Set(
@@ -115,30 +112,23 @@ export function AssignStudentDialog({
         .map((cohort) => cohort.section)
     )].sort((a, b) => a.localeCompare(b));
   }, [bulkCohorts, courses, selectedCourse]);
-  const selectedCourseValue = courses.find((course) => courseKey(course) === selectedCourse);
-  const validBulkTarget = Boolean(
-    selectedPlot && selectedCourse && selectedBulkSection &&
+  const selectedCourseValue = bulkCohorts.find(
+    (cohort) => courseKey(cohort.course) === selectedCourse
+  )?.course;
+  const validCohortTarget = Boolean(
+    selectedPlot && selectedCourse && selectedSection &&
     bulkCohorts.some((cohort) =>
-      courseKey(cohort.course) === selectedCourse && cohort.section === selectedBulkSection
+      courseKey(cohort.course) === selectedCourse && cohort.section === selectedSection
     )
-  );
-  const sections = useMemo(() => candidateSections(students), [students]);
-  const visibleStudents = useMemo(
-    () =>
-      candidatesInSection(
-        students,
-        selectedSection === ALL_SECTIONS ? undefined : selectedSection
-      ),
-    [selectedSection, students]
   );
   const studentOptions = useMemo(
     () =>
-      visibleStudents.map((student) => ({
+      students.map((student) => ({
         value: student.id,
         label: studentOptionLabel(student),
         searchKeywords: candidateSearchKeywords(student),
       })),
-    [visibleStudents]
+    [students]
   );
 
   function reset() {
@@ -151,15 +141,15 @@ export function AssignStudentDialog({
     setMode("individual");
     setSelectedPlot("");
     setSelectedCourse("");
-    setSelectedBulkSection("");
+    setSelectedSection("");
     setPreview(null);
     setPreviewError(null);
     setLoadingPreview(false);
     setPreviewRetry(0);
     setStudents([]);
     setLoadingStudents(false);
+    studentRequestKeyRef.current = "";
     setStudentsError(null);
-    setSelectedSection(ALL_SECTIONS);
     setStudentSearch("");
     setSelectedStudent("");
     setNotes("");
@@ -202,32 +192,51 @@ export function AssignStudentDialog({
     router.refresh();
   }
 
-  async function loadStudentsForPlot(plotId: string) {
+  function clearStudentCandidates() {
+    studentRequestIdRef.current += 1;
+    studentRequestKeyRef.current = "";
+    setStudents([]);
+    setStudentsError(null);
+    setLoadingStudents(false);
+    setStudentSearch("");
+    setSelectedStudent("");
+  }
+
+  async function loadStudentsForTarget(target: SectionAssignmentTarget) {
     const requestId = ++studentRequestIdRef.current;
+    const requestKey = assignmentCandidateRequestKey(target);
+    studentRequestKeyRef.current = requestKey;
     setStudents([]);
     setStudentsError(null);
     setLoadingStudents(true);
+    setStudentSearch("");
+    setSelectedStudent("");
 
     try {
-      const result = await getAssignableStudentsForPlot(plotId);
+      const result = await getAssignableStudentsForPlot(target);
 
-      if (requestId !== studentRequestIdRef.current) return;
+      if (
+        requestId !== studentRequestIdRef.current ||
+        requestKey !== studentRequestKeyRef.current
+      ) return;
 
       if ("error" in result) {
         setStudentsError(result.error);
         return;
       }
       setStudents(result.students);
-      const nextSections = candidateSections(result.students);
-      setSelectedSection(
-        defaultCandidateSection(role, nextSections) ?? ALL_SECTIONS
-      );
     } catch {
-      if (requestId === studentRequestIdRef.current) {
+      if (
+        requestId === studentRequestIdRef.current &&
+        requestKey === studentRequestKeyRef.current
+      ) {
         setStudentsError("Something went wrong. Please try again.");
       }
     } finally {
-      if (requestId === studentRequestIdRef.current) {
+      if (
+        requestId === studentRequestIdRef.current &&
+        requestKey === studentRequestKeyRef.current
+      ) {
         setLoadingStudents(false);
       }
     }
@@ -235,56 +244,76 @@ export function AssignStudentDialog({
 
   function handlePlotChange(plotId: string) {
     previewRequestIdRef.current += 1;
-    studentRequestIdRef.current += 1;
     setSelectedPlot(plotId);
-    setSelectedCourse("");
-    setSelectedBulkSection("");
     setPreview(null);
     setPreviewError(null);
-    setLoadingPreview(false);
-    setSelectedSection(ALL_SECTIONS);
-    setStudentSearch("");
-    setSelectedStudent("");
-    setStudents([]);
-    setStudentsError(null);
-    setLoadingStudents(false);
-    if (mode === "individual") void loadStudentsForPlot(plotId);
+    clearStudentCandidates();
+
+    const courseIsValid = bulkCohorts.some(
+      (cohort) => courseKey(cohort.course) === selectedCourse
+    );
+    const cohort = bulkCohorts.find(
+      (candidate) =>
+        courseKey(candidate.course) === selectedCourse &&
+        candidate.section === selectedSection
+    );
+    if (!courseIsValid) setSelectedCourse("");
+    if (!cohort) setSelectedSection("");
+    setLoadingPreview(mode === "section" && Boolean(cohort));
+    if (mode === "individual" && cohort) {
+      void loadStudentsForTarget({ plotId, ...cohort });
+    }
   }
 
   function handleModeChange(next: AssignmentMode) {
     if (next === mode || submitPendingRef.current) return;
     previewRequestIdRef.current += 1;
-    studentRequestIdRef.current += 1;
     setMode(next);
-    setSelectedStudent("");
-    setSelectedSection(ALL_SECTIONS);
-    setStudentSearch("");
-    setStudents([]);
-    setLoadingStudents(false);
-    setStudentsError(null);
-    setSelectedCourse("");
-    setSelectedBulkSection("");
+    clearStudentCandidates();
     setPreview(null);
     setPreviewError(null);
-    setLoadingPreview(false);
-    if (next === "individual" && selectedPlot) void loadStudentsForPlot(selectedPlot);
+    const courseIsValid = bulkCohorts.some(
+      (candidate) => courseKey(candidate.course) === selectedCourse
+    );
+    const cohort = bulkCohorts.find(
+      (candidate) =>
+        courseKey(candidate.course) === selectedCourse &&
+        candidate.section === selectedSection
+    );
+    if (!courseIsValid) setSelectedCourse("");
+    if (!cohort) setSelectedSection("");
+    setLoadingPreview(next === "section" && Boolean(selectedPlot && cohort));
+    if (next === "individual" && selectedPlot && cohort) {
+      void loadStudentsForTarget({ plotId: selectedPlot, ...cohort });
+    }
   }
 
   function handleCourseChange(value: string) {
     previewRequestIdRef.current += 1;
+    clearStudentCandidates();
     setSelectedCourse(value);
-    setSelectedBulkSection("");
+    setSelectedSection("");
     setPreview(null);
     setPreviewError(null);
     setLoadingPreview(false);
   }
 
-  function handleBulkSectionChange(value: string) {
+  function handleSectionChange(value: string) {
     previewRequestIdRef.current += 1;
-    setSelectedBulkSection(value);
+    clearStudentCandidates();
+    setSelectedSection(value);
     setPreview(null);
     setPreviewError(null);
-    setLoadingPreview(Boolean(value && selectedPlot && selectedCourse));
+
+    const cohort = bulkCohorts.find(
+      (candidate) =>
+        courseKey(candidate.course) === selectedCourse &&
+        candidate.section === value
+    );
+    setLoadingPreview(mode === "section" && Boolean(selectedPlot && cohort));
+    if (mode === "individual" && selectedPlot && cohort) {
+      void loadStudentsForTarget({ plotId: selectedPlot, ...cohort });
+    }
   }
 
   function retryPreview() {
@@ -296,7 +325,7 @@ export function AssignStudentDialog({
   }
 
   useEffect(() => {
-    if (!open || mode !== "section" || !validBulkTarget) {
+    if (!open || mode !== "section" || !validCohortTarget) {
       return;
     }
     const requestId = ++previewRequestIdRef.current;
@@ -306,7 +335,7 @@ export function AssignStudentDialog({
         const result = await getSectionAssignmentPreview({
           plotId: selectedPlot,
           course: course ?? null,
-          section: selectedBulkSection,
+          section: selectedSection,
         });
         if (requestId !== previewRequestIdRef.current) return;
         if ("error" in result) setPreviewError(result.error ?? "Could not load the assignment preview.");
@@ -321,19 +350,11 @@ export function AssignStudentDialog({
     }
     void fetchPreview();
     return () => { previewRequestIdRef.current += 1; };
-  }, [open, mode, validBulkTarget, selectedPlot, selectedCourse, selectedBulkSection, selectedCourseValue, previewRetry]);
-
-  function handleSectionChange(nextSection: string) {
-    const section = nextSection === ALL_SECTIONS ? undefined : nextSection;
-    if (shouldClearSelectedStudent(students, selectedStudent, section)) {
-      setSelectedStudent("");
-    }
-    setSelectedSection(nextSection);
-  }
+  }, [open, mode, validCohortTarget, selectedPlot, selectedCourse, selectedSection, selectedCourseValue, previewRetry]);
 
   async function handleAssign() {
-    if (!selectedPlot || !selectedStudent) {
-      toast.error("Please select a plot and a student");
+    if (!validCohortTarget || !selectedStudent) {
+      toast.error("Please select a plot, course, section, and student");
       return;
     }
     const request = beginSubmit();
@@ -360,14 +381,14 @@ export function AssignStudentDialog({
   }
 
   async function handleBulkAssign() {
-    if (!validBulkTarget || !preview || preview.willBeAssigned === 0) return;
+    if (!validCohortTarget || !preview || preview.willBeAssigned === 0) return;
     const request = beginSubmit();
     if (!request) return;
     try {
       const result = await assignSectionToPlot({
         plotId: selectedPlot,
         course: selectedCourseValue ?? null,
-        section: selectedBulkSection,
+        section: selectedSection,
       }, notes);
       if (!isCurrentSubmit(request)) return;
       if ("error" in result) {
@@ -467,73 +488,7 @@ export function AssignStudentDialog({
             )}
           </div>
 
-          {mode === "individual" && selectedPlot && (
-            <div className="space-y-4">
-              {studentsError ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {studentsError}
-                </p>
-              ) : !loadingStudents && students.length === 0 ? (
-                <EmptyState
-                  compact
-                  icon={Users}
-                  title="No eligible students"
-                  description="Only active, non-graduated student farmers can be assigned — and for faculty, only those in a section you advise. No one currently matches for this plot."
-                />
-              ) : (
-                <>
-                  {!loadingStudents && students.length > 0 && (
-                    <div>
-                      <Label htmlFor="assign-section-select">Section</Label>
-                      <Select
-                        value={selectedSection}
-                        onValueChange={handleSectionChange}
-                      >
-                        <SelectTrigger id="assign-section-select">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={ALL_SECTIONS}>
-                            {role === "FACULTY"
-                              ? "All authorized sections"
-                              : "All sections"}
-                          </SelectItem>
-                          {sections.map((section) => (
-                            <SelectItem key={section} value={section}>
-                              {section}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div>
-                    <Label htmlFor="assign-student-select">Student</Label>
-                    <SearchableSelect
-                      options={studentOptions}
-                      value={selectedStudent || undefined}
-                      onChange={(value) => setSelectedStudent(value ?? "")}
-                      allLabel={
-                        loadingStudents ? "Loading..." : "Select a student"
-                      }
-                      searchPlaceholder="Search name, email, or student number..."
-                      emptyText="No eligible students found."
-                      width="w-full"
-                      disabled={loadingStudents}
-                      allowEmptySelection={false}
-                      triggerId="assign-student-select"
-                      ariaLabel="Select an eligible student"
-                      searchValue={studentSearch}
-                      onSearchValueChange={setStudentSearch}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {mode === "section" && selectedPlot && (
+          {selectedPlot && (
             <div className="space-y-4">
               {bulkCohorts.length === 0 ? (
                 <EmptyState
@@ -560,17 +515,17 @@ export function AssignStudentDialog({
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="assign-bulk-section-select">Section</Label>
+                    <Label htmlFor="assign-section-select">Section</Label>
                     <Select
-                      value={selectedBulkSection}
-                      onValueChange={handleBulkSectionChange}
+                      value={selectedSection}
+                      onValueChange={handleSectionChange}
                       disabled={!selectedCourse || submitting}
                     >
-                      <SelectTrigger id="assign-bulk-section-select">
+                      <SelectTrigger id="assign-section-select">
                         <SelectValue placeholder="Select a section" />
                       </SelectTrigger>
                       <SelectContent>
-                        {bulkSections.map((section) => (
+                        {sections.map((section) => (
                           <SelectItem key={section} value={section}>
                             {section}
                           </SelectItem>
@@ -578,7 +533,41 @@ export function AssignStudentDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  {validBulkTarget && (
+
+                  {mode === "individual" ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="assign-student-select">Student</Label>
+                        <SearchableSelect
+                          options={studentOptions}
+                          value={selectedStudent || undefined}
+                          onChange={(value) => setSelectedStudent(value ?? "")}
+                          allLabel={loadingStudents ? "Loading..." : "Search student"}
+                          searchPlaceholder="Search name, email, or student number..."
+                          emptyText="No eligible students found."
+                          width="w-full"
+                          disabled={!validCohortTarget || loadingStudents || submitting}
+                          allowEmptySelection={false}
+                          triggerId="assign-student-select"
+                          ariaLabel="Select an eligible student"
+                          searchValue={studentSearch}
+                          onSearchValueChange={setStudentSearch}
+                        />
+                      </div>
+                      {studentsError ? (
+                        <p className="text-sm text-destructive" role="alert">
+                          {studentsError}
+                        </p>
+                      ) : validCohortTarget && !loadingStudents && students.length === 0 ? (
+                        <EmptyState
+                          compact
+                          icon={Users}
+                          title="No eligible students"
+                          description="Only active, non-graduated student farmers in the selected course and section can be assigned. Students already active on this plot are excluded."
+                        />
+                      ) : null}
+                    </div>
+                  ) : validCohortTarget ? (
                     <div className="rounded-md border bg-muted/30 p-3 text-sm" aria-live="polite">
                       <p className="font-medium mb-2">Assignment Preview</p>
                       {loadingPreview ? (
@@ -603,7 +592,7 @@ export function AssignStudentDialog({
                         </>
                       ) : null}
                     </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>
@@ -631,8 +620,8 @@ export function AssignStudentDialog({
           <Button
             onClick={mode === "individual" ? handleAssign : handleBulkAssign}
             disabled={submitting || (mode === "individual"
-              ? !selectedPlot || !selectedStudent
-              : !validBulkTarget || loadingPreview || !preview || preview.willBeAssigned === 0)}
+              ? !validCohortTarget || !selectedStudent
+              : !validCohortTarget || loadingPreview || !preview || preview.willBeAssigned === 0)}
           >
             {submitting
               ? "Assigning..."

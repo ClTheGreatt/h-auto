@@ -47,6 +47,38 @@ test("Eligibility predicate includes exact course/section and canonical active n
   assert.equal(sectionAssignmentInputError({ ...target, course: "" }), "Select a valid course.");
 });
 
+test("Same-named sections in different courses and null-course cohorts stay distinct", () => {
+  const courseA = buildSectionStudentsWhere({
+    ...target,
+    course: "BS Agriculture - Crop Science",
+  });
+  const courseB = buildSectionStudentsWhere({
+    ...target,
+    course: "BS Agriculture - Agronomy",
+  });
+  const noCourse = buildSectionStudentsWhere({ ...target, course: null });
+
+  assert.deepEqual(courseA.course, "BS Agriculture - Crop Science");
+  assert.deepEqual(courseB.course, "BS Agriculture - Agronomy");
+  assert.deepEqual(noCourse.course, null);
+  assert.equal(courseA.section, target.section);
+  assert.equal(courseB.section, target.section);
+  assert.notDeepEqual(courseA, courseB);
+  assert.notDeepEqual(courseA, noCourse);
+});
+
+test("Candidate lookup input requires plot, an explicit valid course value, and section", () => {
+  assert.equal(
+    sectionAssignmentInputError({ ...target, plotId: "" }),
+    "Select a plot, course, and section."
+  );
+  assert.equal(
+    sectionAssignmentInputError({ ...target, section: "" }),
+    "Select a plot, course, and section."
+  );
+  assert.equal(sectionAssignmentInputError({ ...target, course: null }), null);
+});
+
 test("Selected-plot active IDs alone are excluded; another-plot assignments do not matter", () => {
   const result = classifySectionStudents(["student-a", "student-b", "student-c"], ["student-b"]);
   assert.deepEqual(result.missingIds, ["student-a", "student-c"]);
