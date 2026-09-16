@@ -24,7 +24,7 @@ import {
   DEVICE_STATUS_LABEL,
 } from "@/lib/utils/device-status";
 import { buildDirectPlotAccessWhere } from "@/lib/auth/plot-access";
-import { buildAssignableStudentsWhere } from "@/lib/students/assignable-students";
+import { getAssignableStudentCohorts } from "@/lib/students/assignable-students";
 import { PlotAssignments } from "@/components/plots/plot-assignments";
 import { RestorePlotDialog } from "@/components/plots/restore-plot-dialog";
 import { HarvestPlotDialog } from "@/components/plots/harvest-plot-dialog";
@@ -144,42 +144,14 @@ export default async function PlotDetailPage({
   const canLogGrowth =
     (canManageAssignments || isAssignedStudent) && isActivityPlot;
   const canManageAssignmentsNow = canManageAssignments && isActivityPlot;
+  const canAssignStudentNow = canManageAssignmentsNow && Boolean(plot.facultyId);
 
-  // FACULTY is scoped to sections they actually advise; ADMIN/SUPER_ADMIN
-  // stay unscoped. Zero advisories means zero eligible students — the
-  // `in: advisedSections` filter is applied unconditionally below, never
-  // skipped for an empty array, so that stays true rather than silently
-  // falling back to an unscoped list.
-  const advisedSections =
-    canManageAssignmentsNow && role === "FACULTY"
-      ? (
-          await prisma.facultySectionAdvisory.findMany({
-            where: { facultyId: session.user.id },
-            select: { section: true },
-          })
-        ).map((a) => a.section)
-      : [];
-
-  const facultyHasNoAdvisories =
-    canManageAssignmentsNow && role === "FACULTY" && advisedSections.length === 0;
-
-  const availableStudents = canManageAssignmentsNow
-    ? await prisma.user.findMany({
-        where: await buildAssignableStudentsWhere({
-          role,
-          userId: session.user.id,
-        }),
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          course: true,
-          yearLevel: true,
-          section: true,
-        },
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      })
+  // Reuse the Assignments page's canonical actor-scoped cohort source:
+  // Faculty receives advised sections only, while admins retain the broader
+  // eligible cohort scope. Candidate rows are loaded on demand after the
+  // fixed plot, course, and section are all known.
+  const assignmentCohorts = canAssignStudentNow
+    ? await getAssignableStudentCohorts({ role, userId: session.user.id })
     : [];
 
   const latestReading = await prisma.sensorReading.findFirst({
@@ -504,10 +476,9 @@ export default async function PlotDetailPage({
           <PlotAssignments
             plotId={plot.id}
             assignments={plot.assignments}
-            availableStudents={availableStudents}
+            cohorts={assignmentCohorts}
             canManage={canManageAssignmentsNow}
-            facultyHasNoAdvisories={facultyHasNoAdvisories}
-            viewerIsFaculty={role === "FACULTY"}
+            canAssign={canAssignStudentNow}
           />
         </CardContent>
       </Card>

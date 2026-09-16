@@ -32,12 +32,25 @@ export type AssignmentCandidate = {
   section: string | null;
 };
 
+export type AssignmentDialogMode = "individual" | "section";
+
+export function assignmentDialogRequestKey(
+  mode: AssignmentDialogMode,
+  target: {
+    plotId: string;
+    course: string | null;
+    section: string;
+  }
+): string {
+  return JSON.stringify([mode, target.plotId, target.course, target.section]);
+}
+
 export function assignmentCandidateRequestKey(target: {
   plotId: string;
   course: string | null;
   section: string;
 }): string {
-  return JSON.stringify([target.plotId, target.course, target.section]);
+  return assignmentDialogRequestKey("individual", target);
 }
 
 type AssignmentStudent = {

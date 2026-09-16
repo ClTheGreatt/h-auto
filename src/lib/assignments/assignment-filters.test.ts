@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { Prisma, UserRole } from "@prisma/client";
 import {
   assignmentCandidateRequestKey,
+  assignmentDialogRequestKey,
   assignmentRequestError,
   assignmentSearchTokens,
   buildAssignmentListWhere,
@@ -319,7 +320,7 @@ test("27. Clear filters preserves unrelated query parameters", () => {
   );
 });
 
-test("28-30. Candidate request identity includes plot, course (including null), and section", () => {
+test("28-31. Dialog request identity includes mode, plot, course (including null), and section", () => {
   const base = {
     plotId: "plot-a",
     course: "BS Agriculture - Crop Science",
@@ -343,4 +344,5 @@ test("28-30. Candidate request identity includes plot, course (including null), 
     key,
     assignmentCandidateRequestKey({ ...base, course: null })
   );
+  assert.notEqual(key, assignmentDialogRequestKey("section", base));
 });

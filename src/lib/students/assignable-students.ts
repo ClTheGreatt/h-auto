@@ -3,6 +3,7 @@ import type { Prisma, UserRole } from "@prisma/client";
 import { BASE_ASSIGNABLE_STUDENT_WHERE } from "@/lib/students/eligibility";
 
 export type AssignableStudentsActor = { role: UserRole; userId: string };
+export type AssignableStudentCohort = { course: string | null; section: string };
 
 /**
  * The WHERE clause for "students eligible to be assigned to a plot this
@@ -46,4 +47,21 @@ export async function buildAssignableStudentsWhere(
     ...BASE_ASSIGNABLE_STUDENT_WHERE,
     ...(actor.role === "FACULTY" ? { section: { in: advisedSections } } : {}),
   };
+}
+
+// One actor-scoped cohort source for every web assignment picker. Keeping
+// this beside the canonical eligibility predicate prevents Plot Detail and
+// the Assignments page from independently widening course/section options.
+export async function getAssignableStudentCohorts(
+  actor: AssignableStudentsActor
+): Promise<AssignableStudentCohort[]> {
+  const scope = await buildAssignableStudentsWhere(actor);
+  const rows = await prisma.user.groupBy({
+    where: { AND: [scope, { section: { not: null } }] },
+    by: ["course", "section"],
+  });
+
+  return rows.filter(
+    (row): row is AssignableStudentCohort => Boolean(row.section)
+  );
 }

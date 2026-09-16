@@ -1,31 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { UserPlus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { assignStudent } from "@/actions/assignments";
+import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format-date";
+import type { AssignableStudentCohort } from "@/lib/students/assignable-students";
+import { PlotAssignStudentDialog } from "./plot-assign-student-dialog";
 import { RemoveAssignmentDialog } from "./remove-assignment-dialog";
 
 type Student = {
@@ -38,91 +18,33 @@ type Student = {
   section: string | null;
 };
 
-const COURSE_TRUNCATE_LENGTH = 24;
-
-// Prefers "yearLevel · section" (short, e.g. "3rd Year · BSIT-3A") over the
-// full course name, which can be long enough to overflow the dropdown.
-function studentOptionLabel(s: Student): { label: string; full: string } {
-  const name = `${s.firstName} ${s.lastName}`;
-  if (s.yearLevel && s.section) {
-    return { label: `${name} · ${s.yearLevel} · ${s.section}`, full: s.course ?? name };
-  }
-  if (s.course) {
-    const short =
-      s.course.length > COURSE_TRUNCATE_LENGTH
-        ? `${s.course.slice(0, COURSE_TRUNCATE_LENGTH)}…`
-        : s.course;
-    return { label: `${name} · ${short}`, full: s.course };
-  }
-  return { label: name, full: name };
-}
-
 type Assignment = {
   id: string;
   notes: string | null;
   assignedAt: Date;
   student: Student;
   // The plot's supervising adviser (Plot.facultyId, copied onto every
-  // assignment row for this plot) — identical across every row, so it's
-  // rendered once in the card header, not per row.
+  // assignment row for this plot) — identical across every row, so it is
+  // rendered once in the card header rather than per row.
   faculty: { firstName: string; lastName: string; position: string | null };
-  // Who actually clicked "Assign" — may be an admin, a super admin, or the
-  // adviser themselves. Null for rows created before this column existed;
-  // never fall back to `faculty` in that case, that was the original bug.
+  // Who actually clicked Assign. Older rows may not have this value; never
+  // substitute the supervising adviser because those are different roles.
   assignedBy: { firstName: string; lastName: string } | null;
 };
 
 export function PlotAssignments({
   plotId,
   assignments,
-  availableStudents,
+  cohorts,
   canManage,
-  facultyHasNoAdvisories,
-  viewerIsFaculty,
+  canAssign,
 }: {
   plotId: string;
   assignments: Assignment[];
-  availableStudents: Student[];
+  cohorts: AssignableStudentCohort[];
   canManage: boolean;
-  facultyHasNoAdvisories: boolean;
-  viewerIsFaculty: boolean;
+  canAssign: boolean;
 }) {
-  const router = useRouter();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState("");
-  const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const assignedIds = new Set(assignments.map((a) => a.student.id));
-  const unassigned = availableStudents.filter((s) => !assignedIds.has(s.id));
-
-  async function handleAssign() {
-    if (!selectedStudent) {
-      toast.error("Please select a student");
-      return;
-    }
-    setSubmitting(true);
-
-    try {
-      const result = await assignStudent(plotId, selectedStudent, notes);
-
-      if (result?.error) {
-        toast.error(result.error);
-        return;
-      }
-
-      toast.success("Student assigned");
-      setDialogOpen(false);
-      setSelectedStudent("");
-      setNotes("");
-      router.refresh();
-    } catch {
-      toast.error("Something went wrong. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -140,80 +62,7 @@ export function PlotAssignments({
             </p>
           )}
         </div>
-        {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Assign student
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Assign a student farmer</DialogTitle>
-                <DialogDescription>
-                  Select a student to monitor this plot.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div>
-                  <Label htmlFor="student-select">Student</Label>
-                  <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                    <SelectTrigger id="student-select">
-                      <SelectValue placeholder="Select a student" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unassigned.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          {facultyHasNoAdvisories
-                            ? "You have no advised sections assigned. Contact an administrator to set them up."
-                            : viewerIsFaculty
-                            ? "No eligible students in your advised sections."
-                            : "No available students"}
-                        </div>
-                      ) : (
-                        unassigned.map((s) => {
-                          const { label, full } = studentOptionLabel(s);
-                          return (
-                            <SelectItem
-                              key={s.id}
-                              value={s.id}
-                              title={full}
-                              className="max-w-full"
-                            >
-                              <span className="truncate">{label}</span>
-                            </SelectItem>
-                          );
-                        })
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Input
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="e.g. Watering schedule, special instructions"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={submitting}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleAssign} disabled={submitting || !selectedStudent}>
-                  {submitting ? "Assigning..." : "Assign"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        {canAssign && <PlotAssignStudentDialog plotId={plotId} cohorts={cohorts} />}
       </div>
 
       {assignments.length > 0 && (
