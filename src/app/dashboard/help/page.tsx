@@ -63,14 +63,14 @@ const ADMIN_SECTIONS: Section[] = [
     ],
   },
   {
-    title: "Bulk import users via CSV",
+    title: "Bulk import users via CSV or Excel",
     icon: Users,
     steps: [
       "Go to 'Users' in the sidebar",
       "Click the 'Import' button",
-      "Download the template CSV if needed",
-      "Fill in user data following the template format",
-      "Upload the completed CSV",
+      "Download the H-Auto Excel template if needed",
+      "Fill in the template, or use an existing school masterlist",
+      "Upload the CSV or Excel file and review the detected column mapping",
       "Review the import preview — errors are flagged before commit",
       "Click the 'Import valid row(s)' button to add all valid users at once",
     ],

@@ -13,6 +13,11 @@ export type ParsedRow = {
   errors: string[];
 };
 
+export type BuildParsedRowsOptions = {
+  rowNumbers?: readonly number[];
+  parsingErrors?: readonly (readonly string[])[];
+};
+
 // Normalizes a raw parsed row (from either CSV or Excel) to exactly the
 // columns the selected import type expects, as strings. This is what keeps
 // a column that's entirely ABSENT from the file (e.g. the wrong template
@@ -67,7 +72,8 @@ export function formatZodIssue(issue: ZodError["issues"][number]): string {
 // detectImportTypeMismatch) — this only validates row content.
 export function buildParsedRows(
   data: Record<string, unknown>[],
-  importType: ImportRowType
+  importType: ImportRowType,
+  options: BuildParsedRowsOptions = {}
 ): ParsedRow[] {
   const schema =
     importType === "FACULTY" ? facultyImportRowSchema : studentImportRowSchema;
@@ -86,7 +92,10 @@ export function buildParsedRows(
 
   return normalizedRows.map((trimmed, idx) => {
     const result = schema.safeParse(trimmed);
-    const errors: string[] = result.success ? [] : result.error.issues.map(formatZodIssue);
+    const errors: string[] = [
+      ...(options.parsingErrors?.[idx] ?? []),
+      ...(result.success ? [] : result.error.issues.map(formatZodIssue)),
+    ];
 
     const email = trimmed.email.toLowerCase();
     if (email && (emailCounts.get(email) ?? 0) > 1) {
@@ -99,7 +108,10 @@ export function buildParsedRows(
     }
 
     return {
-      rowNumber: idx + 2, // +2 because header is row 1 and rows are 1-indexed
+      // Legacy callers still get the old row-1-header behavior. The
+      // masterlist mapping pipeline supplies physical source row numbers so
+      // title rows before the detected header never shift preview errors.
+      rowNumber: options.rowNumbers?.[idx] ?? idx + 2,
       raw: trimmed,
       errors,
     };

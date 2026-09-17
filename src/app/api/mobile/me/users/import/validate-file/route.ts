@@ -42,5 +42,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  // Batch 1 adds manual sheet/header/column mapping to the web importer.
+  // The mobile UI has no mapping screen, so keep its existing contract
+  // truthful: auto-mapped files work; files needing intervention are sent to
+  // the web dashboard instead of returning a nullable `rows` payload.
+  if (!result.rows) {
+    return NextResponse.json(
+      {
+        error:
+          "This workbook needs sheet or column mapping. Use the web dashboard to review it, or upload an H-Auto template.",
+      },
+      { status: 400 }
+    );
+  }
+
   return NextResponse.json({ rows: result.rows });
 }

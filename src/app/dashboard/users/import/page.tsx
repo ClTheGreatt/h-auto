@@ -18,7 +18,7 @@ export default async function ImportUsersPage() {
         </Link>
         <h1 className="text-2xl font-semibold text-foreground">Import users</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Bulk-create faculty members or student farmers from a CSV file.
+          Bulk-create faculty members or student farmers from a CSV or Excel masterlist.
         </p>
       </div>
 
