@@ -13,7 +13,7 @@ import {
   reviewSectionConflictError,
   type AcademicCohort,
 } from "@/lib/academics/cohort-integrity";
-import { SECTION_REGEX } from "@/lib/constants/user-import";
+import { isSectionAllowedForCourse } from "@/lib/constants/user-import";
 
 type RequestedCohort = { course: string; section: string };
 
@@ -176,7 +176,7 @@ export async function getFacultyAdvisoryOptions(facultyId: string): Promise<{
   return {
     department,
     cohorts: rows.flatMap((row) =>
-      row.section && SECTION_REGEX.test(row.section)
+      row.section && isSectionAllowedForCourse(department, row.section)
         ? [{ course: department, section: row.section }]
         : []
     ),

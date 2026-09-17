@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-helpers";
 import { parseExcelImportFile } from "@/lib/imports/parse-excel";
 import type { ImportRowType } from "@/lib/validations/import";
+import { MAX_IMPORT_FILE_BYTES } from "@/lib/constants/user-import";
 
 export async function POST(req: NextRequest) {
   await requireAdmin();
@@ -20,6 +21,12 @@ export async function POST(req: NextRequest) {
   }
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    return NextResponse.json(
+      { error: "File is too large. Maximum upload size is 4 MB." },
+      { status: 413 }
+    );
   }
 
   const importType: ImportRowType = type === "faculty" ? "FACULTY" : "STUDENT_FARMER";

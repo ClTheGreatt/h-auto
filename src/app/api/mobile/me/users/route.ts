@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import {
   createUserSchema,
-  createStudentSchema,
+  createStudentOptionalPasswordSchema,
   createFacultySchema,
 } from "@/lib/validations/user";
 import { sendEmail } from "@/lib/email/send-email";
@@ -41,15 +41,12 @@ const VALID_STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE"];
 const createUserSchemaOptionalPassword = createUserSchema.partial({
   password: true,
 });
-const createStudentSchemaOptionalPassword = createStudentSchema.partial({
-  password: true,
-});
 const createFacultySchemaOptionalPassword = createFacultySchema.partial({
   password: true,
 });
 
 function pickCreateSchema(role: unknown) {
-  if (role === "STUDENT_FARMER") return createStudentSchemaOptionalPassword;
+  if (role === "STUDENT_FARMER") return createStudentOptionalPasswordSchema;
   if (role === "FACULTY") return createFacultySchemaOptionalPassword;
   return createUserSchemaOptionalPassword;
 }

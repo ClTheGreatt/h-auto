@@ -5,28 +5,45 @@ import {
   FACULTY_POSITIONS,
   FACULTY_ID_REGEX,
   STUDENT_ID_REGEX,
-  SECTION_REGEX,
   IMPORT_PHONE_REGEX,
+  IMPORT_TYPES,
+  MAX_IMPORT_TEXT_LENGTH,
   studentIdPrefixRange,
   isValidStudentIdPrefix,
   enumMismatchMessage,
+  validateStudentAcademicFields,
   type ImportRowType,
 } from "@/lib/constants/user-import";
+
+export const importTypeSchema = z.enum(IMPORT_TYPES);
+
+export function parseImportType(value: unknown): ImportRowType | null {
+  const parsed = importTypeSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+const boundedText = z
+  .string()
+  .trim()
+  .max(MAX_IMPORT_TEXT_LENGTH, `must be at most ${MAX_IMPORT_TEXT_LENGTH} characters`);
 
 // Import-only phone rule (stricter than the interactive form's phPhone,
 // which also accepts 09XXXXXXXXX) — optional field, but must match if present.
 const importPhone = z
   .string()
   .trim()
+  .max(MAX_IMPORT_TEXT_LENGTH, `phoneNumber must be at most ${MAX_IMPORT_TEXT_LENGTH} characters`)
   .regex(IMPORT_PHONE_REGEX, "phoneNumber must be in format +639XXXXXXXXX, e.g. +639171234567")
   .optional()
   .or(z.literal(""));
 
 const baseRow = {
-  firstName: z.string().trim().min(1, "firstName is required"),
-  middleName: z.string().trim().optional().default(""),
-  lastName: z.string().trim().min(1, "lastName is required"),
-  email: bpsuEmail,
+  firstName: boundedText.min(1, "firstName is required"),
+  middleName: boundedText.optional().default(""),
+  lastName: boundedText.min(1, "lastName is required"),
+  email: bpsuEmail
+    .max(MAX_IMPORT_TEXT_LENGTH, `email must be at most ${MAX_IMPORT_TEXT_LENGTH} characters`)
+    .transform((email) => email.toLowerCase()),
   phoneNumber: importPhone,
 };
 
@@ -40,9 +57,9 @@ const { min: studentIdMin, max: studentIdMax } = studentIdPrefixRange();
 export const facultyImportRowSchema = z
   .object({
     ...baseRow,
-    idNumber: z.string().trim().min(1, "idNumber is required"),
-    department: z.string().trim().min(1, "department is required"),
-    position: z.string().trim().min(1, "position is required"),
+    idNumber: boundedText.min(1, "idNumber is required"),
+    department: boundedText.min(1, "department is required"),
+    position: boundedText.min(1, "position is required"),
   })
   .superRefine((data, ctx) => {
     if (data.idNumber && !FACULTY_ID_REGEX.test(data.idNumber)) {
@@ -71,14 +88,14 @@ export const facultyImportRowSchema = z
 export const studentImportRowSchema = z
   .object({
     ...baseRow,
-    idNumber: z.string().trim().min(1, "idNumber is required"),
+    idNumber: boundedText.min(1, "idNumber is required"),
     // Optional: blank is filled in from the idNumber prefix during row
     // normalization (see normalizeImportRow), so by the time this schema
     // runs it's either a value the file provided or the derived one.
-    academicYear: z.string().trim().optional().default(""),
-    course: z.string().trim().min(1, "course is required"),
-    yearLevel: z.string().trim().optional().default(""),
-    section: z.string().trim().min(1, "section is required"),
+    academicYear: boundedText.optional().default(""),
+    course: boundedText.min(1, "course is required"),
+    yearLevel: boundedText.min(1, "yearLevel is required"),
+    section: boundedText.min(1, "section is required"),
   })
   .superRefine((data, ctx) => {
     if (data.idNumber) {
@@ -96,18 +113,14 @@ export const studentImportRowSchema = z
         });
       }
     }
-    if (data.course && !(DEPARTMENTS as readonly string[]).includes(data.course)) {
+    // Shared academic helper is also consumed by normal Add/Edit User
+    // validation, preventing the import path from developing its own rules.
+    for (const issue of validateStudentAcademicFields(data)) {
       ctx.addIssue({
         code: "custom",
-        path: ["course"],
-        message: enumMismatchMessage(data.course, DEPARTMENTS, "course", "valid programs"),
-      });
-    }
-    if (data.section && !SECTION_REGEX.test(data.section)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["section"],
-        message: "section must be in format PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C",
+        path: [issue.field],
+        message: issue.message,
+        params: { importIssueCode: issue.code },
       });
     }
   });

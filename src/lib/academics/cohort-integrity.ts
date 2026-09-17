@@ -1,4 +1,7 @@
-import { DEPARTMENTS, SECTION_REGEX } from "@/lib/constants/user-import";
+import {
+  DEPARTMENTS,
+  isSectionAllowedForCourse,
+} from "@/lib/constants/user-import";
 import type { UserRole } from "@prisma/client";
 
 export type AcademicProgram = (typeof DEPARTMENTS)[number];
@@ -89,7 +92,7 @@ export function requestedCohortError(
   if (!isFacultyCourseCompatible(facultyDepartment, cohort.course)) {
     return "The selected Course / Program does not match the Faculty department.";
   }
-  if (!cohort.section || !SECTION_REGEX.test(cohort.section)) {
+  if (!isSectionAllowedForCourse(cohort.course, cohort.section)) {
     return "Select a valid Section.";
   }
   return null;

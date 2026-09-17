@@ -5,7 +5,10 @@
 export function normalizePhPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
 
-  const cleaned = phone.replace(/\D/g, "");
+  const trimmed = phone.trim();
+  if (!/^\+?[0-9\s().-]+$/.test(trimmed)) return null;
+
+  const cleaned = trimmed.replace(/\D/g, "");
 
   if (cleaned.length === 11 && cleaned.startsWith("09")) {
     return "63" + cleaned.substring(1);

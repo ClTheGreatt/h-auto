@@ -13,7 +13,7 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
-import { commitImport } from "@/actions/import";
+import { commitImport, preflightImport } from "@/actions/import";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,7 @@ import {
   STUDENT_REQUIRED_FIELDS,
   detectImportTypeMismatch,
   importTypeMismatchMessage,
+  MAX_IMPORT_FILE_BYTES,
 } from "@/lib/constants/user-import";
 import {
   IMPORT_FIELD_LABELS,
@@ -57,7 +58,8 @@ import {
   type ImportSheetCandidate,
 } from "@/lib/imports/masterlist-mapping";
 import type { ParseExcelResponse } from "@/lib/imports/parse-excel";
-import { buildParsedRows, type ParsedRow } from "@/lib/imports/parse-rows";
+import type { ParsedRow } from "@/lib/imports/parse-rows";
+import type { ServerImportRow } from "@/lib/imports/preflight";
 import { cn } from "@/lib/utils";
 import type { ImportRowType } from "@/lib/validations/import";
 
@@ -97,6 +99,7 @@ export function ImportForm() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [preparedRows, setPreparedRows] = useState<ServerImportRow[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [hasLegacyPasswordColumn, setHasLegacyPasswordColumn] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -125,6 +128,7 @@ export function ImportForm() {
 
   function clearDownstreamState() {
     setRows([]);
+    setPreparedRows([]);
     setResult(null);
     setHasLegacyPasswordColumn(false);
     setCsvMatrix(null);
@@ -319,6 +323,11 @@ export function ImportForm() {
       toast.error("Please upload a CSV or Excel file (.csv, .xlsx)");
       return;
     }
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      toast.error("File is too large. Maximum upload size is 4 MB.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
     invalidateAnalysisGeneration();
     clearDownstreamState();
@@ -335,6 +344,7 @@ export function ImportForm() {
     setSelectedSheet(sheetName);
     setAnalysis(null);
     setRows([]);
+    setPreparedRows([]);
     setResult(null);
     setHasLegacyPasswordColumn(false);
     await parseExcelFile(uploadedFile, sheetName);
@@ -343,6 +353,7 @@ export function ImportForm() {
   async function handleHeaderRowChange(rowNumber: number) {
     setAnalysis(null);
     setRows([]);
+    setPreparedRows([]);
     setResult(null);
     setHasLegacyPasswordColumn(false);
     if (csvMatrix) {
@@ -371,39 +382,56 @@ export function ImportForm() {
     }
     setAnalysis(updated.analysis);
     setRows([]);
+    setPreparedRows([]);
   }
 
-  function continueToPreview() {
+  async function continueToPreview() {
     if (!analysis || analysis.mappingStatus !== "READY") {
       toast.error("Map every required H-Auto field before continuing.");
       return;
     }
     const mapped = mapSourceRows(analysis);
-    const parsed = buildParsedRows(
-      mapped.map((row) => row.raw),
-      importType,
-      {
-        rowNumbers: mapped.map((row) => row.rowNumber),
-        parsingErrors: mapped.map((row) => row.parsingErrors),
+    const payload: ServerImportRow[] = mapped.map((row) => ({
+      rowNumber: row.rowNumber,
+      raw: row.raw,
+      parsingErrors: row.parsingErrors,
+    }));
+    const generation = beginAnalysisGeneration();
+    try {
+      const response = await preflightImport(importType, payload);
+      if (!isCurrentGeneration(generation)) return;
+      if ("error" in response) {
+        toast.error(response.error);
+        return;
       }
-    );
-    setRows(parsed);
-    setHasLegacyPasswordColumn(analysis.hasLegacyPasswordColumn);
-    setPhase("preview");
+      setRows(
+        response.rows.map((row) => ({
+          rowNumber: row.rowNumber,
+          raw: row.raw,
+          errors: row.issues.map((issue) => issue.message),
+        }))
+      );
+      setPreparedRows(payload);
+      setHasLegacyPasswordColumn(analysis.hasLegacyPasswordColumn);
+      setPhase("preview");
+    } catch {
+      if (isCurrentGeneration(generation)) {
+        toast.error("Could not validate these rows. Please try again.");
+      }
+    } finally {
+      if (isCurrentGeneration(generation)) setIsParsing(false);
+    }
   }
 
   async function handleCommit() {
-    const validRows = rows
-      .filter((row) => row.errors.length === 0)
-      .map((row) => row.raw);
-    if (validRows.length === 0) {
+    if (validCount === 0) {
       toast.error("No valid rows to import");
       return;
     }
 
     setPhase("committing");
     try {
-      const response = await commitImport(importType, validRows, fileName);
+      const response = await commitImport(importType, preparedRows, fileName);
       setPhase("done");
       if ("error" in response) {
         toast.error(response.error);
@@ -747,14 +775,14 @@ export function ImportForm() {
 
               <div className="flex flex-wrap gap-3">
                 <Button
-                  onClick={continueToPreview}
+                  onClick={() => void continueToPreview()}
                   disabled={
                     isParsing ||
                     analysis.mappingStatus !== "READY" ||
                     analysis.sourceRows.length === 0
                   }
                 >
-                  Continue to row preview
+                  {isParsing ? "Checking rows..." : "Continue to row preview"}
                 </Button>
                 <Button
                   variant="outline"

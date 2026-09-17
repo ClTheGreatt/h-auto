@@ -5,6 +5,7 @@ import {
   detectImportTypeMismatch,
   parseImportTypeMarker,
   importTypeMismatchMessage,
+  MAX_IMPORT_FILE_BYTES,
 } from "@/lib/constants/user-import";
 import {
   MAX_HEADER_SCAN_ROWS,
@@ -212,6 +213,9 @@ export async function parseExcelImportFile(
   importType: ImportRowType,
   options: ParseExcelOptions = {}
 ): Promise<ParseExcelResult> {
+  if (buffer.byteLength > MAX_IMPORT_FILE_BYTES) {
+    return { error: "File is too large. Maximum upload size is 4 MB." };
+  }
   try {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);

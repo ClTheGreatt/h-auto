@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileUser } from "@/lib/mobile-auth";
-import { buildParsedRows } from "@/lib/imports/parse-rows";
-import type { ImportRowType } from "@/lib/validations/import";
+import {
+  preflightImportRows,
+  serializeMobilePreflightRow,
+} from "@/lib/imports/preflight";
+import { parseImportType } from "@/lib/validations/import";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
 }
 
 // POST /api/mobile/me/users/import/validate — dry-run validation for the
-// mobile import preview (admin only). Runs the exact same schemas as the
-// commit route (/api/mobile/me/users/import), via the same buildParsedRows
-// the web preview uses — no duplicated rules. Never persists anything and
-// never checks DB-existing email/idNumber conflicts, matching the web
-// preview's scope (that check only happens at commit time).
+// mobile import preview (admin only). Uses the same authoritative preflight
+// as web preview and final commit, including batched database conflicts.
+// Never persists anything.
 export async function POST(req: NextRequest) {
   const actor = await getMobileUser(req);
   if (!actor) {
@@ -32,8 +33,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const type = body.type as ImportRowType;
-  if (type !== "FACULTY" && type !== "STUDENT_FARMER") {
+  const type = parseImportType(body.type);
+  if (!type) {
     return NextResponse.json(
       { error: "type must be FACULTY or STUDENT_FARMER" },
       { status: 400 }
@@ -45,6 +46,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No rows to validate" }, { status: 400 });
   }
 
-  const parsed = buildParsedRows(rows, type);
-  return NextResponse.json({ rows: parsed });
+  const result = await preflightImportRows(
+    type,
+    rows.map((raw, index) => ({ rowNumber: index + 2, raw }))
+  );
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+  return NextResponse.json({
+    ...result,
+    rows: result.rows.map(serializeMobilePreflightRow),
+  });
 }

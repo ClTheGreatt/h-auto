@@ -57,7 +57,7 @@ const COMMON_NOTES = [
 ];
 
 const STUDENT_ONLY_NOTE =
-  "yearLevel must be exactly one of: 1st Year, 2nd Year, 3rd Year, 4th Year (Student only)";
+  "yearLevel is required: 1st-4th Year for BSA/BTVTEd; 1st-5th Year for BSABE";
 
 const CLOSING_NOTES = [
   "Delete the example rows and add your actual data on the Data sheet before uploading",
@@ -259,8 +259,8 @@ const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "idNumber", required: STUDENT_REQUIRED_FIELDS.includes("idNumber"), description: `Format: 12-34567 (2-digit year prefix ${STUDENT_ID_MIN}–${STUDENT_ID_MAX}, dash, 5 digits)` },
   { name: "academicYear", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("academicYear"), description: "Entry cohort, e.g. 2023-2024. Leave blank to auto-derive from the idNumber prefix" },
   { name: "course", required: STUDENT_REQUIRED_FIELDS.includes("course"), description: "Pick from the dropdown — one of 5 official program names (listed below)" },
-  { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Must be exactly: 1st Year, 2nd Year, 3rd Year, or 4th Year" },
-  { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Format: PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C" },
+  { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Required. 1st-4th Year for BSA/BTVTEd; 1st-5th Year for BSABE" },
+  { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Must match course and year, e.g. BSA-1A, BTVTED-2B, BSABE-5A" },
 ];
 
 export async function generateFacultyTemplate(): Promise<Buffer> {
@@ -308,7 +308,7 @@ export async function generateStudentTemplate(): Promise<Buffer> {
       ...COMMON_NOTES,
       STUDENT_ONLY_NOTE,
       `Valid courses (5): ${DEPARTMENTS.join(", ")}`,
-      "Section prefix must match the course's program (BSA / BTVTED / BSABE) — not cross-checked automatically",
+      "Section prefix and year must match the selected course and year level (BSA / BTVTED / BSABE)",
       ...CLOSING_NOTES,
     ]
   );

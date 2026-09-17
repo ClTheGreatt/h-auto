@@ -6,10 +6,32 @@ import {
   FACULTY_POSITIONS,
   FACULTY_ID_REGEX,
   STUDENT_ID_REGEX,
-  SECTION_REGEX,
+  YEAR_LEVELS,
   studentIdPrefixRange,
   isValidStudentIdPrefix,
+  validateStudentAcademicFields,
 } from "@/lib/constants/user-import";
+
+export { YEAR_LEVELS } from "@/lib/constants/user-import";
+
+function addStudentAcademicIssues(
+  data: { course?: string; yearLevel?: string; section?: string; academicYear?: string },
+  ctx: z.RefinementCtx
+) {
+  for (const issue of
+    validateStudentAcademicFields({
+      course: data.course ?? "",
+      yearLevel: data.yearLevel ?? "",
+      section: data.section ?? "",
+      academicYear: data.academicYear ?? "",
+    })) {
+    ctx.addIssue({
+      code: "custom",
+      path: [issue.field],
+      message: issue.message,
+    });
+  }
+}
 
 const baseUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -40,15 +62,18 @@ export const createUserSchema = baseUserSchema.extend({
 // request so existing incomplete users can still be edited/completed
 // incrementally. Password itself still uses the same strength rule
 // whenever a new one is actually being set (blank = keep current).
-export const updateUserSchema = baseUserSchema.extend({
-  password: passwordStrengthSchema.optional().or(z.literal("")),
-});
+export const updateUserSchema = baseUserSchema
+  .extend({
+    password: passwordStrengthSchema.optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role !== "STUDENT_FARMER") return;
+    addStudentAcademicIssues(data, ctx);
+  });
 
 export const phPhone = z
   .string()
   .regex(/^(09\d{9}|\+639\d{9})$/, "Phone must be 09XXXXXXXXX or +639XXXXXXXXX");
-
-export const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year"] as const;
 
 const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
 
@@ -57,7 +82,7 @@ const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
 // idNumber/section enforce the same format rules as the bulk import (see
 // src/lib/constants/user-import.ts) — same DB table, so free text here
 // would let interactively-created users diverge from imported ones.
-export const createStudentSchema = baseUserSchema.extend({
+const createStudentObjectSchema = baseUserSchema.extend({
   role: z.literal("STUDENT_FARMER"),
   idNumber: z
     .string()
@@ -80,19 +105,7 @@ export const createStudentSchema = baseUserSchema.extend({
       }
     }),
   course: z.enum(DEPARTMENTS, { error: "Course is required" }),
-  section: z
-    .string()
-    .trim()
-    .min(1, "Section is required")
-    .superRefine((val, ctx) => {
-      if (!val) return;
-      if (!SECTION_REGEX.test(val)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Section must be in format PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-3C",
-        });
-      }
-    }),
+  section: z.string().trim().min(1, "Section is required"),
   yearLevel: z.enum(YEAR_LEVELS, { error: "Year level is required" }),
   // Interactive form keeps the more lenient phPhone rule (also accepts
   // 09XXXXXXXXX) rather than the stricter IMPORT_PHONE_REGEX — a human
@@ -100,6 +113,13 @@ export const createStudentSchema = baseUserSchema.extend({
   phoneNumber: phPhone,
   password: passwordStrengthSchema,
 });
+
+export const createStudentSchema = createStudentObjectSchema.superRefine(
+  addStudentAcademicIssues
+);
+export const createStudentOptionalPasswordSchema = createStudentObjectSchema
+  .partial({ password: true })
+  .superRefine(addStudentAcademicIssues);
 
 // STRICT — Faculty creation. Same rationale as createStudentSchema.
 export const createFacultySchema = baseUserSchema.extend({
@@ -127,7 +147,9 @@ export const createFacultySchema = baseUserSchema.extend({
 // every other field's validation rule can never drift from the mobile
 // (still password-collecting) schemas above.
 export const createUserWebSchema = createUserSchema.omit({ password: true });
-export const createStudentWebSchema = createStudentSchema.omit({ password: true });
+export const createStudentWebSchema = createStudentObjectSchema
+  .omit({ password: true })
+  .superRefine(addStudentAcademicIssues);
 export const createFacultyWebSchema = createFacultySchema.omit({ password: true });
 
 export type CreateUserInput = z.infer<typeof createUserWebSchema>;

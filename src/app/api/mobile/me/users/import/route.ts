@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { commitImportRows } from "@/lib/imports/commit";
-import type { ImportRowType } from "@/lib/validations/import";
+import { parseImportType } from "@/lib/validations/import";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -29,12 +29,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const type = body.type as ImportRowType;
+  const type = parseImportType(body.type);
   const rawRows = Array.isArray(body.rows) ? body.rows : [];
   const fileName =
     typeof body.fileName === "string" ? body.fileName : "import.csv";
 
-  if (type !== "FACULTY" && type !== "STUDENT_FARMER") {
+  if (!type) {
     return NextResponse.json(
       { error: "type must be FACULTY or STUDENT_FARMER" },
       { status: 400 }
@@ -43,14 +43,20 @@ export async function POST(req: NextRequest) {
   if (rawRows.length === 0) {
     return NextResponse.json({ error: "No rows to import" }, { status: 400 });
   }
+  if (fileName.length > 255) {
+    return NextResponse.json({ error: "Invalid file name" }, { status: 400 });
+  }
 
-  const { created, credentials, failed, totalProcessed } =
-    await commitImportRows({
-      rows: rawRows,
-      importType: type,
-      actorId: actor.id,
-      fileName,
-    });
+  const result = await commitImportRows({
+    rows: rawRows.map((raw, index) => ({ rowNumber: index + 2, raw })),
+    importType: type,
+    actorId: actor.id,
+    fileName,
+  });
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+  const { created, credentials, failed, totalProcessed } = result;
 
   return NextResponse.json({
     success: created,

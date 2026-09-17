@@ -51,6 +51,7 @@ import {
   studentIdPrefixRange,
   deriveAcademicYearFromIdPrefix,
   isValidStudentIdPrefix,
+  allowedYearLevelsForCourse,
 } from "@/lib/constants/user-import";
 import { createUser, updateUser } from "@/actions/users";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
@@ -167,6 +168,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     ? stripInactivePrefix(defaultValues!.email!)
     : "";
   const watchedRole = useWatch({ control: form.control, name: "role" });
+  const watchedCourse = useWatch({ control: form.control, name: "course" });
   const watchedFirstName = useWatch({
     control: form.control,
     name: "firstName",
@@ -194,6 +196,11 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
       : "";
   const similarUsers =
     similarResult.key === similarKey ? similarResult.users : [];
+  const canonicalYearOptions = allowedYearLevelsForCourse(watchedCourse ?? "");
+  const yearLevelOptions = optionsWithLegacyValue(
+    canonicalYearOptions.length > 0 ? canonicalYearOptions : YEAR_LEVELS.slice(0, 4),
+    defaultValues?.yearLevel
+  );
 
   // Check for similar users (debounced)
   useEffect(() => {
@@ -762,7 +769,7 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {YEAR_LEVELS.map((yl) => (
+                        {yearLevelOptions.map((yl) => (
                           <SelectItem key={yl} value={yl}>
                             {yl}
                           </SelectItem>

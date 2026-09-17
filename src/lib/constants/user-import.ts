@@ -19,6 +19,48 @@ export const DEPARTMENTS = [
   "BS Agricultural and Biosystems Engineering",
 ] as const;
 
+export type CanonicalCourse = (typeof DEPARTMENTS)[number];
+
+export const YEAR_LEVELS = [
+  "1st Year",
+  "2nd Year",
+  "3rd Year",
+  "4th Year",
+  "5th Year",
+] as const;
+
+export type CanonicalYearLevel = (typeof YEAR_LEVELS)[number];
+export type SectionPrefix = "BSA" | "BTVTED" | "BSABE";
+
+// Canonical academic rules shared by imported users and the normal Add/Edit
+// User flow. Keep this explicit: course eligibility must never be inferred
+// from display-name substrings at runtime.
+export const COURSE_ACADEMIC_RULES: Record<
+  CanonicalCourse,
+  { sectionPrefix: SectionPrefix; yearLevels: readonly CanonicalYearLevel[] }
+> = {
+  "BS Agriculture - Animal Science": {
+    sectionPrefix: "BSA",
+    yearLevels: YEAR_LEVELS.slice(0, 4),
+  },
+  "BS Agriculture - Crop Science": {
+    sectionPrefix: "BSA",
+    yearLevels: YEAR_LEVELS.slice(0, 4),
+  },
+  "BTVTEd - Animal Production": {
+    sectionPrefix: "BTVTED",
+    yearLevels: YEAR_LEVELS.slice(0, 4),
+  },
+  "BTVTEd - Crops Production": {
+    sectionPrefix: "BTVTED",
+    yearLevels: YEAR_LEVELS.slice(0, 4),
+  },
+  "BS Agricultural and Biosystems Engineering": {
+    sectionPrefix: "BSABE",
+    yearLevels: YEAR_LEVELS,
+  },
+};
+
 // Final (graduating) year level per course, keyed by the same DEPARTMENTS
 // values used for student `course`. Everything is a 4-year program except
 // Agricultural and Biosystems Engineering, which is 5.
@@ -81,10 +123,152 @@ export const FACULTY_ID_REGEX = /^\d{6}-\d{4}$/;
 // since it depends on the current year.
 export const STUDENT_ID_REGEX = /^\d{2}-\d{5}$/;
 
-// Section: one of the 3 program prefixes, dash, year digit 1-4, one
-// uppercase letter (e.g. BSA-1A, BTVTED-2B, BSABE-3C). Shape and
-// prefix-membership only — NOT cross-validated against the selected course.
-export const SECTION_REGEX = /^(BSA|BTVTED|BSABE)-[1-4][A-Z]$/;
+// Generic section shape. Course prefix/year consistency is enforced by
+// validateStudentAcademicFields below; the regex alone is never authority.
+export const SECTION_REGEX = /^(BSA|BTVTED|BSABE)-([1-5])[A-Z]$/;
+
+export const ACADEMIC_YEAR_REGEX = /^(\d{4})-(\d{4})$/;
+
+export type AcademicRuleIssue = {
+  field: "course" | "yearLevel" | "section" | "academicYear";
+  code:
+    | "INVALID_COURSE"
+    | "INVALID_YEAR_LEVEL"
+    | "INVALID_SECTION"
+    | "INVALID_ACADEMIC_YEAR"
+    | "COURSE_SECTION_MISMATCH"
+    | "YEAR_SECTION_MISMATCH";
+  message: string;
+};
+
+export function isCanonicalCourse(value: string): value is CanonicalCourse {
+  return (DEPARTMENTS as readonly string[]).includes(value);
+}
+
+export function isValidAcademicYear(value: string): boolean {
+  const match = ACADEMIC_YEAR_REGEX.exec(value);
+  return !!match && Number(match[2]) === Number(match[1]) + 1;
+}
+
+export function allowedYearLevelsForCourse(
+  course: string
+): readonly CanonicalYearLevel[] {
+  return isCanonicalCourse(course)
+    ? COURSE_ACADEMIC_RULES[course].yearLevels
+    : [];
+}
+
+export function isSectionAllowedForCourse(
+  course: string,
+  section: string
+): boolean {
+  if (!isCanonicalCourse(course)) return false;
+  const match = SECTION_REGEX.exec(section);
+  if (!match) return false;
+
+  const rule = COURSE_ACADEMIC_RULES[course];
+  const sectionYearLevel = YEAR_LEVELS[Number(match[2]) - 1];
+  return (
+    match[1] === rule.sectionPrefix &&
+    !!sectionYearLevel &&
+    rule.yearLevels.includes(sectionYearLevel)
+  );
+}
+
+export function validateStudentAcademicFields(input: {
+  course: string;
+  yearLevel: string;
+  section: string;
+  academicYear?: string;
+}): AcademicRuleIssue[] {
+  const issues: AcademicRuleIssue[] = [];
+  const { course, yearLevel, section, academicYear = "" } = input;
+  const canonicalCourse = isCanonicalCourse(course);
+
+  if (course && !canonicalCourse) {
+    issues.push({
+      field: "course",
+      code: "INVALID_COURSE",
+      message: enumMismatchMessage(course, DEPARTMENTS, "course", "valid programs"),
+    });
+  }
+
+  if (yearLevel && !(YEAR_LEVELS as readonly string[]).includes(yearLevel)) {
+    issues.push({
+      field: "yearLevel",
+      code: "INVALID_YEAR_LEVEL",
+      message: "yearLevel must be a canonical year level",
+    });
+  }
+
+  const sectionMatch = section ? SECTION_REGEX.exec(section) : null;
+  if (section && !sectionMatch) {
+    issues.push({
+      field: "section",
+      code: "INVALID_SECTION",
+      message:
+        "section must be in format PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-5A",
+    });
+  }
+
+  if (academicYear && !isValidAcademicYear(academicYear)) {
+    issues.push({
+      field: "academicYear",
+      code: "INVALID_ACADEMIC_YEAR",
+      message: "academicYear must be consecutive years in YYYY-YYYY format, e.g. 2023-2024",
+    });
+  }
+
+  if (canonicalCourse && yearLevel) {
+    const allowed = COURSE_ACADEMIC_RULES[course].yearLevels;
+    if (!(allowed as readonly string[]).includes(yearLevel)) {
+      issues.push({
+        field: "yearLevel",
+        code: "INVALID_YEAR_LEVEL",
+        message: `${yearLevel} is not valid for ${course}`,
+      });
+    }
+  }
+
+  if (canonicalCourse && sectionMatch) {
+    const rule = COURSE_ACADEMIC_RULES[course];
+    const expectedPrefix = rule.sectionPrefix;
+    if (sectionMatch[1] !== expectedPrefix) {
+      issues.push({
+        field: "section",
+        code: "COURSE_SECTION_MISMATCH",
+        message: `section must use the ${expectedPrefix} prefix for ${course}`,
+      });
+    }
+
+    const sectionYearLevel = YEAR_LEVELS[Number(sectionMatch[2]) - 1];
+    if (
+      sectionMatch[1] === expectedPrefix &&
+      sectionYearLevel &&
+      !rule.yearLevels.includes(sectionYearLevel)
+    ) {
+      issues.push({
+        field: "section",
+        code: "INVALID_SECTION",
+        message: `section year ${sectionMatch[2]} is not valid for ${course}`,
+      });
+    }
+
+    if (yearLevel && (YEAR_LEVELS as readonly string[]).includes(yearLevel)) {
+      const sectionYear = Number(sectionMatch[2]);
+      const yearLevelNumber = Number.parseInt(yearLevel, 10);
+      if (sectionYear !== yearLevelNumber) {
+        issues.push({
+          field: "section",
+          code: "YEAR_SECTION_MISMATCH",
+          message: `section year ${sectionYear} must match ${yearLevel}`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
 
 // Import-only phone rule: stricter than the interactive Add User form
 // (src/lib/validations/user.ts's phPhone), which also accepts 09XXXXXXXXX.
@@ -133,6 +317,7 @@ export const STUDENT_REQUIRED_FIELDS = [
   "email",
   "idNumber",
   "course",
+  "yearLevel",
   "section",
 ] as const;
 
@@ -193,6 +378,11 @@ export const FACULTY_DISTINCTIVE_FIELDS = ["department", "position"] as const;
 export const STUDENT_DISTINCTIVE_FIELDS = ["course", "section"] as const;
 
 export type ImportRowType = "FACULTY" | "STUDENT_FARMER";
+
+export const IMPORT_TYPES = ["FACULTY", "STUDENT_FARMER"] as const;
+
+export const MAX_IMPORT_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_IMPORT_TEXT_LENGTH = 255;
 
 // Machine-readable marker written into each generated template's hidden
 // "Lists" sheet (see template-generator.ts), read back on parse to catch a

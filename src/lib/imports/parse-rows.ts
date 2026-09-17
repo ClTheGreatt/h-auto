@@ -6,6 +6,7 @@ import {
   deriveAcademicYearFromIdPrefix,
   type ImportRowType,
 } from "@/lib/constants/user-import";
+import { normalizePhPhone } from "@/lib/sms/phone";
 
 export type ParsedRow = {
   rowNumber: number;
@@ -32,8 +33,15 @@ export function normalizeImportRow(
   const normalized: Record<string, string> = {};
   for (const col of columns) {
     const value = raw[col];
-    normalized[col] = typeof value === "string" ? value.trim() : value == null ? "" : String(value);
+    normalized[col] =
+      typeof value === "string"
+        ? value.trim()
+        : typeof value === "number" || typeof value === "boolean"
+          ? String(value)
+          : "";
   }
+
+  normalized.email = normalized.email.toLowerCase();
 
   // Student academicYear: if blank, derive from the idNumber prefix so the
   // preview already shows what will actually be saved. A present value
@@ -67,7 +75,8 @@ export function formatZodIssue(issue: ZodError["issues"][number]): string {
 // Shared by both the CSV and Excel parse paths (and the mobile app's
 // validate-only endpoint, whose rows arrive as parsed JSON of unknown
 // per-value type): validates raw row objects against the schema for the
-// selected import type and flags duplicate emails. Callers are expected to
+// selected import type and flags duplicate email, ID, and phone identities.
+// Callers are expected to
 // have already ruled out a wrong-template upload (see
 // detectImportTypeMismatch) — this only validates row content.
 export function buildParsedRows(
@@ -82,12 +91,16 @@ export function buildParsedRows(
 
   const emailCounts = new Map<string, number>();
   const idNumberCounts = new Map<string, number>();
+  const phoneCounts = new Map<string, number>();
   normalizedRows.forEach((row) => {
     const email = row.email.toLowerCase();
     if (email) emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
 
     const idNumber = row.idNumber;
     if (idNumber) idNumberCounts.set(idNumber, (idNumberCounts.get(idNumber) ?? 0) + 1);
+
+    const phone = normalizePhPhone(row.phoneNumber);
+    if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) ?? 0) + 1);
   });
 
   return normalizedRows.map((trimmed, idx) => {
@@ -105,6 +118,11 @@ export function buildParsedRows(
     const idNumber = trimmed.idNumber;
     if (idNumber && (idNumberCounts.get(idNumber) ?? 0) > 1) {
       errors.push("Duplicate ID number within this file");
+    }
+
+    const phone = normalizePhPhone(trimmed.phoneNumber);
+    if (phone && (phoneCounts.get(phone) ?? 0) > 1) {
+      errors.push("Duplicate phone number within this file");
     }
 
     return {

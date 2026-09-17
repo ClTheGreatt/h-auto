@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { parseExcelImportFile } from "@/lib/imports/parse-excel";
-import type { ImportRowType } from "@/lib/validations/import";
+import { mapSourceRows } from "@/lib/imports/masterlist-mapping";
+import {
+  preflightImportRows,
+  serializeMobilePreflightRow,
+} from "@/lib/imports/preflight";
+import { MAX_IMPORT_FILE_BYTES } from "@/lib/constants/user-import";
+import { parseImportType } from "@/lib/validations/import";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -25,7 +31,8 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file");
   const type = formData.get("type");
 
-  if (type !== "FACULTY" && type !== "STUDENT_FARMER") {
+  const importType = parseImportType(type);
+  if (!importType) {
     return NextResponse.json(
       { error: "type must be FACULTY or STUDENT_FARMER" },
       { status: 400 }
@@ -34,9 +41,15 @@ export async function POST(req: NextRequest) {
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    return NextResponse.json(
+      { error: "File is too large. Maximum upload size is 4 MB." },
+      { status: 413 }
+    );
+  }
 
   const buffer = await file.arrayBuffer();
-  const result = await parseExcelImportFile(buffer, type as ImportRowType);
+  const result = await parseExcelImportFile(buffer, importType);
 
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
@@ -56,5 +69,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ rows: result.rows });
+  const mappedRows = result.analysis ? mapSourceRows(result.analysis) : [];
+  const preflight = await preflightImportRows(
+    importType,
+    mappedRows.map((row) => ({
+      rowNumber: row.rowNumber,
+      raw: row.raw,
+      parsingErrors: row.parsingErrors,
+    }))
+  );
+  if ("error" in preflight) {
+    return NextResponse.json({ error: preflight.error }, { status: 400 });
+  }
+  return NextResponse.json({
+    ...preflight,
+    rows: preflight.rows.map(serializeMobilePreflightRow),
+  });
 }
