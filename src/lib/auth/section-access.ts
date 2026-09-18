@@ -4,9 +4,10 @@ import type { UserRole } from "@prisma/client";
 
 type CohortAccessClient = Pick<typeof prisma, "user">;
 
-// Faculty authority is an exact, resolved academic cohort. Requiring both
-// the Faculty department and advisory course to equal the requested course
-// prevents legacy course=NULL rows and incompatible rows from granting scope.
+// Current Faculty authority requires an active Faculty and an exact, resolved
+// academic cohort. Requiring both the department and advisory course to equal
+// the requested course prevents legacy course=NULL and incompatible rows from
+// granting scope.
 export async function canFacultyAdviseCohort(
   facultyId: string,
   course: string | null,
@@ -18,6 +19,7 @@ export async function canFacultyAdviseCohort(
     where: {
       id: facultyId,
       role: "FACULTY",
+      status: "ACTIVE",
       department: course,
       advisories: { some: { course, section } },
     },

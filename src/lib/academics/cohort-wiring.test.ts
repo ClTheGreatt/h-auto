@@ -8,6 +8,12 @@ function source(...segments: string[]): string {
 }
 
 const assignments = source("src", "actions", "assignments.ts");
+const assignmentIntegrity = source(
+  "src",
+  "lib",
+  "assignments",
+  "assignment-integrity.ts"
+);
 const assignStudentBody = assignments.slice(
   assignments.indexOf("export async function assignStudent"),
   assignments.indexOf("export async function removeAssignment")
@@ -20,18 +26,21 @@ const bulkBody = assignments.slice(
   assignments.indexOf("async function validateSectionTarget")
 );
 
-test("individual assignment authorizes the actual Student Course and Section", () => {
+test("individual assignment delegates final state to shared transactional validation", () => {
   assert.match(
     assignStudentBody,
-    /assertFacultyCanAssignStudent\([\s\S]*?student\?\.course \?\? null,[\s\S]*?student\?\.section \?\? null/
+    /runAssignmentTransaction\(async \(tx\)[\s\S]*?validateFinalAssignment\([\s\S]*?plotId,[\s\S]*?studentId,[\s\S]*?tx/
   );
+  assert.match(assignStudentBody, /facultyId: validation\.plot\.facultyId/);
+  assert.match(assignStudentBody, /assignedById: session\.user\.id/);
 });
 
-test("candidate lookup authorizes the requested exact Course and Section", () => {
+test("candidate lookup checks actor and target adviser for the requested cohort", () => {
   assert.match(
     candidateBody,
-    /assertFacultyCanAssignStudent\([\s\S]*?target\.course,[\s\S]*?target\.section/
+    /validateAssignmentCohortAuthorities\([\s\S]*?plotFacultyId: plot\.facultyId![\s\S]*?course: target\.course,[\s\S]*?section: target\.section/
   );
+  assert.match(candidateBody, /targetAdviserAuthorized/);
 });
 
 test("bulk preview uses the shared exact target validator", () => {
@@ -44,12 +53,14 @@ test("bulk preview uses the shared exact target validator", () => {
 test("bulk submit rechecks the exact target inside the serializable transaction", () => {
   assert.match(
     bulkBody,
-    /assignSectionToPlot[\s\S]*?\$transaction\(async \(tx\)[\s\S]*?validateSectionTarget\(target, actor, tx\)/
+    /assignSectionToPlot[\s\S]*?runAssignmentTransaction\(async \(tx\)[\s\S]*?validateSectionTarget\(target, actor, tx\)/
   );
+  assert.match(bulkBody, /targetAdviserAuthorized/);
   assert.match(
-    bulkBody,
+    assignmentIntegrity,
     /isolationLevel: Prisma\.TransactionIsolationLevel\.Serializable/
   );
+  assert.match(assignmentIntegrity, /error\.code !== "P2034"/);
 });
 
 test("Assignments and Plot Detail use the shared actor-scoped cohort source", () => {
@@ -72,7 +83,7 @@ test("Assignments and Plot Detail use the shared actor-scoped cohort source", ()
   assert.match(plotDetailPage, /getAssignableStudentCohorts\(\{ role, userId:/);
 });
 
-test("mobile assignment and candidate routes share the exact cohort policy", () => {
+test("mobile assignment uses shared final validation and candidates use shared scope", () => {
   const mobileAssignment = source(
     "src",
     "app",
@@ -97,8 +108,10 @@ test("mobile assignment and candidate routes share the exact cohort policy", () 
   );
   assert.match(
     mobileAssignment,
-    /assertFacultyCanAssignStudent\([\s\S]*?student\.course,[\s\S]*?student\.section/
+    /runAssignmentTransaction\(async \(tx\)[\s\S]*?validateFinalAssignment\([\s\S]*?plotId,[\s\S]*?studentId,[\s\S]*?tx/
   );
+  assert.match(mobileAssignment, /facultyId: validation\.plot\.facultyId/);
+  assert.match(mobileAssignment, /assignedById: user\.id/);
   assert.match(mobileCandidates, /buildAssignableStudentsWhere\(\{/);
 });
 

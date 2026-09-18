@@ -23,7 +23,7 @@ function clientReturning(
   } as unknown as AccessClient;
 }
 
-test("Faculty cohort authorization queries exact department, course, and section", async () => {
+test("Faculty cohort authorization queries active status and exact department, course, and section", async () => {
   let where: unknown;
   const allowed = await canFacultyAdviseCohort(
     "faculty-a",
@@ -37,6 +37,7 @@ test("Faculty cohort authorization queries exact department, course, and section
   assert.deepEqual(where, {
     id: "faculty-a",
     role: "FACULTY",
+    status: "ACTIVE",
     department: "BTVTEd - Animal Production",
     advisories: {
       some: {

@@ -4,8 +4,11 @@ import { mayBeActivePairUniqueConflict } from "@/lib/assignments/active-pair-con
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
-import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
-import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
+import {
+  runAssignmentTransaction,
+  type AssignmentIntegrityErrorCode,
+  validateFinalAssignment,
+} from "@/lib/assignments/assignment-integrity";
 
 const assignBodySchema = z.object({
   studentId: z.string().min(1, "studentId is required"),
@@ -14,6 +17,24 @@ const assignBodySchema = z.object({
 
 function isFacultyOrAdmin(role: string) {
   return role === "FACULTY" || role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
+function assignmentIntegrityStatus(code: AssignmentIntegrityErrorCode): number {
+  switch (code) {
+    case "PLOT_NOT_FOUND":
+    case "STUDENT_NOT_FOUND":
+      return 404;
+    case "ACTOR_FORBIDDEN":
+    case "ACTOR_NOT_PLOT_ADVISER":
+    case "ACTOR_COHORT_FORBIDDEN":
+      return 403;
+    case "PLOT_INELIGIBLE":
+    case "PLOT_ADVISER_REQUIRED":
+    case "DUPLICATE_ACTIVE_ASSIGNMENT":
+      return 409;
+    default:
+      return 400;
+  }
 }
 
 // GET /api/mobile/me/plots/[id]/assignments — list active assignments for
@@ -135,92 +156,39 @@ export async function POST(
     }
     const { studentId, notes } = parsed.data;
 
-    const plot = await prisma.plot.findUnique({
-      where: { id: plotId },
-      select: { id: true, facultyId: true, status: true },
-    });
-    if (!plot) {
-      return NextResponse.json({ error: "Plot not found" }, { status: 404 });
-    }
-    if (!isActivityPlotStatus(plot.status)) {
-      return NextResponse.json(
-        {
-          error:
-            "Students can only be assigned while a plot is preparing or operational.",
-        },
-        { status: 409 }
-      );
-    }
-    if (!plot.facultyId) {
-      return NextResponse.json(
-        { error: "Set a plot adviser before assigning students." },
-        { status: 409 }
-      );
-    }
-    if (user.role === "FACULTY" && plot.facultyId !== user.id) {
-      return NextResponse.json(
-        { error: "You are not the adviser of this plot." },
-        { status: 403 }
-      );
-    }
-
-    const student = await prisma.user.findUnique({
-      where: { id: studentId },
-    });
-    if (!student) {
-      return NextResponse.json({ error: "Student not found" }, { status: 404 });
-    }
-    if (student.role !== "STUDENT_FARMER") {
-      return NextResponse.json(
-        { error: "Only student farmers can be assigned to plots" },
-        { status: 400 }
-      );
-    }
-    if (student.graduatedAt) {
-      return NextResponse.json(
-        { error: "Cannot assign a graduated student to a plot." },
-        { status: 400 }
-      );
-    }
-
-    const canAssign = await assertFacultyCanAssignStudent(
-      user.role,
-      user.id,
-      student.course,
-      student.section
-    );
-    if (!canAssign) {
-      return NextResponse.json(
-        {
-          error:
-            "You are not authorized to assign a student from this course and section.",
-        },
-        { status: 403 }
-      );
-    }
-
-    const existing = await prisma.plotAssignment.findFirst({
-      where: { plotId, studentId, status: "ACTIVE" },
-    });
-    if (existing) {
-      return NextResponse.json(
-        { error: "Student already assigned to this plot" },
-        { status: 409 }
-      );
-    }
-
     let created;
     try {
-      created = await prisma.plotAssignment.create({
-        data: {
-          plotId,
-          studentId,
-          facultyId: plot.facultyId,
-          assignedById: user.id,
-          notes: notes?.trim() || null,
-          status: "ACTIVE",
-        },
+      const result = await runAssignmentTransaction(async (tx) => {
+        const validation = await validateFinalAssignment(
+          {
+            actor: { role: user.role, id: user.id },
+            plotId,
+            studentId,
+          },
+          tx
+        );
+        if (!validation.ok) return validation;
+
+        const assignment = await tx.plotAssignment.create({
+          data: {
+            plotId,
+            studentId,
+            facultyId: validation.plot.facultyId,
+            assignedById: user.id,
+            notes: notes?.trim() || null,
+            status: "ACTIVE",
+          },
+        });
+        return { ok: true as const, assignment };
       });
+
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: assignmentIntegrityStatus(result.code) }
+        );
+      }
+      created = result.assignment;
     } catch (error) {
       if (mayBeActivePairUniqueConflict(error)) {
         const activePair = await prisma.plotAssignment.findFirst({
@@ -229,7 +197,7 @@ export async function POST(
         });
         if (activePair) {
           return NextResponse.json(
-            { error: "Student already assigned to this plot" },
+            { error: "This student is already assigned to this plot." },
             { status: 409 }
           );
         }

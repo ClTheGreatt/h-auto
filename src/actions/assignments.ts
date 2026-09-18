@@ -1,14 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma, type UserRole } from "@prisma/client";
+import type { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireFaculty } from "@/lib/auth-helpers";
 import { canFacultyAccessPlot } from "@/lib/auth/plot-access";
-import { assertFacultyCanAssignStudent } from "@/lib/auth/section-access";
 import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
-import { assignmentRequestError } from "@/lib/assignments/assignment-filters";
 import { mayBeActivePairUniqueConflict } from "@/lib/assignments/active-pair-conflict";
+import {
+  runAssignmentTransaction,
+  TARGET_ADVISER_COHORT_ERROR,
+  validateAssignmentCohortAuthorities,
+  validateFinalAssignment,
+} from "@/lib/assignments/assignment-integrity";
 import {
   buildSectionStudentsWhere,
   classifySectionStudents,
@@ -26,72 +30,41 @@ export async function assignStudent(
 ) {
   const session = await requireFaculty();
 
-  const plot = await prisma.plot.findUnique({
-    where: { id: plotId },
-    select: { facultyId: true, status: true },
-  });
-  if (!plot) return { error: "Plot not found" };
-  if (!isActivityPlotStatus(plot.status)) {
-    return {
-      error: "Students can only be assigned while a plot is preparing or operational.",
-    };
-  }
-
-  // No adviser set yet: a PlotAssignment requires a non-null facultyId, and
-  // there's no adviser to record it as. Block every caller (including
-  // admins) until an adviser is assigned to the plot first.
-  if (!plot.facultyId) {
-    return { error: "Set a plot adviser before assigning students." };
-  }
-
-  // Faculty may only assign students on plots they actually advise;
-  // ADMIN/SUPER_ADMIN keep unrestricted access.
-  if (session.user.role === "FACULTY" && plot.facultyId !== session.user.id) {
-    return { error: "You are not the adviser of this plot." };
-  }
-
-  const student = await prisma.user.findUnique({ where: { id: studentId } });
-  const [canAssign, existing] = await Promise.all([
-    // The picker's section filter is UI convenience only. A missing or
-    // sectionless student remains denied for Faculty; admins retain their
-    // existing broader section scope.
-    assertFacultyCanAssignStudent(
-      session.user.role,
-      session.user.id,
-      student?.course ?? null,
-      student?.section ?? null
-    ),
-    prisma.plotAssignment.findFirst({
-      where: { plotId, studentId, status: "ACTIVE" },
-    }),
-  ]);
-  const requestError = assignmentRequestError({
-    student,
-    sectionAuthorized: canAssign,
-    hasActiveAssignment: Boolean(existing),
-  });
-  if (requestError) {
-    return { error: requestError };
-  }
-
   try {
-    await prisma.plotAssignment.create({
-      data: {
-        plotId,
-        studentId,
-        facultyId: plot.facultyId,
-        assignedById: session.user.id,
-        notes: notes || null,
-        status: "ACTIVE",
-      },
+    const result = await runAssignmentTransaction(async (tx) => {
+      const validation = await validateFinalAssignment(
+        {
+          actor: { role: session.user.role, id: session.user.id },
+          plotId,
+          studentId,
+        },
+        tx
+      );
+      if (!validation.ok) return validation;
+
+      await tx.plotAssignment.create({
+        data: {
+          plotId,
+          studentId,
+          facultyId: validation.plot.facultyId,
+          assignedById: session.user.id,
+          notes: notes || null,
+          status: "ACTIVE",
+        },
+      });
+      return { ok: true as const };
     });
+
+    if (!result.ok) return { error: result.error };
   } catch (error) {
     if (mayBeActivePairUniqueConflict(error)) {
       const activePair = await prisma.plotAssignment.findFirst({
         where: { plotId, studentId, status: "ACTIVE" },
         select: { id: true },
       });
-      if (activePair) return { error: "This student is already assigned to this plot" };
+      if (activePair) {
+        return { error: "This student is already assigned to this plot." };
+      }
     }
     throw error;
   }
@@ -167,27 +140,29 @@ export async function getAssignableStudentsForPlot(
   // assigned to, which this action must never do. requireFaculty() above
   // already rejects STUDENT_FARMER outright; this only decides between
   // ADMIN/SUPER_ADMIN (unrestricted) and FACULTY (their own plot only).
-  const canManageAssignments =
-    session.user.role === "ADMIN" || session.user.role === "SUPER_ADMIN"
-      ? true
-      : plot.facultyId === session.user.id;
-  if (!canManageAssignments) {
-    return { error: "You don't have access to this plot" };
-  }
+  const baseAccessError = sectionAssignmentAccessError({
+    role: session.user.role,
+    actorId: session.user.id,
+    plotFacultyId: plot.facultyId,
+    plotStatus: plot.status,
+    sectionAuthorized: true,
+  });
+  if (baseAccessError) return { error: baseAccessError };
 
-  // Course narrows an eligible cohort; section remains the Faculty authority
-  // boundary. Check it before returning any candidate metadata.
-  const sectionAuthorized = await assertFacultyCanAssignStudent(
-    session.user.role,
-    session.user.id,
-    target.course,
-    target.section
-  );
-  if (!sectionAuthorized) {
+  const cohortAuthority = await validateAssignmentCohortAuthorities({
+    actor: { role: session.user.role, id: session.user.id },
+    plotFacultyId: plot.facultyId!,
+    course: target.course,
+    section: target.section,
+  });
+  if (!cohortAuthority.actorAuthorized) {
     return {
       error:
         "You are not authorized to assign a student from this course and section.",
     };
+  }
+  if (!cohortAuthority.targetAdviserAuthorized) {
+    return { error: TARGET_ADVISER_COHORT_ERROR };
   }
 
   const [students, activeOnThisPlot] = await Promise.all([
@@ -243,12 +218,16 @@ async function validateSectionTarget(
   });
   if (plotAccessError) return { error: plotAccessError } as const;
 
-  // No cohort query happens until this exact course+section authority check.
-  const sectionAuthorized = await assertFacultyCanAssignStudent(
-    actor.role,
-    actor.id,
-    target.course,
-    target.section,
+  // Actor permission and target adviser integrity are separate. Admin roles
+  // may perform assignments, but the plot adviser must still own this exact
+  // current cohort.
+  const cohortAuthority = await validateAssignmentCohortAuthorities(
+    {
+      actor,
+      plotFacultyId: plot.facultyId!,
+      course: target.course,
+      section: target.section,
+    },
     client
   );
   const accessError = sectionAssignmentAccessError({
@@ -256,9 +235,12 @@ async function validateSectionTarget(
     actorId: actor.id,
     plotFacultyId: plot.facultyId,
     plotStatus: plot.status,
-    sectionAuthorized,
+    sectionAuthorized: cohortAuthority.actorAuthorized,
   });
   if (accessError) return { error: accessError } as const;
+  if (!cohortAuthority.targetAdviserAuthorized) {
+    return { error: TARGET_ADVISER_COHORT_ERROR } as const;
+  }
 
   const where = buildSectionStudentsWhere(target);
   const cohortExists = await client.user.findFirst({
@@ -269,22 +251,6 @@ async function validateSectionTarget(
     return { error: "No eligible student farmers match this course and section." } as const;
   }
   return { plot, where } as const;
-}
-
-async function withSerializableRetries<T>(operation: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== "P2034" || attempt === 2
-      ) {
-        throw error;
-      }
-    }
-  }
-  throw new Error("Assignment transaction retry limit reached.");
 }
 
 export async function getSectionAssignmentPreview(target: SectionAssignmentTarget) {
@@ -325,7 +291,7 @@ export async function assignSectionToPlot(
   if (!target) return { error: "Select a plot, course, and section." };
   const actor = { role: session.user.role, id: session.user.id };
 
-  const result = await withSerializableRetries(() => prisma.$transaction(async (tx) => {
+  const result = await runAssignmentTransaction(async (tx) => {
     // Reload plot/advisory/cohort inside the transaction; preview is never
     // used as authority or as the source of these counts/IDs.
     const validated = await validateSectionTarget(target, actor, tx);
@@ -364,10 +330,7 @@ export async function assignSectionToPlot(
       ...finalSectionAssignmentCounts(studentIds.length, inserted.count),
       plotName: validated.plot.name,
     };
-  }, {
-    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    timeout: 15000,
-  }));
+  });
 
   if ("error" in result) return result;
   revalidatePath(`/dashboard/plots/${target.plotId}`);
