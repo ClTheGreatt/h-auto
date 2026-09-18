@@ -6,6 +6,11 @@ import { requireAdmin } from "@/lib/auth-helpers";
 import { plotSchema, type PlotFormValues } from "@/lib/validations/plot";
 import { FORM_EDITABLE_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import { applyPlotTransitionEffects } from "@/lib/plots/transition-effects";
+import {
+  applyPlotUpdateWithAdviserIntegrity,
+  runPlotAdviserTransaction,
+  validateNewPlotAdviser,
+} from "@/lib/plots/adviser-integrity";
 
 function parseDate(v: string | undefined | null): Date | null {
   if (!v || v === "") return null;
@@ -19,22 +24,33 @@ export async function createPlot(input: PlotFormValues) {
   if (!parsed.success) return { error: "Invalid input" };
 
   const data = parsed.data;
-  const created = await prisma.plot.create({
-    data: {
-      name: data.name,
-      location: data.location || null,
-      sizeSqm: data.sizeSqm ?? null,
-      cropId: data.cropId || null,
-      facultyId: data.facultyId || null,
-      currentStageId: data.currentStageId || null,
-      plantingDate: parseDate(data.plantingDate),
-      expectedHarvest: parseDate(data.expectedHarvest),
-      status: data.status,
-    },
+  const proposedFacultyId = data.facultyId || null;
+  const result = await runPlotAdviserTransaction(async (tx) => {
+    const adviserValidation = await validateNewPlotAdviser(
+      proposedFacultyId,
+      tx
+    );
+    if (!adviserValidation.ok) return adviserValidation;
+
+    const created = await tx.plot.create({
+      data: {
+        name: data.name,
+        location: data.location || null,
+        sizeSqm: data.sizeSqm ?? null,
+        cropId: data.cropId || null,
+        facultyId: proposedFacultyId,
+        currentStageId: data.currentStageId || null,
+        plantingDate: parseDate(data.plantingDate),
+        expectedHarvest: parseDate(data.expectedHarvest),
+        status: data.status,
+      },
+    });
+    return { ok: true as const, created };
   });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/dashboard/plots");
-  return { success: true, id: created.id };
+  return { success: true, id: result.created.id };
 }
 
 export async function updatePlot(id: string, input: PlotFormValues) {
@@ -69,30 +85,39 @@ export async function updatePlot(id: string, input: PlotFormValues) {
   }
 
   const transitionedAt = new Date();
-  const transitionEffects = await prisma.$transaction(async (tx) => {
-    const effects = await applyPlotTransitionEffects({
-      client: tx,
-      plotId: id,
-      previousStatus: existing.status,
-      nextStatus,
-      transitionedAt,
-    });
-    await tx.plot.update({
-      where: { id },
-      data: {
-        name: data.name,
-        location: data.location || null,
-        sizeSqm: data.sizeSqm ?? null,
-        cropId: data.cropId || null,
-        facultyId: data.facultyId || null,
-        currentStageId: data.currentStageId || null,
-        plantingDate: parseDate(data.plantingDate),
-        expectedHarvest: parseDate(data.expectedHarvest),
-        status: nextStatus,
-      },
-    });
-    return effects;
+  const proposedFacultyId = data.facultyId || null;
+  const result = await runPlotAdviserTransaction(async (tx) => {
+    return applyPlotUpdateWithAdviserIntegrity(
+      { plotId: id, proposedFacultyId },
+      tx,
+      async () => {
+        const effects = await applyPlotTransitionEffects({
+          client: tx,
+          plotId: id,
+          previousStatus: existing.status,
+          nextStatus,
+          transitionedAt,
+        });
+        await tx.plot.update({
+          where: { id },
+          data: {
+            name: data.name,
+            location: data.location || null,
+            sizeSqm: data.sizeSqm ?? null,
+            cropId: data.cropId || null,
+            facultyId: proposedFacultyId,
+            currentStageId: data.currentStageId || null,
+            plantingDate: parseDate(data.plantingDate),
+            expectedHarvest: parseDate(data.expectedHarvest),
+            status: nextStatus,
+          },
+        });
+        return effects;
+      }
+    );
   });
+  if (!result.ok) return { error: result.error };
+  const transitionEffects = result.value;
 
   revalidatePath("/dashboard/plots");
   revalidatePath(`/dashboard/plots/${id}`);
