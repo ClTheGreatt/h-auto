@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,12 +49,19 @@ import {
   DEPARTMENTS,
   FACULTY_POSITIONS,
   studentIdPrefixRange,
+  CURRENT_ACADEMIC_YEAR,
   deriveAcademicYearFromIdPrefix,
+  expectedYearLevelForEntryAcademicYear,
+  isValidAcademicYear,
   isValidStudentIdPrefix,
   allowedYearLevelsForCourse,
 } from "@/lib/constants/user-import";
 import { createUser, updateUser } from "@/actions/users";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
+import {
+  sectionAfterCreateStudentCourseChange,
+  synchronizeCreateStudentAcademicState,
+} from "@/lib/users/create-student-academic";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 
 const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
@@ -109,6 +116,9 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     id: string;
     tempPassword: string;
   } | null>(null);
+  // Track provenance separately from the visible text: the same value may
+  // have been entered manually and must not then be overwritten by an ID edit.
+  const autoDerivedAcademicYearRef = useRef<string | null>(null);
 
   // EDIT stays lenient (updateUserSchema) so existing incomplete users can
   // still be saved. CREATE picks the strict, role-specific schema so
@@ -178,7 +188,11 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
     name: "lastName",
   });
   const watchedIdNumber = useWatch({ control: form.control, name: "idNumber" });
-  // Live preview of the same derivation the onBlur handler below writes
+  const watchedAcademicYear = useWatch({
+    control: form.control,
+    name: "academicYear",
+  });
+  // Live preview of the same derivation the ID-change handler below writes
   // into academicYear — gated on the full prefix range too (not just
   // format), so this never confirms a cohort the schema would still reject.
   const trimmedIdNumber = (watchedIdNumber ?? "").trim();
@@ -197,10 +211,42 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
   const similarUsers =
     similarResult.key === similarKey ? similarResult.users : [];
   const canonicalYearOptions = allowedYearLevelsForCourse(watchedCourse ?? "");
-  const yearLevelOptions = optionsWithLegacyValue(
-    canonicalYearOptions.length > 0 ? canonicalYearOptions : YEAR_LEVELS.slice(0, 4),
-    defaultValues?.yearLevel
-  );
+  const trimmedAcademicYear = (watchedAcademicYear ?? "").trim();
+  const entryAcademicYear = showDetectedCohort
+    ? detectedCohort
+    : isValidAcademicYear(trimmedAcademicYear)
+      ? trimmedAcademicYear
+      : null;
+  const expectedYearLevel = entryAcademicYear
+    ? expectedYearLevelForEntryAcademicYear(entryAcademicYear)
+    : null;
+  const canonicalFormYearOptions =
+    canonicalYearOptions.length > 0 ? canonicalYearOptions : YEAR_LEVELS;
+  const yearLevelOptions = isCreate
+    ? expectedYearLevel
+      ? [expectedYearLevel]
+      : [...canonicalFormYearOptions]
+    : optionsWithLegacyValue(canonicalFormYearOptions, defaultValues?.yearLevel);
+
+  function synchronizeCreateStudentId(idNumber: string) {
+    if (!isCreate || form.getValues("role") !== "STUDENT_FARMER") return;
+
+    const next = synchronizeCreateStudentAcademicState({
+      idNumber,
+      academicYear: form.getValues("academicYear") ?? "",
+      yearLevel: form.getValues("yearLevel") ?? "",
+      section: form.getValues("section") ?? "",
+      course: form.getValues("course") ?? "",
+      previousAutoDerivedAcademicYear: autoDerivedAcademicYearRef.current,
+    });
+    autoDerivedAcademicYearRef.current = next.autoDerivedAcademicYear;
+
+    for (const field of ["academicYear", "yearLevel", "section"] as const) {
+      if ((form.getValues(field) ?? "") !== next[field]) {
+        form.setValue(field, next[field], { shouldDirty: true });
+      }
+    }
+  }
 
   // Check for similar users (debounced)
   useEffect(() => {
@@ -610,24 +656,19 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                             : undefined
                         }
                         {...field}
+                        onChange={(event) => {
+                          field.onChange(event);
+                          synchronizeCreateStudentId(event.target.value);
+                        }}
                         onBlur={(e) => {
                           field.onBlur();
-                          // Prefill academicYear from the idNumber prefix —
-                          // only when it's still blank, so this never
-                          // clobbers a value the admin already set/edited.
-                          if (
-                            watchedRole === "STUDENT_FARMER" &&
-                            !form.getValues("academicYear")
-                          ) {
-                            const derived = deriveAcademicYearFromIdPrefix(
-                              e.target.value.trim()
-                            );
-                            if (derived) {
-                              form.setValue("academicYear", derived, {
-                                shouldDirty: true,
-                              });
-                            }
-                          }
+                          synchronizeCreateStudentId(e.target.value);
+                          void form.trigger([
+                            "idNumber",
+                            "academicYear",
+                            "yearLevel",
+                            "section",
+                          ]);
                         }}
                       />
                     </FormControl>
@@ -735,7 +776,25 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                       Course
                       {isCreate && <RequiredMark />}
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        if (isCreate) {
+                          const currentSection = form.getValues("section") ?? "";
+                          const nextSection = sectionAfterCreateStudentCourseChange(
+                            value,
+                            currentSection
+                          );
+                          if (nextSection !== currentSection) {
+                            form.setValue("section", nextSection, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                          }
+                        }
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select course" />
@@ -776,6 +835,12 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormDescription className="text-xs">
+                      Current academic year: {CURRENT_ACADEMIC_YEAR}
+                      {expectedYearLevel
+                        ? `. Expected standing: ${expectedYearLevel}.`
+                        : ". Enter a valid Student ID or entry academic year to determine the expected standing."}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -806,7 +871,16 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
                   <FormItem>
                     <FormLabel>Academic year</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. 2023-2024" {...field} />
+                      <Input
+                        placeholder="e.g. 2023-2024"
+                        {...field}
+                        onChange={(event) => {
+                          field.onChange(event);
+                          if (isCreate) {
+                            autoDerivedAcademicYearRef.current = null;
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormDescription className="text-xs">
                       Entry cohort — prefilled from the ID number, editable

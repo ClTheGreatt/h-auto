@@ -120,6 +120,14 @@ export function isCurrentAnalysisGeneration(
   return tracker.current === generation;
 }
 
+export function shouldAutoContinueToPreview(
+  analysis: ImportMatrixAnalysis | null
+): analysis is ImportMatrixAnalysis {
+  return (
+    analysis?.mappingStatus === "READY" && analysis.sourceRows.length > 0
+  );
+}
+
 export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   firstName: "First Name",
   middleName: "Middle Name",
@@ -173,7 +181,7 @@ const STUDENT_ALIASES: Partial<Record<StudentImportField, readonly string[]>> = 
     "student number",
     "student no",
   ],
-  academicYear: ["academicYear"],
+  academicYear: ["academicYear", "academic year"],
   course: ["course", "program", "degree program"],
   yearLevel: ["yearLevel", "year level"],
   section: ["section", "class section"],

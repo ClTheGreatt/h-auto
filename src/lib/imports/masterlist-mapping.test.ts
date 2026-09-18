@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import ExcelJS from "exceljs";
 import { generateFacultyTemplate, generateStudentTemplate } from "./template-generator";
-import { parseExcelImportFile } from "./parse-excel";
+import {
+  EXCEL_PARSE_ERROR_MESSAGE,
+  parseExcelImportFile,
+} from "./parse-excel";
 import { buildParsedRows } from "./parse-rows";
 import {
   MAX_HEADER_SCAN_ROWS,
@@ -13,12 +16,14 @@ import {
   applyManualColumnMapping,
   buildAutomaticColumns,
   detectHeaderCandidates,
+  evaluateColumnMapping,
   findAliasCollisions,
   isCurrentAnalysisGeneration,
   mapSourceRows,
   matrixFromValues,
   normalizeImportHeader,
   selectDetectedHeader,
+  shouldAutoContinueToPreview,
   type ImportMatrixAnalysis,
   type ImportMatrixRow,
 } from "./masterlist-mapping";
@@ -43,7 +48,7 @@ const STUDENT_HEADERS = [
   "idNumber *",
   "academicYear",
   "course *",
-  "yearLevel",
+  "yearLevel *",
   "section *",
 ];
 
@@ -56,6 +61,49 @@ const FACULTY_VALUES = [
   "202000-0001",
   "BS Agriculture - Animal Science",
   "Instructor I",
+];
+
+const ORDINARY_STUDENT_HEADERS = [
+  "Student Number",
+  "Surname",
+  "Given Name",
+  "Middle Name",
+  "Email Address",
+  "Contact Number",
+  "Program",
+  "Year Level",
+  "Section",
+  "Academic Year",
+  "Sex",
+  "Remarks",
+];
+
+const ORDINARY_STUDENT_VALUES = [
+  "23-12345",
+  "Dela Cruz",
+  "Ana",
+  "M",
+  "ana.delacruz@bpsu.edu.ph",
+  "+639171234567",
+  "BS Agriculture - Animal Science",
+  "4th Year",
+  "BSA-4A",
+  "2023-2024",
+  "Female",
+  "Active",
+];
+
+const ORDINARY_FACULTY_HEADERS = [
+  "Employee No.",
+  "Surname",
+  "Given Name",
+  "Middle Name",
+  "Email Address",
+  "Mobile Number",
+  "Department",
+  "Designation",
+  "Office",
+  "Remarks",
 ];
 
 function analyze(
@@ -233,6 +281,47 @@ test("missing required fields produce NEEDS_MAPPING", () => {
   );
   assert.equal(analysis.mappingStatus, "NEEDS_MAPPING");
   assert.deepEqual(analysis.missingRequiredFields, ["department", "position"]);
+});
+
+test("Student mapping requires yearLevel", () => {
+  const columns = buildAutomaticColumns(
+    [
+      "First Name",
+      "Last Name",
+      "Email",
+      "Student No.",
+      "Program",
+      "Class Section",
+    ],
+    "STUDENT_FARMER"
+  );
+  const mapping = evaluateColumnMapping(columns, "STUDENT_FARMER");
+  assert.equal(mapping.status, "NEEDS_MAPPING");
+  assert.deepEqual(mapping.missingRequiredFields, ["yearLevel"]);
+});
+
+test("manually mapping Student Year Level completes required mapping", () => {
+  const columns = buildAutomaticColumns(
+    [
+      "First Name",
+      "Last Name",
+      "Email",
+      "Student No.",
+      "Program",
+      "Class Section",
+      "Year",
+    ],
+    "STUDENT_FARMER"
+  );
+  const mapped = applyManualColumnMapping(
+    columns,
+    "STUDENT_FARMER",
+    6,
+    "yearLevel"
+  );
+  assert.ok("columns" in mapped);
+  assert.equal(mapped.mapping.status, "READY");
+  assert.deepEqual(mapped.mapping.missingRequiredFields, []);
 });
 
 test("one source column can hold only one target mapping", () => {
@@ -743,4 +832,154 @@ test("hidden worksheets are excluded from normal selection", async () => {
   assert.ok(!("error" in result));
   assert.deepEqual(result.sheets.map((sheet) => sheet.name), ["Visible Cover"]);
   assert.equal(result.selectedSheet, "Visible Cover");
+});
+
+test("ordinary Student XLSX without template metadata auto-maps and parses", async () => {
+  const result = await parseExcelImportFile(
+    await workbookBuffer([
+      {
+        name: "Masterlist",
+        rows: [ORDINARY_STUDENT_HEADERS, ORDINARY_STUDENT_VALUES],
+      },
+    ]),
+    "STUDENT_FARMER"
+  );
+
+  assert.ok(!("error" in result));
+  assert.equal(result.isTemplateWorkbook, false);
+  assert.equal(result.selectedSheet, "Masterlist");
+  assert.equal(result.analysis?.selectedHeaderRow, 1);
+  assert.equal(result.mappingStatus, "READY");
+  assert.equal(shouldAutoContinueToPreview(result.analysis), true);
+  assert.equal(result.rows?.[0].rowNumber, 2);
+  assert.equal(result.rows?.[0].raw.academicYear, "2023-2024");
+  assert.deepEqual(
+    result.analysis?.columns
+      .filter((column) => ["Sex", "Remarks"].includes(column.sourceHeader))
+      .map((column) => column.status),
+    ["IGNORED", "IGNORED"]
+  );
+});
+
+test("ordinary Faculty XLSX without template metadata auto-maps and parses", async () => {
+  const result = await parseExcelImportFile(
+    await workbookBuffer([
+      {
+        name: "Faculty Masterlist",
+        rows: [
+          ORDINARY_FACULTY_HEADERS,
+          [
+            "202000-0001",
+            "Cruz",
+            "Ana",
+            "M",
+            "ana.cruz@bpsu.edu.ph",
+            "+639171234567",
+            "BS Agriculture - Animal Science",
+            "Instructor I",
+            "Main Campus",
+            "Active",
+          ],
+        ],
+      },
+    ]),
+    "FACULTY"
+  );
+
+  assert.ok(!("error" in result));
+  assert.equal(result.isTemplateWorkbook, false);
+  assert.equal(result.mappingStatus, "READY");
+  assert.equal(shouldAutoContinueToPreview(result.analysis), true);
+  assert.deepEqual(result.rows?.[0].errors, []);
+});
+
+test("ordinary XLSX title rows preserve the physical source row", async () => {
+  const result = await parseExcelImportFile(
+    await workbookBuffer([
+      {
+        name: "Masterlist",
+        rows: [
+          ["BATAAN PENINSULA STATE UNIVERSITY"],
+          ["STUDENT MASTERLIST"],
+          [],
+          ORDINARY_STUDENT_HEADERS,
+          ORDINARY_STUDENT_VALUES,
+        ],
+      },
+    ]),
+    "STUDENT_FARMER"
+  );
+
+  assert.ok(!("error" in result));
+  assert.equal(result.analysis?.selectedHeaderRow, 4);
+  assert.equal(result.rows?.[0].rowNumber, 5);
+  assert.equal(result.mappingStatus, "READY");
+});
+
+test("ordinary multi-sheet XLSX auto-selects its only plausible data sheet", async () => {
+  const result = await parseExcelImportFile(
+    await workbookBuffer([
+      { name: "Read Me", rows: [["Institutional notes"]] },
+      {
+        name: "Masterlist",
+        rows: [ORDINARY_STUDENT_HEADERS, ORDINARY_STUDENT_VALUES],
+      },
+      {
+        name: "Hidden Lists",
+        rows: [["Internal"]],
+        state: "hidden",
+      },
+    ]),
+    "STUDENT_FARMER"
+  );
+
+  assert.ok(!("error" in result));
+  assert.deepEqual(result.sheets.map((sheet) => sheet.name), [
+    "Read Me",
+    "Masterlist",
+  ]);
+  assert.equal(result.selectedSheet, "Masterlist");
+  assert.equal(result.mappingStatus, "READY");
+});
+
+test("READY analysis auto-continues while unresolved analysis stays in mapping", () => {
+  const ready = requireAnalysis(
+    analyze([ORDINARY_FACULTY_HEADERS, FACULTY_VALUES])
+  );
+  const unresolved = requireAnalysis(
+    analyze([["Given Name", "Surname", "Email Address"]])
+  );
+
+  assert.equal(shouldAutoContinueToPreview(ready), true);
+  assert.equal(shouldAutoContinueToPreview(unresolved), false);
+});
+
+test("official templates remain eligible for direct preview", async () => {
+  const faculty = await parseExcelImportFile(
+    toArrayBuffer(await generateFacultyTemplate()),
+    "FACULTY"
+  );
+  const student = await parseExcelImportFile(
+    toArrayBuffer(await generateStudentTemplate()),
+    "STUDENT_FARMER"
+  );
+
+  assert.ok(!("error" in faculty));
+  assert.ok(!("error" in student));
+  assert.equal(shouldAutoContinueToPreview(faculty.analysis), true);
+  assert.equal(shouldAutoContinueToPreview(student.analysis), true);
+});
+
+test("malformed XLSX content returns a safe parser error", async () => {
+  const originalConsoleError = console.error;
+  console.error = () => undefined;
+  try {
+    const malformed = toArrayBuffer(Buffer.from("not an xlsx workbook"));
+    const result = await parseExcelImportFile(malformed, "FACULTY");
+    assert.ok("error" in result);
+    assert.equal(result.error, EXCEL_PARSE_ERROR_MESSAGE);
+    assert.doesNotMatch(result.error, /sheets|TypeError|undefined/i);
+  } finally {
+    console.error = originalConsoleError;
+  }
 });

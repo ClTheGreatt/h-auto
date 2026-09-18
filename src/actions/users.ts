@@ -13,9 +13,11 @@ import {
   createStudentWebSchema,
   createFacultyWebSchema,
   updateUserSchema,
+  validateStudentAcademicUpdate,
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations/user";
+import { deriveAcademicYearFromIdPrefix } from "@/lib/constants/user-import";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
 import {
   resultingFacultyAdvisoryError,
@@ -114,6 +116,10 @@ export async function createUser(input: CreateUserInput): Promise<CreateUserResu
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
   const rest = parsed.data;
+  const academicYear =
+    rest.role === "STUDENT_FARMER"
+      ? rest.academicYear || deriveAcademicYearFromIdPrefix(rest.idNumber || "")
+      : rest.academicYear;
 
   let createdUser;
   try {
@@ -127,7 +133,7 @@ export async function createUser(input: CreateUserInput): Promise<CreateUserResu
         course: rest.course || null,
         yearLevel: rest.yearLevel || null,
         section: rest.section || null,
-        academicYear: rest.academicYear || null,
+        academicYear: academicYear || null,
         position: rest.position || null,
         passwordHash,
         mustChangePassword: true,
@@ -186,7 +192,17 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 
   const existingUser = await prisma.user.findUnique({
     where: { id },
-    select: { status: true, email: true, role: true, department: true },
+    select: {
+      status: true,
+      email: true,
+      role: true,
+      department: true,
+      idNumber: true,
+      course: true,
+      yearLevel: true,
+      section: true,
+      academicYear: true,
+    },
   });
   if (!existingUser) {
     return { error: "User not found" };
@@ -214,6 +230,15 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     };
   }
 
+  const academicUpdate = validateStudentAcademicUpdate(existingUser, rest);
+  if (academicUpdate.issues.length > 0) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of academicUpdate.issues) {
+      (fieldErrors[issue.field] ??= []).push(issue.message);
+    }
+    return { error: "Invalid input", fieldErrors };
+  }
+
   const resultingAcademicState = resultingUserAcademicState(existingUser, {
     role: rest.role,
     department: rest.department,
@@ -235,12 +260,27 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     ...rest,
     middleName: rest.middleName || null,
     phoneNumber: rest.phoneNumber || null,
-    idNumber: rest.idNumber || null,
+    idNumber:
+      rest.role === "STUDENT_FARMER" && academicUpdate.changed
+        ? (rest.idNumber ?? "").trim() || null
+        : rest.idNumber || null,
     department: resultingAcademicState.department,
-    course: rest.course || null,
-    yearLevel: rest.yearLevel || null,
-    section: rest.section || null,
-    academicYear: rest.academicYear || null,
+    course:
+      rest.role === "STUDENT_FARMER" && academicUpdate.changed
+        ? (rest.course ?? "").trim() || null
+        : rest.course || null,
+    yearLevel:
+      rest.role === "STUDENT_FARMER" && academicUpdate.changed
+        ? (rest.yearLevel ?? "").trim() || null
+        : rest.yearLevel || null,
+    section:
+      rest.role === "STUDENT_FARMER" && academicUpdate.changed
+        ? (rest.section ?? "").trim() || null
+        : rest.section || null,
+    academicYear:
+      rest.role === "STUDENT_FARMER" && academicUpdate.changed
+        ? academicUpdate.academicYear || null
+        : rest.academicYear || null,
     position: rest.position || null,
   };
 

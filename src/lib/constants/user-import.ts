@@ -26,7 +26,6 @@ export const YEAR_LEVELS = [
   "2nd Year",
   "3rd Year",
   "4th Year",
-  "5th Year",
 ] as const;
 
 export type CanonicalYearLevel = (typeof YEAR_LEVELS)[number];
@@ -62,12 +61,11 @@ export const COURSE_ACADEMIC_RULES: Record<
 };
 
 // Final (graduating) year level per course, keyed by the same DEPARTMENTS
-// values used for student `course`. Everything is a 4-year program except
-// Agricultural and Biosystems Engineering, which is 5.
+// values used for student `course`. All supported programs are four-year.
 export const COURSE_FINAL_YEAR: Record<(typeof DEPARTMENTS)[number], number> =
   DEPARTMENTS.reduce(
     (acc, course) => {
-      acc[course] = course === "BS Agricultural and Biosystems Engineering" ? 5 : 4;
+      acc[course] = 4;
       return acc;
     },
     {} as Record<(typeof DEPARTMENTS)[number], number>
@@ -125,19 +123,29 @@ export const STUDENT_ID_REGEX = /^\d{2}-\d{5}$/;
 
 // Generic section shape. Course prefix/year consistency is enforced by
 // validateStudentAcademicFields below; the regex alone is never authority.
-export const SECTION_REGEX = /^(BSA|BTVTED|BSABE)-([1-5])[A-Z]$/;
+export const SECTION_REGEX = /^(BSA|BTVTED|BSABE)-([1-4])[A-Z]$/;
 
 export const ACADEMIC_YEAR_REGEX = /^(\d{4})-(\d{4})$/;
 
+// Operational school-year source. Update this single value during the
+// annual rollover; validation, ID ranges, imports, templates, and UI hints
+// derive their current-year behavior from it.
+export const CURRENT_ACADEMIC_YEAR = "2026-2027";
+
 export type AcademicRuleIssue = {
-  field: "course" | "yearLevel" | "section" | "academicYear";
+  field: "idNumber" | "course" | "yearLevel" | "section" | "academicYear";
   code:
+    | "INVALID_ID"
     | "INVALID_COURSE"
     | "INVALID_YEAR_LEVEL"
     | "INVALID_SECTION"
     | "INVALID_ACADEMIC_YEAR"
     | "COURSE_SECTION_MISMATCH"
-    | "YEAR_SECTION_MISMATCH";
+    | "YEAR_SECTION_MISMATCH"
+    | "ID_ACADEMIC_YEAR_MISMATCH"
+    | "COHORT_YEAR_LEVEL_MISMATCH"
+    | "COHORT_SECTION_YEAR_MISMATCH"
+    | "COHORT_OUT_OF_RANGE";
   message: string;
 };
 
@@ -148,6 +156,33 @@ export function isCanonicalCourse(value: string): value is CanonicalCourse {
 export function isValidAcademicYear(value: string): boolean {
   const match = ACADEMIC_YEAR_REGEX.exec(value);
   return !!match && Number(match[2]) === Number(match[1]) + 1;
+}
+
+export function academicYearStartYear(value: string): number | null {
+  const match = ACADEMIC_YEAR_REGEX.exec(value);
+  if (!match || Number(match[2]) !== Number(match[1]) + 1) return null;
+  return Number(match[1]);
+}
+
+export function expectedYearNumberForEntryAcademicYear(
+  entryAcademicYear: string,
+  currentAcademicYear: string = CURRENT_ACADEMIC_YEAR
+): number | null {
+  const entryStartYear = academicYearStartYear(entryAcademicYear);
+  const currentStartYear = academicYearStartYear(currentAcademicYear);
+  if (entryStartYear === null || currentStartYear === null) return null;
+  return currentStartYear - entryStartYear + 1;
+}
+
+export function expectedYearLevelForEntryAcademicYear(
+  entryAcademicYear: string,
+  currentAcademicYear: string = CURRENT_ACADEMIC_YEAR
+): CanonicalYearLevel | null {
+  const expectedYear = expectedYearNumberForEntryAcademicYear(
+    entryAcademicYear,
+    currentAcademicYear
+  );
+  return expectedYear === null ? null : YEAR_LEVELS[expectedYear - 1] ?? null;
 }
 
 export function allowedYearLevelsForCourse(
@@ -175,17 +210,57 @@ export function isSectionAllowedForCourse(
   );
 }
 
-export function validateStudentAcademicFields(input: {
-  course: string;
-  yearLevel: string;
-  section: string;
-  academicYear?: string;
-}): AcademicRuleIssue[] {
+export function validateStudentAcademicFields(
+  input: {
+    idNumber?: string;
+    course: string;
+    yearLevel: string;
+    section: string;
+    academicYear?: string;
+  },
+  options: {
+    requireComplete?: boolean;
+    currentAcademicYear?: string;
+  } = {}
+): AcademicRuleIssue[] {
   const issues: AcademicRuleIssue[] = [];
-  const { course, yearLevel, section, academicYear = "" } = input;
+  const idNumber = (input.idNumber ?? "").trim();
+  const course = input.course.trim();
+  const yearLevel = input.yearLevel.trim();
+  const section = input.section.trim();
+  const academicYear = (input.academicYear ?? "").trim();
+  const currentAcademicYear =
+    options.currentAcademicYear ?? CURRENT_ACADEMIC_YEAR;
   const canonicalCourse = isCanonicalCourse(course);
 
-  if (course && !canonicalCourse) {
+  if (options.requireComplete && !idNumber) {
+    issues.push({
+      field: "idNumber",
+      code: "INVALID_ID",
+      message: "ID number is required",
+    });
+  } else if (idNumber && !STUDENT_ID_REGEX.test(idNumber)) {
+    issues.push({
+      field: "idNumber",
+      code: "INVALID_ID",
+      message: "ID number must be in format 12-34567, e.g. 23-04567",
+    });
+  } else if (idNumber && !isValidStudentIdPrefix(idNumber, currentAcademicYear)) {
+    const { min, max } = studentIdPrefixRange(currentAcademicYear);
+    issues.push({
+      field: "idNumber",
+      code: "INVALID_ID",
+      message: `ID number prefix must be between ${min} and ${max}`,
+    });
+  }
+
+  if (options.requireComplete && !course) {
+    issues.push({
+      field: "course",
+      code: "INVALID_COURSE",
+      message: "Course is required",
+    });
+  } else if (course && !canonicalCourse) {
     issues.push({
       field: "course",
       code: "INVALID_COURSE",
@@ -193,7 +268,13 @@ export function validateStudentAcademicFields(input: {
     });
   }
 
-  if (yearLevel && !(YEAR_LEVELS as readonly string[]).includes(yearLevel)) {
+  if (options.requireComplete && !yearLevel) {
+    issues.push({
+      field: "yearLevel",
+      code: "INVALID_YEAR_LEVEL",
+      message: "Year level is required",
+    });
+  } else if (yearLevel && !(YEAR_LEVELS as readonly string[]).includes(yearLevel)) {
     issues.push({
       field: "yearLevel",
       code: "INVALID_YEAR_LEVEL",
@@ -202,12 +283,18 @@ export function validateStudentAcademicFields(input: {
   }
 
   const sectionMatch = section ? SECTION_REGEX.exec(section) : null;
-  if (section && !sectionMatch) {
+  if (options.requireComplete && !section) {
+    issues.push({
+      field: "section",
+      code: "INVALID_SECTION",
+      message: "Section is required",
+    });
+  } else if (section && !sectionMatch) {
     issues.push({
       field: "section",
       code: "INVALID_SECTION",
       message:
-        "section must be in format PREFIX-YN, e.g. BSA-1A, BTVTED-2B, BSABE-5A",
+        "section must be in format PREFIX-YN for years 1-4, e.g. BSA-1A, BTVTED-2B, BSABE-4A",
     });
   }
 
@@ -216,6 +303,54 @@ export function validateStudentAcademicFields(input: {
       field: "academicYear",
       code: "INVALID_ACADEMIC_YEAR",
       message: "academicYear must be consecutive years in YYYY-YYYY format, e.g. 2023-2024",
+    });
+  }
+
+  const derivedAcademicYear = deriveAcademicYearFromIdPrefix(idNumber);
+  const suppliedAcademicYearIsValid =
+    !!academicYear && isValidAcademicYear(academicYear);
+
+  if (
+    derivedAcademicYear &&
+    suppliedAcademicYearIsValid &&
+    academicYear !== derivedAcademicYear
+  ) {
+    issues.push({
+      field: "academicYear",
+      code: "ID_ACADEMIC_YEAR_MISMATCH",
+      message: `Student ID ${idNumber} corresponds to entry academic year ${derivedAcademicYear}.`,
+    });
+  }
+
+  const entryAcademicYear =
+    derivedAcademicYear ?? (suppliedAcademicYearIsValid ? academicYear : "");
+  const expectedYearNumber = entryAcademicYear
+    ? expectedYearNumberForEntryAcademicYear(entryAcademicYear, currentAcademicYear)
+    : null;
+  const expectedYearLevel = entryAcademicYear
+    ? expectedYearLevelForEntryAcademicYear(entryAcademicYear, currentAcademicYear)
+    : null;
+
+  if (
+    expectedYearNumber !== null &&
+    (expectedYearNumber < 1 || expectedYearNumber > YEAR_LEVELS.length)
+  ) {
+    issues.push({
+      field: "academicYear",
+      code: "COHORT_OUT_OF_RANGE",
+      message: `Entry academic year ${entryAcademicYear} is outside the supported 1st-4th Year progression for current academic year ${currentAcademicYear}.`,
+    });
+  }
+
+  if (
+    expectedYearLevel &&
+    (YEAR_LEVELS as readonly string[]).includes(yearLevel) &&
+    yearLevel !== expectedYearLevel
+  ) {
+    issues.push({
+      field: "yearLevel",
+      code: "COHORT_YEAR_LEVEL_MISMATCH",
+      message: `For current academic year ${currentAcademicYear}, this student is expected to be ${expectedYearLevel}.`,
     });
   }
 
@@ -254,7 +389,20 @@ export function validateStudentAcademicFields(input: {
       });
     }
 
-    if (yearLevel && (YEAR_LEVELS as readonly string[]).includes(yearLevel)) {
+    if (expectedYearLevel) {
+      const sectionYear = Number(sectionMatch[2]);
+      const expectedYear = Number.parseInt(expectedYearLevel, 10);
+      if (sectionYear !== expectedYear) {
+        issues.push({
+          field: "section",
+          code: "COHORT_SECTION_YEAR_MISMATCH",
+          message: `Section ${section} does not match the expected ${expectedYearLevel} standing.`,
+        });
+      }
+    } else if (
+      yearLevel &&
+      (YEAR_LEVELS as readonly string[]).includes(yearLevel)
+    ) {
       const sectionYear = Number(sectionMatch[2]);
       const yearLevelNumber = Number.parseInt(yearLevel, 10);
       if (sectionYear !== yearLevelNumber) {
@@ -274,18 +422,24 @@ export function validateStudentAcademicFields(input: {
 // (src/lib/validations/user.ts's phPhone), which also accepts 09XXXXXXXXX.
 export const IMPORT_PHONE_REGEX = /^\+639\d{9}$/;
 
-// Student ID prefix must be between 20 and (current year % 100) + 1 —
-// e.g. in 2026 that's 20 through 27 inclusive.
-export function studentIdPrefixRange(): { min: number; max: number } {
-  return { min: 20, max: (new Date().getFullYear() % 100) + 1 };
+// Student ID prefix must be between 20 and the current operational entry
+// cohort (the start year of CURRENT_ACADEMIC_YEAR).
+export function studentIdPrefixRange(
+  currentAcademicYear: string = CURRENT_ACADEMIC_YEAR
+): { min: number; max: number } {
+  const currentStartYear = academicYearStartYear(currentAcademicYear);
+  return { min: 20, max: (currentStartYear ?? new Date().getFullYear()) % 100 };
 }
 
 // Assumes the format regex (STUDENT_ID_REGEX) already passed — this only
 // checks the numeric prefix range, so callers can report a distinct
 // "wrong format" vs "wrong prefix" message.
-export function isValidStudentIdPrefix(idNumber: string): boolean {
+export function isValidStudentIdPrefix(
+  idNumber: string,
+  currentAcademicYear: string = CURRENT_ACADEMIC_YEAR
+): boolean {
   const prefix = parseInt(idNumber.slice(0, 2), 10);
-  const { min, max } = studentIdPrefixRange();
+  const { min, max } = studentIdPrefixRange(currentAcademicYear);
   return prefix >= min && prefix <= max;
 }
 

@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Prisma } from "@prisma/client";
 import {
+  CURRENT_ACADEMIC_YEAR,
   MAX_IMPORT_FILE_BYTES,
+  deriveAcademicYearFromIdPrefix,
+  expectedYearLevelForEntryAcademicYear,
   validateStudentAcademicFields,
 } from "@/lib/constants/user-import";
 import {
   createStudentWebSchema,
   updateUserSchema,
+  validateStudentAcademicUpdate,
 } from "@/lib/validations/user";
 import { parseImportType } from "@/lib/validations/import";
 import { parseExcelImportFile } from "@/lib/imports/parse-excel";
@@ -27,6 +31,11 @@ import {
   friendlyImportUniqueConflict,
 } from "@/lib/imports/commit";
 import { buildAutomaticColumns } from "@/lib/imports/masterlist-mapping";
+import { buildStudentTemplateExamples } from "@/lib/imports/template-generator";
+import {
+  sectionAfterCreateStudentCourseChange,
+  synchronizeCreateStudentAcademicState,
+} from "@/lib/users/create-student-academic";
 
 const BSA = "BS Agriculture - Animal Science";
 const BTVTED = "BTVTEd - Animal Production";
@@ -42,8 +51,8 @@ function student(seed = 1, overrides: Record<string, unknown> = {}) {
     idNumber: `23-${String(seed).padStart(5, "0")}`,
     academicYear: "2023-2024",
     course: BSA,
-    yearLevel: "3rd Year",
-    section: "BSA-3A",
+    yearLevel: "4th Year",
+    section: "BSA-4A",
     ...overrides,
   };
 }
@@ -126,15 +135,14 @@ test("canonical BTVTEd course, prefix, and year are valid", () => {
   );
 });
 
-test("canonical BSABE fifth year is valid", () => {
-  assert.deepEqual(
-    validateStudentAcademicFields({
-      course: BSABE,
-      yearLevel: "5th Year",
-      section: "BSABE-5A",
-    }),
-    []
-  );
+test("BSABE fifth year is rejected", () => {
+  const issues = validateStudentAcademicFields({
+    course: BSABE,
+    yearLevel: "5th Year",
+    section: "BSABE-5A",
+  });
+  assert.ok(issues.some((issue) => issue.code === "INVALID_YEAR_LEVEL"));
+  assert.ok(issues.some((issue) => issue.code === "INVALID_SECTION"));
 });
 
 test("four-year BSA course rejects fifth year", () => {
@@ -178,6 +186,55 @@ test("Student import requires yearLevel", () => {
   assert.ok(hasCode(result, "MISSING_REQUIRED"));
 });
 
+for (const field of ["yearLevel", "section", "course", "idNumber"] as const) {
+  test(`Student import reports one required issue for blank ${field}`, () => {
+    const result = resultFor("STUDENT_FARMER", [
+      input(student(1, { [field]: "" })),
+    ]);
+    const requiredIssues = result.rows[0].issues.filter(
+      (issue) => issue.code === "MISSING_REQUIRED"
+    );
+    assert.deepEqual(
+      requiredIssues.map(({ field: issueField, code }) => ({
+        field: issueField,
+        code,
+      })),
+      [{ field, code: "MISSING_REQUIRED" }]
+    );
+  });
+}
+
+test("Student import retains semantic issues when required fields are present", () => {
+  const result = resultFor("STUDENT_FARMER", [
+    input(student(1, { yearLevel: "1st Year", section: "BSA-1A" })),
+  ]);
+  assert.deepEqual(
+    result.rows[0].issues.map((issue) => issue.code),
+    ["COHORT_YEAR_LEVEL_MISMATCH", "COHORT_SECTION_YEAR_MISMATCH"]
+  );
+});
+
+test("Student import keeps distinct semantic problems separate", () => {
+  const result = resultFor("STUDENT_FARMER", [
+    input(
+      student(1, {
+        academicYear: "2024-2025",
+        yearLevel: "1st Year",
+        section: "BTVTED-2A",
+      })
+    ),
+  ]);
+  assert.deepEqual(
+    result.rows[0].issues.map((issue) => issue.code),
+    [
+      "ID_ACADEMIC_YEAR_MISMATCH",
+      "COHORT_YEAR_LEVEL_MISMATCH",
+      "COURSE_SECTION_MISMATCH",
+      "COHORT_SECTION_YEAR_MISMATCH",
+    ]
+  );
+});
+
 test("Faculty department remains canonical", () => {
   const result = resultFor("FACULTY", [input(faculty(1, { department: "Agriculture" }))]);
   assert.ok(hasCode(result, "INVALID_DEPARTMENT"));
@@ -188,7 +245,14 @@ test("academic year 2023-2024 is valid", () => {
 });
 
 test("academic year 2026-2027 is valid", () => {
-  const result = resultFor("STUDENT_FARMER", [input(student(1, { academicYear: "2026-2027" }))]);
+  const result = resultFor("STUDENT_FARMER", [
+    input(student(1, {
+      idNumber: "26-00001",
+      academicYear: "2026-2027",
+      yearLevel: "1st Year",
+      section: "BSA-1A",
+    })),
+  ]);
   assert.equal(result.rows[0].eligible, true);
 });
 
@@ -203,6 +267,152 @@ test("blank academic year keeps Student ID derivation", () => {
   const result = resultFor("STUDENT_FARMER", [input(student(1, { academicYear: "" }))]);
   assert.equal(result.rows[0].raw.academicYear, "2023-2024");
   assert.equal(result.rows[0].eligible, true);
+});
+
+test("current academic year source is 2026-2027", () => {
+  assert.equal(CURRENT_ACADEMIC_YEAR, "2026-2027");
+});
+
+test("Student ID derives its entry academic year", () => {
+  assert.equal(deriveAcademicYearFromIdPrefix("23-12001"), "2023-2024");
+  assert.equal(deriveAcademicYearFromIdPrefix("26-12001"), "2026-2027");
+});
+
+test("23 ID rejects a conflicting supplied entry academic year", () => {
+  const result = resultFor("STUDENT_FARMER", [
+    input(student(1, { academicYear: "2024-2025" })),
+  ]);
+  assert.ok(hasCode(result, "ID_ACADEMIC_YEAR_MISMATCH"));
+});
+
+test("23 through 26 cohorts resolve to fourth through first year", () => {
+  for (const [entryAcademicYear, expected] of [
+    ["2023-2024", "4th Year"],
+    ["2024-2025", "3rd Year"],
+    ["2025-2026", "2nd Year"],
+    ["2026-2027", "1st Year"],
+  ] as const) {
+    assert.equal(expectedYearLevelForEntryAcademicYear(entryAcademicYear), expected);
+  }
+});
+
+test("23 through 26 cohorts accept their exact expected year and section", () => {
+  for (const [prefix, academicYear, yearLevel, section] of [
+    ["23", "2023-2024", "4th Year", "BSA-4A"],
+    ["24", "2024-2025", "3rd Year", "BTVTED-3B"],
+    ["25", "2025-2026", "2nd Year", "BSABE-2A"],
+    ["26", "2026-2027", "1st Year", "BSA-1A"],
+  ] as const) {
+    const course = section.startsWith("BTVTED")
+      ? BTVTED
+      : section.startsWith("BSABE")
+        ? BSABE
+        : BSA;
+    const issues = validateStudentAcademicFields(
+      {
+        idNumber: `${prefix}-12001`,
+        academicYear,
+        course,
+        yearLevel,
+        section,
+      },
+      { requireComplete: true }
+    );
+    assert.deepEqual(issues, []);
+  }
+});
+
+test("cohort progression rejects incorrect selected year levels", () => {
+  for (const [idNumber, academicYear, yearLevel, section] of [
+    ["23-12001", "2023-2024", "1st Year", "BSA-1A"],
+    ["23-12001", "2023-2024", "3rd Year", "BSA-3A"],
+    ["24-12001", "2024-2025", "4th Year", "BSA-4A"],
+    ["26-12001", "2026-2027", "2nd Year", "BSA-2A"],
+  ] as const) {
+    const issues = validateStudentAcademicFields({
+      idNumber,
+      academicYear,
+      course: BSA,
+      yearLevel,
+      section,
+    });
+    assert.ok(issues.some((issue) => issue.code === "COHORT_YEAR_LEVEL_MISMATCH"));
+    assert.ok(issues.some((issue) => issue.code === "COHORT_SECTION_YEAR_MISMATCH"));
+  }
+});
+
+test("matching year and section still fail when both disagree with cohort", () => {
+  const issues = validateStudentAcademicFields({
+    idNumber: "23-12001",
+    academicYear: "2023-2024",
+    course: BSA,
+    yearLevel: "3rd Year",
+    section: "BSA-3A",
+  });
+  assert.ok(issues.some((issue) => issue.code === "COHORT_YEAR_LEVEL_MISMATCH"));
+  assert.ok(issues.some((issue) => issue.code === "COHORT_SECTION_YEAR_MISMATCH"));
+});
+
+test("expected year rejects a section from another year", () => {
+  const issues = validateStudentAcademicFields({
+    idNumber: "23-12001",
+    academicYear: "2023-2024",
+    course: BSA,
+    yearLevel: "4th Year",
+    section: "BSA-3A",
+  });
+  assert.ok(issues.some((issue) => issue.code === "COHORT_SECTION_YEAR_MISMATCH"));
+});
+
+test("all section prefixes reject fifth-year shapes", () => {
+  for (const [course, section] of [
+    [BSA, "BSA-5A"],
+    [BTVTED, "BTVTED-5A"],
+    [BSABE, "BSABE-5A"],
+  ] as const) {
+    const issues = validateStudentAcademicFields({
+      idNumber: "22-12001",
+      academicYear: "2022-2023",
+      course,
+      yearLevel: "5th Year",
+      section,
+    });
+    assert.ok(issues.some((issue) => issue.code === "INVALID_YEAR_LEVEL"));
+    assert.ok(issues.some((issue) => issue.code === "INVALID_SECTION"));
+  }
+});
+
+test("past and future cohorts are outside the supported active range", () => {
+  for (const [idNumber, academicYear] of [
+    ["22-12001", "2022-2023"],
+    ["27-12001", "2027-2028"],
+  ] as const) {
+    const issues = validateStudentAcademicFields({
+      idNumber,
+      academicYear,
+      course: BSA,
+      yearLevel: "4th Year",
+      section: "BSA-4A",
+    });
+    assert.ok(issues.some((issue) => issue.code === "COHORT_OUT_OF_RANGE"));
+  }
+});
+
+test("all canonical programs retain exact course-to-section prefixes", () => {
+  for (const [course, section] of [
+    [BSA, "BTVTED-4A"],
+    [BTVTED, "BSA-4A"],
+    [BSABE, "BSA-4A"],
+  ] as const) {
+    const issues = validateStudentAcademicFields({
+      idNumber: "23-12001",
+      academicYear: "2023-2024",
+      course,
+      yearLevel: "4th Year",
+      section,
+    });
+    assert.ok(issues.some((issue) => issue.code === "COURSE_SECTION_MISMATCH"));
+  }
 });
 
 test("generic academic-year headers remain deliberately unmapped", () => {
@@ -506,11 +716,22 @@ function webStudent(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test("normal Add Student accepts BSABE fifth year", () => {
+test("normal Add Student accepts a 23 cohort in matching fourth year", () => {
+  assert.equal(createStudentWebSchema.safeParse(webStudent()).success, true);
+});
+
+test("normal Add Student rejects a 23 cohort presented as first year", () => {
+  const parsed = createStudentWebSchema.safeParse(
+    webStudent({ yearLevel: "1st Year", section: "BSA-1A" })
+  );
+  assert.equal(parsed.success, false);
+});
+
+test("normal Add Student rejects BSABE fifth year", () => {
   const parsed = createStudentWebSchema.safeParse(
     webStudent({ course: BSABE, yearLevel: "5th Year", section: "BSABE-5A" })
   );
-  assert.equal(parsed.success, true);
+  assert.equal(parsed.success, false);
 });
 
 test("normal Add Student rejects wrong course/section prefix", () => {
@@ -520,10 +741,200 @@ test("normal Add Student rejects wrong course/section prefix", () => {
   assert.equal(parsed.success, false);
 });
 
-test("normal Edit Student rejects year/section mismatch", () => {
-  const parsed = updateUserSchema.safeParse({
-    ...webStudent({ yearLevel: "2nd Year", section: "BSA-3A" }),
-    password: "",
+test("normal Edit Student rejects an academic change into a mismatch", () => {
+  const existing = webStudent();
+  const result = validateStudentAcademicUpdate(existing, {
+    ...existing,
+    yearLevel: "1st Year",
+    section: "BSA-1A",
   });
+  assert.equal(result.changed, true);
+  assert.ok(result.issues.some((issue) => issue.code === "COHORT_YEAR_LEVEL_MISMATCH"));
+  assert.ok(result.issues.some((issue) => issue.code === "COHORT_SECTION_YEAR_MISMATCH"));
+});
+
+test("existing valid Student unrelated edit passes", () => {
+  const existing = webStudent();
+  const result = validateStudentAcademicUpdate(existing, existing);
+  assert.equal(result.changed, false);
+  assert.deepEqual(result.issues, []);
+  assert.equal(
+    updateUserSchema.safeParse({ ...existing, firstName: "Changed", password: "" })
+      .success,
+    true
+  );
+});
+
+test("unchanged legacy-invalid Student academics allow an unrelated edit", () => {
+  const existing = webStudent({
+    idNumber: "23-12001",
+    academicYear: "2023-2024",
+    yearLevel: "1st Year",
+    section: "BSA-1A",
+  });
+  const result = validateStudentAcademicUpdate(existing, existing);
+  assert.equal(result.changed, false);
+  assert.deepEqual(result.issues, []);
+});
+
+test("changing legacy-invalid Student academics requires a valid final state", () => {
+  const existing = webStudent({
+    idNumber: "23-12001",
+    academicYear: "2023-2024",
+    yearLevel: "1st Year",
+    section: "BSA-1A",
+  });
+  const invalid = validateStudentAcademicUpdate(existing, {
+    ...existing,
+    section: "BSA-2A",
+  });
+  assert.equal(invalid.changed, true);
+  assert.ok(invalid.issues.length > 0);
+
+  const repaired = validateStudentAcademicUpdate(existing, {
+    ...existing,
+    yearLevel: "4th Year",
+    section: "BSA-4A",
+  });
+  assert.equal(repaired.changed, true);
+  assert.deepEqual(repaired.issues, []);
+});
+
+test("academic edit derives blank entry year before shared validation", () => {
+  const existing = webStudent({ academicYear: "" });
+  const result = validateStudentAcademicUpdate(existing, {
+    ...existing,
+    section: "BSA-4B",
+  });
+  assert.equal(result.academicYear, "2023-2024");
+  assert.deepEqual(result.issues, []);
+});
+
+test("create Student ID derives its cohort and current standing", () => {
+  const result = synchronizeCreateStudentAcademicState({
+    idNumber: "23-12001",
+    academicYear: "",
+    yearLevel: "",
+    section: "",
+    course: BSA,
+    previousAutoDerivedAcademicYear: null,
+  });
+  assert.deepEqual(result, {
+    academicYear: "2023-2024",
+    yearLevel: "4th Year",
+    section: "",
+    autoDerivedAcademicYear: "2023-2024",
+  });
+});
+
+test("create Student ID change replaces a previously auto-derived cohort", () => {
+  const result = synchronizeCreateStudentAcademicState({
+    idNumber: "26-12001",
+    academicYear: "2023-2024",
+    yearLevel: "4th Year",
+    section: "BSA-4A",
+    course: BSA,
+    previousAutoDerivedAcademicYear: "2023-2024",
+  });
+  assert.equal(result.academicYear, "2026-2027");
+  assert.equal(result.autoDerivedAcademicYear, "2026-2027");
+});
+
+test("create Student ID change synchronizes Year Level", () => {
+  const result = synchronizeCreateStudentAcademicState({
+    idNumber: "26-12001",
+    academicYear: "2023-2024",
+    yearLevel: "4th Year",
+    section: "BSA-4A",
+    course: BSA,
+    previousAutoDerivedAcademicYear: "2023-2024",
+  });
+  assert.equal(result.yearLevel, "1st Year");
+});
+
+test("create Student ID change clears a section from the old standing", () => {
+  const result = synchronizeCreateStudentAcademicState({
+    idNumber: "26-12001",
+    academicYear: "2023-2024",
+    yearLevel: "4th Year",
+    section: "BSA-4A",
+    course: BSA,
+    previousAutoDerivedAcademicYear: "2023-2024",
+  });
+  assert.equal(result.section, "");
+});
+
+test("create Student course change clears a section with the old prefix", () => {
+  assert.equal(
+    sectionAfterCreateStudentCourseChange(BTVTED, "BSA-4A"),
+    ""
+  );
+});
+
+test("create Student ID change preserves a manually edited Academic Year", () => {
+  const result = synchronizeCreateStudentAcademicState({
+    idNumber: "26-12001",
+    academicYear: "2024-2025",
+    yearLevel: "4th Year",
+    section: "BSA-4A",
+    course: BSA,
+    previousAutoDerivedAcademicYear: null,
+  });
+  assert.equal(result.academicYear, "2024-2025");
+  assert.equal(result.autoDerivedAcademicYear, null);
+});
+
+test("server validation rejects a manually inconsistent create Student result", () => {
+  const synchronized = synchronizeCreateStudentAcademicState({
+    idNumber: "26-12001",
+    academicYear: "2024-2025",
+    yearLevel: "4th Year",
+    section: "BSA-4A",
+    course: BSA,
+    previousAutoDerivedAcademicYear: null,
+  });
+  const parsed = createStudentWebSchema.safeParse(
+    webStudent({
+      idNumber: "26-12001",
+      ...synchronized,
+    })
+  );
   assert.equal(parsed.success, false);
+});
+
+function validateTemplateExamples(currentAcademicYear: string) {
+  const rows = buildStudentTemplateExamples(currentAcademicYear);
+  for (const row of rows) {
+    assert.deepEqual(
+      validateStudentAcademicFields(
+        {
+          idNumber: row[5],
+          academicYear: row[6],
+          course: row[7],
+          yearLevel: row[8],
+          section: row[9],
+        },
+        { requireComplete: true, currentAcademicYear }
+      ),
+      []
+    );
+  }
+  return rows;
+}
+
+test("production Student template examples satisfy shared academic validation", () => {
+  assert.equal(validateTemplateExamples(CURRENT_ACADEMIC_YEAR).length, 4);
+});
+
+test("Student template examples roll forward for academic year 2027-2028", () => {
+  const rows = validateTemplateExamples("2027-2028");
+  assert.deepEqual(
+    rows.map((row) => [row[5].slice(0, 2), row[6], row[8], row[9]]),
+    [
+      ["24", "2024-2025", "4th Year", "BSA-4A"],
+      ["25", "2025-2026", "3rd Year", "BTVTED-3B"],
+      ["26", "2026-2027", "2nd Year", "BSA-2C"],
+      ["27", "2027-2028", "1st Year", "BSABE-1D"],
+    ]
+  );
 });

@@ -24,6 +24,7 @@ import {
 const BTVTED_ANIMAL = "BTVTEd - Animal Production";
 const BSA_CROP = "BS Agriculture - Crop Science";
 const BSA_ANIMAL = "BS Agriculture - Animal Science";
+const BSABE = "BS Agricultural and Biosystems Engineering";
 
 test("canonical academic programs are shared exact values", () => {
   assert.equal(isCanonicalAcademicProgram(BTVTED_ANIMAL), true);
@@ -44,6 +45,67 @@ test("valid compatible cohort passes advisory validation", () => {
       section: "BTVTED-2B",
     }),
     null
+  );
+});
+
+test("BSA advisory sections stop at fourth year", () => {
+  assert.equal(
+    requestedCohortError(BSA_ANIMAL, {
+      course: BSA_ANIMAL,
+      section: "BSA-4A",
+    }),
+    null
+  );
+  assert.equal(
+    requestedCohortError(BSA_ANIMAL, {
+      course: BSA_ANIMAL,
+      section: "BSA-5A",
+    }),
+    "Select a valid Section."
+  );
+});
+
+test("BTVTEd advisory sections stop at fourth year", () => {
+  assert.equal(
+    requestedCohortError(BTVTED_ANIMAL, {
+      course: BTVTED_ANIMAL,
+      section: "BTVTED-4A",
+    }),
+    null
+  );
+  assert.equal(
+    requestedCohortError(BTVTED_ANIMAL, {
+      course: BTVTED_ANIMAL,
+      section: "BTVTED-5A",
+    }),
+    "Select a valid Section."
+  );
+});
+
+test("BSABE advisory sections stop at fourth year", () => {
+  assert.equal(
+    requestedCohortError(BSABE, {
+      course: BSABE,
+      section: "BSABE-4A",
+    }),
+    null
+  );
+  assert.equal(
+    requestedCohortError(BSABE, {
+      course: BSABE,
+      section: "BSABE-5A",
+    }),
+    "Select a valid Section."
+  );
+});
+
+test("BSABE advisory sections reject a mismatched prefix", () => {
+  assert.equal(
+    requestedCohortError(BSABE, {
+      course: BSABE,
+      section: "BSA-4A",
+    }),
+    "Select a valid Section."
   );
 });
 

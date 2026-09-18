@@ -5,26 +5,33 @@ import {
   DEPARTMENTS,
   FACULTY_POSITIONS,
   FACULTY_ID_REGEX,
-  STUDENT_ID_REGEX,
   YEAR_LEVELS,
-  studentIdPrefixRange,
-  isValidStudentIdPrefix,
+  deriveAcademicYearFromIdPrefix,
   validateStudentAcademicFields,
+  type AcademicRuleIssue,
 } from "@/lib/constants/user-import";
 
 export { YEAR_LEVELS } from "@/lib/constants/user-import";
 
 function addStudentAcademicIssues(
-  data: { course?: string; yearLevel?: string; section?: string; academicYear?: string },
+  data: {
+    idNumber?: string;
+    course?: string;
+    yearLevel?: string;
+    section?: string;
+    academicYear?: string;
+  },
   ctx: z.RefinementCtx
 ) {
-  for (const issue of
-    validateStudentAcademicFields({
+  for (const issue of validateStudentAcademicFields(
+    {
+      idNumber: data.idNumber ?? "",
       course: data.course ?? "",
       yearLevel: data.yearLevel ?? "",
       section: data.section ?? "",
       academicYear: data.academicYear ?? "",
-    })) {
+    }
+  )) {
     ctx.addIssue({
       code: "custom",
       path: [issue.field],
@@ -62,20 +69,13 @@ export const createUserSchema = baseUserSchema.extend({
 // request so existing incomplete users can still be edited/completed
 // incrementally. Password itself still uses the same strength rule
 // whenever a new one is actually being set (blank = keep current).
-export const updateUserSchema = baseUserSchema
-  .extend({
-    password: passwordStrengthSchema.optional().or(z.literal("")),
-  })
-  .superRefine((data, ctx) => {
-    if (data.role !== "STUDENT_FARMER") return;
-    addStudentAcademicIssues(data, ctx);
-  });
+export const updateUserSchema = baseUserSchema.extend({
+  password: passwordStrengthSchema.optional().or(z.literal("")),
+});
 
 export const phPhone = z
   .string()
   .regex(/^(09\d{9}|\+639\d{9})$/, "Phone must be 09XXXXXXXXX or +639XXXXXXXXX");
-
-const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
 
 // STRICT — Student Farmer creation. Adviser request: can't add a student
 // with missing required fields (EDIT stays lenient via updateUserSchema).
@@ -84,26 +84,7 @@ const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
 // would let interactively-created users diverge from imported ones.
 const createStudentObjectSchema = baseUserSchema.extend({
   role: z.literal("STUDENT_FARMER"),
-  idNumber: z
-    .string()
-    .trim()
-    .min(1, "ID number is required")
-    .superRefine((val, ctx) => {
-      if (!val) return;
-      if (!STUDENT_ID_REGEX.test(val)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "ID number must be in format 12-34567, e.g. 23-04567",
-        });
-        return;
-      }
-      if (!isValidStudentIdPrefix(val)) {
-        ctx.addIssue({
-          code: "custom",
-          message: `ID number prefix must be between ${STUDENT_ID_MIN} and ${STUDENT_ID_MAX}`,
-        });
-      }
-    }),
+  idNumber: z.string().trim().min(1, "ID number is required"),
   course: z.enum(DEPARTMENTS, { error: "Course is required" }),
   section: z.string().trim().min(1, "Section is required"),
   yearLevel: z.enum(YEAR_LEVELS, { error: "Year level is required" }),
@@ -156,3 +137,70 @@ export type CreateUserInput = z.infer<typeof createUserWebSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateStudentInput = z.infer<typeof createStudentWebSchema>;
 export type CreateFacultyInput = z.infer<typeof createFacultyWebSchema>;
+
+export type StudentAcademicState = {
+  role: string;
+  idNumber?: string | null;
+  course?: string | null;
+  yearLevel?: string | null;
+  section?: string | null;
+  academicYear?: string | null;
+};
+
+const STUDENT_ACADEMIC_FIELDS = [
+  "idNumber",
+  "course",
+  "yearLevel",
+  "section",
+  "academicYear",
+] as const;
+
+function academicValue(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+export function studentAcademicFieldsChanged(
+  existing: StudentAcademicState,
+  next: StudentAcademicState
+): boolean {
+  return (
+    existing.role !== next.role ||
+    STUDENT_ACADEMIC_FIELDS.some(
+      (field) => academicValue(existing[field]) !== academicValue(next[field])
+    )
+  );
+}
+
+export function validateStudentAcademicUpdate(
+  existing: StudentAcademicState,
+  next: StudentAcademicState
+): {
+  changed: boolean;
+  academicYear: string;
+  issues: AcademicRuleIssue[];
+} {
+  const changed = studentAcademicFieldsChanged(existing, next);
+  const idNumber = academicValue(next.idNumber);
+  const suppliedAcademicYear = academicValue(next.academicYear);
+  const academicYear =
+    suppliedAcademicYear || deriveAcademicYearFromIdPrefix(idNumber) || "";
+
+  if (next.role !== "STUDENT_FARMER" || !changed) {
+    return { changed, academicYear: suppliedAcademicYear, issues: [] };
+  }
+
+  return {
+    changed,
+    academicYear,
+    issues: validateStudentAcademicFields(
+      {
+        idNumber,
+        course: academicValue(next.course),
+        yearLevel: academicValue(next.yearLevel),
+        section: academicValue(next.section),
+        academicYear,
+      },
+      { requireComplete: true }
+    ),
+  };
+}

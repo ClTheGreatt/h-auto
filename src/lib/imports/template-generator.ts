@@ -8,6 +8,9 @@ import {
   FACULTY_IMPORT_COLUMNS,
   STUDENT_IMPORT_COLUMNS,
   IMPORT_TYPE_MARKER,
+  CURRENT_ACADEMIC_YEAR,
+  academicYearStartYear,
+  expectedYearLevelForEntryAcademicYear,
   studentIdPrefixRange,
 } from "@/lib/constants/user-import";
 
@@ -57,7 +60,7 @@ const COMMON_NOTES = [
 ];
 
 const STUDENT_ONLY_NOTE =
-  "yearLevel is required: 1st-4th Year for BSA/BTVTEd; 1st-5th Year for BSABE";
+  "yearLevel is required: all supported programs use 1st-4th Year";
 
 const CLOSING_NOTES = [
   "Delete the example rows and add your actual data on the Data sheet before uploading",
@@ -243,12 +246,61 @@ const FACULTY_COLUMN_GUIDE: ColumnGuideEntry[] = [
 
 const STUDENT_COLUMNS: ColumnDef[] = makeColumns([...STUDENT_IMPORT_COLUMNS], STUDENT_REQUIRED_FIELDS);
 
-const STUDENT_EXAMPLE_ROWS: string[][] = [
-  ["Chrislord", "Dizon", "Buenaventura", "cbdizon23@bpsu.edu.ph", "+639696227630", "23-03604", "2023-2024", "BS Agriculture - Animal Science", "4th Year", "BSA-4A"],
-  ["Said", "Hussin", "Al-Rashid", "sahussin24@bpsu.edu.ph", "+639181234567", "24-01245", "2024-2025", "BTVTEd - Animal Production", "3rd Year", "BTVTED-3B"],
-  ["Geoffrey", "Perello", "Mendoza", "gpperello25@bpsu.edu.ph", "+639172345671", "25-00879", "2025-2026", "BS Agriculture - Crop Science", "2nd Year", "BSA-2C"],
-  ["Jhan Criss", "Alba", "Manalo", "jcalba22@bpsu.edu.ph", "+639191234563", "22-05423", "2022-2023", "BS Agricultural and Biosystems Engineering", "4th Year", "BSABE-4D"],
-];
+const STUDENT_EXAMPLE_IDENTITIES = [
+  ["Chrislord", "Dizon", "Buenaventura", "cbdizon", "+639696227630", "03604", "BS Agriculture - Animal Science", "BSA", "A"],
+  ["Said", "Hussin", "Al-Rashid", "sahussin", "+639181234567", "01245", "BTVTEd - Animal Production", "BTVTED", "B"],
+  ["Geoffrey", "Perello", "Mendoza", "gpperello", "+639172345671", "00879", "BS Agriculture - Crop Science", "BSA", "C"],
+  ["Jhan Criss", "Alba", "Manalo", "jcalba", "+639191234563", "05423", "BS Agricultural and Biosystems Engineering", "BSABE", "D"],
+] as const;
+
+export function buildStudentTemplateExamples(
+  currentAcademicYear: string = CURRENT_ACADEMIC_YEAR
+): string[][] {
+  const currentStartYear = academicYearStartYear(currentAcademicYear);
+  if (currentStartYear === null) {
+    throw new Error(`Invalid current academic year: ${currentAcademicYear}`);
+  }
+
+  return STUDENT_EXAMPLE_IDENTITIES.map((identity, index) => {
+    const [
+      firstName,
+      middleName,
+      lastName,
+      emailStem,
+      phoneNumber,
+      idSuffix,
+      course,
+      sectionPrefix,
+      sectionLetter,
+    ] = identity;
+    const entryStartYear = currentStartYear - (3 - index);
+    const entryAcademicYear = `${entryStartYear}-${entryStartYear + 1}`;
+    const yearLevel = expectedYearLevelForEntryAcademicYear(
+      entryAcademicYear,
+      currentAcademicYear
+    );
+    if (!yearLevel) {
+      throw new Error(`Unable to derive standing for ${entryAcademicYear}`);
+    }
+    const yearNumber = Number.parseInt(yearLevel, 10);
+    const idPrefix = String(entryStartYear % 100).padStart(2, "0");
+
+    return [
+      firstName,
+      middleName,
+      lastName,
+      `${emailStem}${idPrefix}@bpsu.edu.ph`,
+      phoneNumber,
+      `${idPrefix}-${idSuffix}`,
+      entryAcademicYear,
+      course,
+      yearLevel,
+      `${sectionPrefix}-${yearNumber}${sectionLetter}`,
+    ];
+  });
+}
+
+const STUDENT_EXAMPLE_ROWS = buildStudentTemplateExamples();
 
 const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "firstName", required: STUDENT_REQUIRED_FIELDS.includes("firstName"), description: "The person's first (given) name" },
@@ -259,8 +311,8 @@ const STUDENT_COLUMN_GUIDE: ColumnGuideEntry[] = [
   { name: "idNumber", required: STUDENT_REQUIRED_FIELDS.includes("idNumber"), description: `Format: 12-34567 (2-digit year prefix ${STUDENT_ID_MIN}–${STUDENT_ID_MAX}, dash, 5 digits)` },
   { name: "academicYear", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("academicYear"), description: "Entry cohort, e.g. 2023-2024. Leave blank to auto-derive from the idNumber prefix" },
   { name: "course", required: STUDENT_REQUIRED_FIELDS.includes("course"), description: "Pick from the dropdown — one of 5 official program names (listed below)" },
-  { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Required. 1st-4th Year for BSA/BTVTEd; 1st-5th Year for BSABE" },
-  { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Must match course and year, e.g. BSA-1A, BTVTED-2B, BSABE-5A" },
+  { name: "yearLevel", required: (STUDENT_REQUIRED_FIELDS as readonly string[]).includes("yearLevel"), description: "Required. All supported programs use 1st-4th Year" },
+  { name: "section", required: STUDENT_REQUIRED_FIELDS.includes("section"), description: "Must match course and expected cohort year, e.g. BSA-1A, BTVTED-2B, BSABE-4A" },
 ];
 
 export async function generateFacultyTemplate(): Promise<Buffer> {

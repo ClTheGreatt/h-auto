@@ -12,6 +12,7 @@ import { sendEmail } from "@/lib/email/send-email";
 import { welcomeEmailTemplate } from "@/lib/email/templates";
 import { generateTempPassword } from "@/lib/auth/generate-password";
 import { stripInactivePrefix } from "@/lib/users/inactive-prefix";
+import { deriveAcademicYearFromIdPrefix } from "@/lib/constants/user-import";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -199,6 +200,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { password: suppliedPassword, ...rest } = parsed.data;
+    const academicYear =
+      rest.role === "STUDENT_FARMER"
+        ? rest.academicYear || deriveAcademicYearFromIdPrefix(rest.idNumber || "")
+        : rest.academicYear;
     // TEMPPASS-1: when the admin didn't supply a password, generate one —
     // mirrors web's createUser action. The generated password is never run
     // through passwordStrengthSchema: its format (Hauto-XXXX-XXXX, all
@@ -221,7 +226,7 @@ export async function POST(req: NextRequest) {
           course: rest.course || null,
           yearLevel: rest.yearLevel || null,
           section: rest.section || null,
-          academicYear: rest.academicYear || null,
+          academicYear: academicYear || null,
           position: rest.position || null,
           passwordHash,
           mustChangePassword: true,

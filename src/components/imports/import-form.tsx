@@ -51,6 +51,7 @@ import {
   mapSourceRows,
   matrixFromValues,
   resetAnalysisMapping,
+  shouldAutoContinueToPreview,
   updateAnalysisMapping,
   type ImportField,
   type ImportMatrixAnalysis,
@@ -174,11 +175,11 @@ export function ImportForm() {
     setImportType(nextType);
   }
 
-  function setCsvAnalysis(
+  async function setCsvAnalysis(
     matrix: ImportMatrixRow[],
     generation: number,
     forcedHeaderRow?: number
-  ): boolean {
+  ): Promise<boolean> {
     if (!isCurrentGeneration(generation)) return false;
     const analyzed = analyzeImportMatrix(matrix, importType, {
       fileType: "csv",
@@ -229,7 +230,11 @@ export function ImportForm() {
     ]);
     setHasLegacyPasswordColumn(analyzed.analysis.hasLegacyPasswordColumn);
     setIsTemplateWorkbook(false);
-    setPhase("mapping");
+    if (shouldAutoContinueToPreview(analyzed.analysis)) {
+      await previewAnalysis(analyzed.analysis, generation);
+    } else {
+      setPhase("mapping");
+    }
     return true;
   }
 
@@ -238,7 +243,7 @@ export function ImportForm() {
     Papa.parse<string[]>(file, {
       header: false,
       skipEmptyLines: false,
-      complete: (results) => {
+      complete: async (results) => {
         if (!isCurrentGeneration(generation)) return;
         if (results.errors.length > 0) {
           toast.error(
@@ -249,7 +254,7 @@ export function ImportForm() {
         }
         const matrix = matrixFromValues(results.data);
         setCsvMatrix(matrix);
-        setCsvAnalysis(matrix, generation);
+        await setCsvAnalysis(matrix, generation);
         if (isCurrentGeneration(generation)) setIsParsing(false);
       },
       error: (error) => {
@@ -292,13 +297,15 @@ export function ImportForm() {
       setAnalysis(data.analysis);
       setHasLegacyPasswordColumn(data.hasLegacyPasswordColumn);
       setIsTemplateWorkbook(data.isTemplateWorkbook);
-      setPhase("mapping");
-    } catch (error) {
+      if (shouldAutoContinueToPreview(data.analysis)) {
+        await previewAnalysis(data.analysis, generation);
+      } else {
+        setPhase("mapping");
+      }
+    } catch {
       if (!isCurrentGeneration(generation)) return;
       toast.error(
-        `Failed to parse Excel file: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        "We couldn't read this Excel workbook. Please verify that it is a valid .xlsx file."
       );
     } finally {
       if (isCurrentGeneration(generation)) setIsParsing(false);
@@ -358,7 +365,7 @@ export function ImportForm() {
     setHasLegacyPasswordColumn(false);
     if (csvMatrix) {
       const generation = beginAnalysisGeneration();
-      setCsvAnalysis(csvMatrix, generation, rowNumber);
+      await setCsvAnalysis(csvMatrix, generation, rowNumber);
       if (isCurrentGeneration(generation)) setIsParsing(false);
       return;
     }
@@ -367,7 +374,7 @@ export function ImportForm() {
     }
   }
 
-  function handleColumnMapping(sourceIndex: number, value: string) {
+  async function handleColumnMapping(sourceIndex: number, value: string) {
     if (!analysis) return;
     const targetField = value === "__IGNORE__" ? null : (value as ImportField);
     const updated = updateAnalysisMapping(
@@ -383,25 +390,31 @@ export function ImportForm() {
     setAnalysis(updated.analysis);
     setRows([]);
     setPreparedRows([]);
+    if (shouldAutoContinueToPreview(updated.analysis)) {
+      await previewAnalysis(updated.analysis);
+    }
   }
 
-  async function continueToPreview() {
-    if (!analysis || analysis.mappingStatus !== "READY") {
+  async function previewAnalysis(
+    nextAnalysis: ImportMatrixAnalysis,
+    generation = beginAnalysisGeneration()
+  ) {
+    if (!shouldAutoContinueToPreview(nextAnalysis)) {
       toast.error("Map every required H-Auto field before continuing.");
       return;
     }
-    const mapped = mapSourceRows(analysis);
+    const mapped = mapSourceRows(nextAnalysis);
     const payload: ServerImportRow[] = mapped.map((row) => ({
       rowNumber: row.rowNumber,
       raw: row.raw,
       parsingErrors: row.parsingErrors,
     }));
-    const generation = beginAnalysisGeneration();
     try {
       const response = await preflightImport(importType, payload);
       if (!isCurrentGeneration(generation)) return;
       if ("error" in response) {
         toast.error(response.error);
+        setPhase("mapping");
         return;
       }
       setRows(
@@ -412,14 +425,32 @@ export function ImportForm() {
         }))
       );
       setPreparedRows(payload);
-      setHasLegacyPasswordColumn(analysis.hasLegacyPasswordColumn);
+      setHasLegacyPasswordColumn(nextAnalysis.hasLegacyPasswordColumn);
       setPhase("preview");
     } catch {
       if (isCurrentGeneration(generation)) {
         toast.error("Could not validate these rows. Please try again.");
+        setPhase("mapping");
       }
     } finally {
       if (isCurrentGeneration(generation)) setIsParsing(false);
+    }
+  }
+
+  async function continueToPreview() {
+    if (!analysis) {
+      toast.error("Map every required H-Auto field before continuing.");
+      return;
+    }
+    await previewAnalysis(analysis);
+  }
+
+  async function handleResetMapping() {
+    if (!analysis) return;
+    const reset = resetAnalysisMapping(analysis, importType);
+    setAnalysis(reset);
+    if (shouldAutoContinueToPreview(reset)) {
+      await previewAnalysis(reset);
     }
   }
 
@@ -563,7 +594,8 @@ export function ImportForm() {
                 {isParsing ? "Reading file..." : "Click to upload a CSV or Excel file"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                You&apos;ll review column mapping before the row preview
+                Supported columns are detected automatically. Mapping appears
+                only when required fields need your review.
               </p>
             </label>
           </CardContent>
@@ -725,7 +757,7 @@ export function ImportForm() {
                       <Select
                         value={selectValue}
                         onValueChange={(value) =>
-                          handleColumnMapping(column.sourceIndex, value)
+                          void handleColumnMapping(column.sourceIndex, value)
                         }
                       >
                         <SelectTrigger
@@ -786,7 +818,7 @@ export function ImportForm() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => setAnalysis(resetAnalysisMapping(analysis, importType))}
+                  onClick={() => void handleResetMapping()}
                   disabled={isParsing}
                 >
                   Reset automatic mapping

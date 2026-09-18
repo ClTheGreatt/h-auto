@@ -37,6 +37,9 @@ export type ParseExcelSuccess = {
 export type ParseExcelResult = ParseExcelSuccess | { error: string };
 export type ParseExcelResponse = Omit<ParseExcelSuccess, "rows">;
 
+export const EXCEL_PARSE_ERROR_MESSAGE =
+  "We couldn't read this Excel workbook. Please verify that it is a valid .xlsx file.";
+
 export type ParseExcelOptions = {
   selectedSheet?: string;
   selectedHeaderRow?: number;
@@ -218,7 +221,11 @@ export async function parseExcelImportFile(
   }
   try {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    // Route uploads arrive as Web ArrayBuffers. Normalize to the Node Buffer
+    // accepted by ExcelJS's public load API before it enters the OOXML parser.
+    // This avoids relying on producer/runtime-specific ArrayBuffer handling.
+    const workbookBuffer = Buffer.from(buffer);
+    await workbook.xlsx.load(workbookBuffer as never);
 
     const visibleSheets = workbook.worksheets.filter(
       (sheet) => sheet.state === "visible"
@@ -348,10 +355,7 @@ export async function parseExcelImportFile(
 
     return ambiguousResult(candidates, null);
   } catch (err) {
-    return {
-      error: `Failed to parse Excel file: ${
-        err instanceof Error ? err.message : "Unknown error"
-      }`,
-    };
+    console.error("Failed to parse Excel import workbook.", err);
+    return { error: EXCEL_PARSE_ERROR_MESSAGE };
   }
 }

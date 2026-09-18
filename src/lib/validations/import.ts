@@ -4,12 +4,9 @@ import {
   DEPARTMENTS,
   FACULTY_POSITIONS,
   FACULTY_ID_REGEX,
-  STUDENT_ID_REGEX,
   IMPORT_PHONE_REGEX,
   IMPORT_TYPES,
   MAX_IMPORT_TEXT_LENGTH,
-  studentIdPrefixRange,
-  isValidStudentIdPrefix,
   enumMismatchMessage,
   validateStudentAcademicFields,
   type ImportRowType,
@@ -46,8 +43,6 @@ const baseRow = {
     .transform((email) => email.toLowerCase()),
   phoneNumber: importPhone,
 };
-
-const { min: studentIdMin, max: studentIdMax } = studentIdPrefixRange();
 
 // Messages below are self-contained (no "see Instructions sheet" pointers) —
 // the user has usually already closed the file by the time they read them.
@@ -98,23 +93,11 @@ export const studentImportRowSchema = z
     section: boundedText.min(1, "section is required"),
   })
   .superRefine((data, ctx) => {
-    if (data.idNumber) {
-      if (!STUDENT_ID_REGEX.test(data.idNumber)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["idNumber"],
-          message: "idNumber must be in format 12-34567, e.g. 23-04567",
-        });
-      } else if (!isValidStudentIdPrefix(data.idNumber)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["idNumber"],
-          message: `idNumber prefix must be between ${studentIdMin} and ${studentIdMax}`,
-        });
-      }
-    }
     // Shared academic helper is also consumed by normal Add/Edit User
     // validation, preventing the import path from developing its own rules.
+    // The Zod object above owns required-field presence. The shared helper
+    // contributes only format and cross-field academic semantics here, so a
+    // blank field cannot surface two equivalent "required" messages.
     for (const issue of validateStudentAcademicFields(data)) {
       ctx.addIssue({
         code: "custom",

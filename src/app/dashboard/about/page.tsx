@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { CURRENT_ACADEMIC_YEAR } from "@/lib/constants/user-import";
 
 // EDIT: Replace with your actual team members
 const TEAM = [
@@ -206,7 +207,7 @@ export default function AboutPage() {
                 Bachelor of Science in Information Technology
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Academic Year 2025-2026
+                Academic Year {CURRENT_ACADEMIC_YEAR}
               </p>
             </div>
           </div>
@@ -314,7 +315,7 @@ export default function AboutPage() {
 
       {/* Footer */}
       <div className="text-center text-sm text-muted-foreground pt-4 pb-8">
-        <p>AY 2025-2026</p>
+        <p>AY {CURRENT_ACADEMIC_YEAR}</p>
         <p className="mt-1">© 2026 H-Auto Development Team</p>
         <p className="mt-1">Bataan Peninsula State University</p>
       </div>
