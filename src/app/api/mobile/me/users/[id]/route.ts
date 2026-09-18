@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser } from "@/lib/mobile-auth";
 import { isInactivePrefixed, stripInactivePrefix } from "@/lib/users/inactive-prefix";
+import {
+  applyUserUpdateWithStudentAssignmentLifecycle,
+  runStudentAssignmentLifecycleTransaction,
+} from "@/lib/users/student-assignment-lifecycle";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -129,74 +133,92 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const target = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true, role: true, status: true, email: true },
-    });
-    if (!target) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Same permission rules as creating: nobody manages SUPER_ADMIN from mobile,
-    // and only SUPER_ADMIN can manage ADMIN accounts.
-    if (target.role === "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Super Admin accounts can't be managed from mobile" },
-        { status: 403 }
-      );
-    }
-    if (target.role === "ADMIN" && actor.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Only Super Admins can manage Admin accounts" },
-        { status: 403 }
-      );
-    }
-
-    // Reactivation: INACTIVE -> ACTIVE. Mirrors updateUser()'s email-restore
-    // logic (src/actions/users.ts) — deactivateUser() prefixed the email to
-    // free the unique constraint, so reactivating must strip it back off.
-    // Unlike the web edit form, this PATCH body never carries an email
-    // field, so the prefixed value is always read from the stored record
-    // itself (target.email), never from client input.
-    const isReactivating = target.status === "INACTIVE" && status === "ACTIVE";
-    const updateData: Record<string, unknown> = { status };
-
-    if (isReactivating && isInactivePrefixed(target.email)) {
-      const finalEmail = stripInactivePrefix(target.email);
-
-      const conflict = await prisma.user.findFirst({
-        where: {
-          email: { equals: finalEmail, mode: "insensitive" },
-          id: { not: id },
-          status: "ACTIVE",
-        },
+    const transitionAt = new Date();
+    const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
+      const target = await tx.user.findUnique({
+        where: { id },
+        select: { id: true, role: true, status: true, email: true },
       });
-
-      if (conflict) {
-        return NextResponse.json(
-          {
-            error: `Cannot reactivate: another active user (${conflict.firstName} ${conflict.lastName}) is using ${finalEmail}.`,
-          },
-          { status: 409 }
-        );
+      if (!target) {
+        return { error: "User not found", statusCode: 404 } as const;
       }
 
-      updateData.email = finalEmail;
-    }
+      // Same permission rules as creating: nobody manages SUPER_ADMIN from mobile,
+      // and only SUPER_ADMIN can manage ADMIN accounts.
+      if (target.role === "SUPER_ADMIN") {
+        return {
+          error: "Super Admin accounts can't be managed from mobile",
+          statusCode: 403,
+        } as const;
+      }
+      if (target.role === "ADMIN" && actor.role !== "SUPER_ADMIN") {
+        return {
+          error: "Only Super Admins can manage Admin accounts",
+          statusCode: 403,
+        } as const;
+      }
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-      },
+      // Reactivation restores a prefixed email but never restores historical
+      // assignments. The lifecycle helper acts only on eligibility loss.
+      const isReactivating =
+        target.status === "INACTIVE" && status === "ACTIVE";
+      const updateData: Record<string, unknown> = { status };
+
+      if (isReactivating && isInactivePrefixed(target.email)) {
+        const finalEmail = stripInactivePrefix(target.email);
+        const conflict = await tx.user.findFirst({
+          where: {
+            email: { equals: finalEmail, mode: "insensitive" },
+            id: { not: id },
+            status: "ACTIVE",
+          },
+        });
+
+        if (conflict) {
+          return {
+            error: `Cannot reactivate: another active user (${conflict.firstName} ${conflict.lastName}) is using ${finalEmail}.`,
+            statusCode: 409,
+          } as const;
+        }
+
+        updateData.email = finalEmail;
+      }
+
+      if (status === "INACTIVE" || isReactivating) {
+        updateData.tokenVersion = { increment: 1 };
+      }
+
+      const { user } = await applyUserUpdateWithStudentAssignmentLifecycle(
+        {
+          current: target,
+          next: { role: target.role, status },
+          transitionAt,
+        },
+        tx,
+        () =>
+          tx.user.update({
+            where: { id },
+            data: updateData,
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              status: true,
+            },
+          })
+      );
+
+      return { user };
     });
 
-    return NextResponse.json({ user: updated });
+    if ("error" in result) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.statusCode }
+      );
+    }
+    return NextResponse.json({ user: result.user });
   } catch (error) {
     console.error("[mobile/me/users/[id] PATCH] error:", error);
     return NextResponse.json(

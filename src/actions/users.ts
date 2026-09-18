@@ -23,6 +23,11 @@ import {
   resultingFacultyAdvisoryError,
   resultingUserAcademicState,
 } from "@/lib/academics/cohort-integrity";
+import {
+  applyUserUpdateWithStudentAssignmentLifecycle,
+  completeActiveAssignmentsForStudents,
+  runStudentAssignmentLifecycleTransaction,
+} from "@/lib/users/student-assignment-lifecycle";
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (adviser
 // request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema. Web
@@ -70,7 +75,8 @@ function handlePrismaError(error: unknown): { error: string } | null {
 // unrelated field edit) costs nothing extra.
 async function wouldLeaveNoActiveSuperAdmin(
   target: { role: UserRole; status: UserStatus },
-  next: { role?: UserRole; status?: UserStatus }
+  next: { role?: UserRole; status?: UserStatus },
+  client: Pick<Prisma.TransactionClient, "user"> = prisma
 ): Promise<boolean> {
   const losingMembership =
     target.role === "SUPER_ADMIN" &&
@@ -80,7 +86,7 @@ async function wouldLeaveNoActiveSuperAdmin(
 
   if (!losingMembership) return false;
 
-  const activeSuperAdminCount = await prisma.user.count({
+  const activeSuperAdminCount = await client.user.count({
     where: { role: "SUPER_ADMIN", status: "ACTIVE" },
   });
   return activeSuperAdminCount <= 1;
@@ -335,8 +341,57 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     updateData.tokenVersion = { increment: 1 };
   }
 
+  const transitionAt = new Date();
   try {
-    await prisma.user.update({ where: { id }, data: updateData });
+    const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
+      const authoritativeUser = await tx.user.findUnique({
+        where: { id },
+        select: { id: true, role: true, status: true },
+      });
+      if (!authoritativeUser) return { error: "User not found" };
+
+      if (!canManageUser(session.user.role, authoritativeUser.role)) {
+        return {
+          error: "Only a Super Admin can manage Admin or Super Admin accounts.",
+        };
+      }
+      if (
+        rest.role !== authoritativeUser.role &&
+        !canAssignRole(session.user.role, rest.role)
+      ) {
+        return {
+          error: "Only a Super Admin can assign Admin or Super Admin roles.",
+        };
+      }
+      if (
+        await wouldLeaveNoActiveSuperAdmin(
+          authoritativeUser,
+          { status: rest.status, role: rest.role },
+          tx
+        )
+      ) {
+        return {
+          error:
+            "Cannot deactivate or demote the last remaining Super Admin. Promote another account to Super Admin first.",
+        };
+      }
+
+      await applyUserUpdateWithStudentAssignmentLifecycle(
+        {
+          current: authoritativeUser,
+          next: { role: rest.role, status: rest.status },
+          transitionAt,
+        },
+        tx,
+        () => tx.user.update({ where: { id }, data: updateData })
+      );
+
+      return { success: true as const };
+    });
+
+    if ("error" in result && result.error) {
+      return { error: result.error };
+    }
   } catch (error) {
     const friendly = handlePrismaError(error);
     if (friendly) return friendly;
@@ -346,6 +401,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 
   revalidatePath("/dashboard/users");
   revalidatePath(`/dashboard/users/${id}`);
+  revalidatePath("/dashboard/assignments");
   return { success: true };
 }
 
@@ -423,16 +479,58 @@ export async function deactivateUser(id: string) {
   // the unique constraint on email blocks re-signup under the same address.
   // Also bump tokenVersion to invalidate any session/token this account
   // currently holds.
-  const inactiveEmail = `inactive_${Date.now()}_${target.email}`;
+  const transitionAt = new Date();
   try {
-    await prisma.user.update({
-      where: { id },
-      data: {
-        status: "INACTIVE",
-        email: inactiveEmail,
-        tokenVersion: { increment: 1 },
-      },
+    const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
+      const authoritativeUser = await tx.user.findUnique({
+        where: { id },
+        select: { id: true, email: true, role: true, status: true },
+      });
+      if (!authoritativeUser) return { error: "User not found" };
+
+      if (!canManageUser(session.user.role, authoritativeUser.role)) {
+        return {
+          error: "Only a Super Admin can manage Admin or Super Admin accounts.",
+        };
+      }
+      if (
+        await wouldLeaveNoActiveSuperAdmin(
+          authoritativeUser,
+          { status: "INACTIVE" },
+          tx
+        )
+      ) {
+        return {
+          error:
+            "Cannot deactivate the last remaining Super Admin. Promote another account to Super Admin first.",
+        };
+      }
+
+      const inactiveEmail = `inactive_${transitionAt.getTime()}_${authoritativeUser.email}`;
+      await applyUserUpdateWithStudentAssignmentLifecycle(
+        {
+          current: authoritativeUser,
+          next: { role: authoritativeUser.role, status: "INACTIVE" },
+          transitionAt,
+        },
+        tx,
+        () =>
+          tx.user.update({
+            where: { id },
+            data: {
+              status: "INACTIVE",
+              email: inactiveEmail,
+              tokenVersion: { increment: 1 },
+            },
+          })
+      );
+
+      return { success: true as const };
     });
+
+    if ("error" in result && result.error) {
+      return { error: result.error };
+    }
   } catch (error) {
     console.error("deactivateUser error:", error);
     return {
@@ -442,6 +540,7 @@ export async function deactivateUser(id: string) {
   }
 
   revalidatePath("/dashboard/users");
+  revalidatePath("/dashboard/assignments");
   return {
     success: true,
     mode: "deactivated",
@@ -452,8 +551,8 @@ export async function deactivateUser(id: string) {
 /**
  * Bulk, reversible graduation — the Student Farmer counterpart to
  * harvestPlot/unharvestPlot. Graduation is orthogonal to `status`; this
- * never touches status and never cascades (growth logs, plot assignments,
- * alerts all stay intact).
+ * never touches status. ACTIVE assignments are completed while their
+ * historical fields, growth logs, alerts, and other history stay intact.
  *
  * All-or-nothing: any id that isn't a not-yet-graduated STUDENT_FARMER
  * rejects the whole batch, rather than silently applying to a subset. In
@@ -468,34 +567,47 @@ export async function graduateStudents(userIds: string[], graduatedAt: Date) {
     return { error: "No students selected" };
   }
 
-  const matched = await prisma.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, role: true, graduatedAt: true },
-  });
+  try {
+    const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
+      const matched = await tx.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, role: true, graduatedAt: true },
+      });
 
-  if (matched.length !== userIds.length) {
-    return { error: "One or more selected users could not be found." };
-  }
-  if (matched.some((u) => u.role !== "STUDENT_FARMER")) {
-    return { error: "Only student farmers can be marked as graduated." };
-  }
-  if (matched.some((u) => u.graduatedAt)) {
-    return { error: "One or more selected students are already graduated." };
-  }
+      if (matched.length !== userIds.length) {
+        return { error: "One or more selected users could not be found." };
+      }
+      if (matched.some((u) => u.role !== "STUDENT_FARMER")) {
+        return { error: "Only student farmers can be marked as graduated." };
+      }
+      if (matched.some((u) => u.graduatedAt)) {
+        return { error: "One or more selected students are already graduated." };
+      }
 
-  await prisma.user.updateMany({
-    where: { id: { in: userIds } },
-    data: {
-      graduatedAt,
-      // Belt-and-suspenders: graduatedAt itself is already checked at every
-      // revocation checkpoint (auth.ts / mobile-auth.ts), but bumping this
-      // too matches the existing "state change that should kill sessions"
-      // convention used for deactivation/password changes.
-      tokenVersion: { increment: 1 },
-    },
-  });
+      await tx.user.updateMany({
+        where: { id: { in: userIds } },
+        data: {
+          graduatedAt,
+          // graduatedAt is checked at every auth revocation checkpoint; the
+          // token bump preserves the existing immediate-session invalidation.
+          tokenVersion: { increment: 1 },
+        },
+      });
+      await completeActiveAssignmentsForStudents(tx, userIds, graduatedAt);
+
+      return { success: true as const };
+    });
+
+    if ("error" in result && result.error) {
+      return { error: result.error };
+    }
+  } catch (error) {
+    console.error("graduateStudents error:", error);
+    return { error: "Failed to graduate students. Please try again." };
+  }
 
   revalidatePath("/dashboard/users");
+  revalidatePath("/dashboard/assignments");
   return { success: true, count: userIds.length };
 }
 
