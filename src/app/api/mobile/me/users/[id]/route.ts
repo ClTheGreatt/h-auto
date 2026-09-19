@@ -6,6 +6,7 @@ import {
   applyUserUpdateWithStudentAssignmentLifecycle,
   runStudentAssignmentLifecycleTransaction,
 } from "@/lib/users/student-assignment-lifecycle";
+import { validateFacultyOperationalTransition } from "@/lib/users/faculty-operational-integrity";
 
 function isAdmin(role: string) {
   return role === "ADMIN" || role === "SUPER_ADMIN";
@@ -137,7 +138,13 @@ export async function PATCH(
     const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
       const target = await tx.user.findUnique({
         where: { id },
-        select: { id: true, role: true, status: true, email: true },
+        select: {
+          id: true,
+          role: true,
+          status: true,
+          email: true,
+          department: true,
+        },
       });
       if (!target) {
         return { error: "User not found", statusCode: 404 } as const;
@@ -156,6 +163,19 @@ export async function PATCH(
           error: "Only Super Admins can manage Admin accounts",
           statusCode: 403,
         } as const;
+      }
+
+      const facultyValidation = await validateFacultyOperationalTransition(
+        target,
+        {
+          role: target.role,
+          status,
+          department: target.department,
+        },
+        tx
+      );
+      if (!facultyValidation.ok) {
+        return { error: facultyValidation.error, statusCode: 409 } as const;
       }
 
       // Reactivation restores a prefixed email but never restores historical

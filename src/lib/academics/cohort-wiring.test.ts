@@ -131,11 +131,15 @@ test("legacy advisory presentation stays visible and explicitly reviewable", () 
 
 test("user updates validate the resulting Faculty role without deleting advisories", () => {
   const usersAction = source("src", "actions", "users.ts");
-  assert.match(usersAction, /resultingUserAcademicState\(existingUser,/);
   assert.match(
     usersAction,
-    /if \(resultingAcademicState\.role === "FACULTY"\)/
+    /resultingUserAcademicState\(\s*authoritativeUser,/
   );
+  assert.match(
+    usersAction,
+    /if \(authoritativeAcademicState\.role === "FACULTY"\)/
+  );
+  assert.match(usersAction, /tx\.facultySectionAdvisory\.findMany/);
   assert.match(usersAction, /resultingFacultyAdvisoryError\(/);
   assert.doesNotMatch(usersAction, /facultySectionAdvisory\.delete/);
 });

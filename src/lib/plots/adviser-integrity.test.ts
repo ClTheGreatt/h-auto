@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Prisma, type UserRole, type UserStatus } from "@prisma/client";
+import {
+  Prisma,
+  type PlotStatus,
+  type UserRole,
+  type UserStatus,
+} from "@prisma/client";
 import {
   ACTIVE_ASSIGNMENTS_REQUIRE_ADVISER_ERROR,
   applyPlotUpdateWithAdviserIntegrity,
@@ -34,7 +39,7 @@ type Assignment = {
 };
 
 type Scenario = {
-  plot: { facultyId: string | null } | null;
+  plot: { facultyId: string | null; status?: PlotStatus } | null;
   assignments: Assignment[];
   faculty: Faculty | null;
 };
@@ -86,7 +91,9 @@ function clientFor(
     plot: {
       findUnique: async () => {
         counts.plots += 1;
-        return scenario.plot;
+        return scenario.plot
+          ? { ...scenario.plot, status: scenario.plot.status ?? "GROWING" }
+          : null;
       },
     },
     plotAssignment: {

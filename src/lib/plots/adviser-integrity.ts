@@ -1,5 +1,6 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type PlotStatus } from "@prisma/client";
 import { canFacultyAdviseCohort } from "@/lib/auth/section-access";
+import { isActivityPlotStatus } from "@/lib/plots/lifecycle";
 import { prisma } from "@/lib/prisma";
 
 export const INELIGIBLE_PLOT_ADVISER_ERROR =
@@ -8,6 +9,8 @@ export const ACTIVE_ASSIGNMENTS_REQUIRE_ADVISER_ERROR =
   "This plot has active student assignments and must have an eligible faculty adviser.";
 export const INCOMPATIBLE_PLOT_ADVISER_ERROR =
   "The selected adviser is not assigned to all active student courses and sections on this plot.";
+export const INELIGIBLE_ACTIVITY_ENTRY_ADVISER_ERROR =
+  "The plot's current adviser is not eligible. Assign an active faculty adviser before returning this plot to active use.";
 
 export type PlotAdviserIntegrityClient = Pick<
   Prisma.TransactionClient,
@@ -59,7 +62,8 @@ export async function runPlotAdviserTransaction<T>(
 
 async function validateSelectedAdviser(
   facultyId: string,
-  client: Pick<PlotAdviserIntegrityClient, "user">
+  client: Pick<PlotAdviserIntegrityClient, "user">,
+  ineligibleError = INELIGIBLE_PLOT_ADVISER_ERROR
 ): Promise<AdviserIntegrityResult> {
   const adviser = await client.user.findUnique({
     where: { id: facultyId },
@@ -71,7 +75,7 @@ async function validateSelectedAdviser(
     adviser.role !== "FACULTY" ||
     adviser.status !== "ACTIVE"
   ) {
-    return { ok: false, error: INELIGIBLE_PLOT_ADVISER_ERROR };
+    return { ok: false, error: ineligibleError };
   }
 
   return { ok: true };
@@ -89,23 +93,50 @@ export async function validatePlotAdviserChange(
   {
     plotId,
     proposedFacultyId,
+    resultingStatus,
   }: {
     plotId: string;
     proposedFacultyId: string | null;
+    resultingStatus?: PlotStatus;
   },
   client: PlotAdviserIntegrityClient
 ): Promise<AdviserIntegrityResult> {
   const plot = await client.plot.findUnique({
     where: { id: plotId },
-    select: { facultyId: true },
+    select: { facultyId: true, status: true },
   });
   if (!plot) return { ok: false, error: "Plot not found" };
+
+  const enteringActivity =
+    resultingStatus !== undefined &&
+    !isActivityPlotStatus(plot.status) &&
+    isActivityPlotStatus(resultingStatus);
 
   // An ordinary edit with no adviser change must not be blocked by legacy
   // assignment state. A real change cannot disguise itself because both IDs
   // come from authoritative database/input values inside this transaction.
-  if (plot.facultyId === proposedFacultyId) return { ok: true };
+  // Activity re-entry is deliberately not an ordinary edit: the retained
+  // adviser must be revalidated even when its ID is unchanged.
+  if (plot.facultyId === proposedFacultyId && !enteringActivity) {
+    return { ok: true };
+  }
 
+  return validateAdviserForActiveAssignments(
+    plotId,
+    proposedFacultyId,
+    client,
+    enteringActivity
+      ? INELIGIBLE_ACTIVITY_ENTRY_ADVISER_ERROR
+      : INELIGIBLE_PLOT_ADVISER_ERROR
+  );
+}
+
+async function validateAdviserForActiveAssignments(
+  plotId: string,
+  proposedFacultyId: string | null,
+  client: PlotAdviserIntegrityClient,
+  ineligibleError: string
+): Promise<AdviserIntegrityResult> {
   const activeAssignments = await client.plotAssignment.findMany({
     where: { plotId, status: "ACTIVE" },
     select: {
@@ -123,7 +154,8 @@ export async function validatePlotAdviserChange(
 
   const selectedAdviser = await validateSelectedAdviser(
     proposedFacultyId,
-    client
+    client,
+    ineligibleError
   );
   if (!selectedAdviser.ok) return selectedAdviser;
 
@@ -156,8 +188,54 @@ export async function validatePlotAdviserChange(
   return { ok: true };
 }
 
+export async function validatePlotActivityEntry(
+  {
+    plotId,
+    resultingStatus,
+  }: {
+    plotId: string;
+    resultingStatus: PlotStatus;
+  },
+  client: PlotAdviserIntegrityClient
+): Promise<AdviserIntegrityResult> {
+  const plot = await client.plot.findUnique({
+    where: { id: plotId },
+    select: { facultyId: true, status: true },
+  });
+  if (!plot) return { ok: false, error: "Plot not found" };
+
+  if (
+    isActivityPlotStatus(plot.status) ||
+    !isActivityPlotStatus(resultingStatus)
+  ) {
+    return { ok: true };
+  }
+
+  return validateAdviserForActiveAssignments(
+    plotId,
+    plot.facultyId,
+    client,
+    INELIGIBLE_ACTIVITY_ENTRY_ADVISER_ERROR
+  );
+}
+
+export async function applyPlotActivityEntryWithIntegrity<T>(
+  input: { plotId: string; resultingStatus: PlotStatus },
+  client: PlotAdviserIntegrityClient,
+  update: () => Promise<T>
+): Promise<AdviserIntegrityFailure | { ok: true; value: T }> {
+  const validation = await validatePlotActivityEntry(input, client);
+  if (!validation.ok) return validation;
+
+  return { ok: true, value: await update() };
+}
+
 export async function applyPlotUpdateWithAdviserIntegrity<T>(
-  input: { plotId: string; proposedFacultyId: string | null },
+  input: {
+    plotId: string;
+    proposedFacultyId: string | null;
+    resultingStatus?: PlotStatus;
+  },
   client: PlotAdviserIntegrityClient,
   update: () => Promise<T>
 ): Promise<AdviserIntegrityFailure | { ok: true; value: T }> {

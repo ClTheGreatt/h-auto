@@ -28,6 +28,11 @@ import {
   completeActiveAssignmentsForStudents,
   runStudentAssignmentLifecycleTransaction,
 } from "@/lib/users/student-assignment-lifecycle";
+import { validateFacultyOperationalTransition } from "@/lib/users/faculty-operational-integrity";
+import {
+  applyUserUpdateWithStudentCohortIntegrity,
+  canonicalStudentCohortValues,
+} from "@/lib/users/student-cohort-integrity";
 
 // STUDENT_FARMER / FACULTY get strict, role-specific validation (adviser
 // request). Other roles (ADMIN/SUPER_ADMIN) keep the lenient schema. Web
@@ -236,7 +241,25 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     };
   }
 
-  const academicUpdate = validateStudentAcademicUpdate(existingUser, rest);
+  const canonicalExistingStudentCohort =
+    canonicalStudentCohortValues(existingUser);
+  const currentAcademicInput =
+    existingUser.role === "STUDENT_FARMER"
+      ? { ...existingUser, ...canonicalExistingStudentCohort }
+      : existingUser;
+  const canonicalStudentCohort = canonicalStudentCohortValues(rest);
+  const finalAcademicInput =
+    rest.role === "STUDENT_FARMER"
+      ? {
+          ...rest,
+          course: canonicalStudentCohort.course,
+          section: canonicalStudentCohort.section,
+        }
+      : rest;
+  const academicUpdate = validateStudentAcademicUpdate(
+    currentAcademicInput,
+    finalAcademicInput
+  );
   if (academicUpdate.issues.length > 0) {
     const fieldErrors: Record<string, string[]> = {};
     for (const issue of academicUpdate.issues) {
@@ -249,19 +272,14 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     role: rest.role,
     department: rest.department,
   });
-  if (resultingAcademicState.role === "FACULTY") {
-    const advisories = await prisma.facultySectionAdvisory.findMany({
-      where: { facultyId: id },
-      select: { course: true },
-    });
-    const advisoryError = resultingFacultyAdvisoryError(
-      resultingAcademicState.role,
-      resultingAcademicState.department,
-      advisories
-    );
-    if (advisoryError) return { error: advisoryError };
-  }
-
+  const resultingCourse =
+    rest.role === "STUDENT_FARMER"
+      ? canonicalStudentCohort.course
+      : rest.course || null;
+  const resultingSection =
+    rest.role === "STUDENT_FARMER"
+      ? canonicalStudentCohort.section
+      : rest.section || null;
   const updateData: Record<string, unknown> = {
     ...rest,
     middleName: rest.middleName || null,
@@ -271,18 +289,12 @@ export async function updateUser(id: string, input: UpdateUserInput) {
         ? (rest.idNumber ?? "").trim() || null
         : rest.idNumber || null,
     department: resultingAcademicState.department,
-    course:
-      rest.role === "STUDENT_FARMER" && academicUpdate.changed
-        ? (rest.course ?? "").trim() || null
-        : rest.course || null,
+    course: resultingCourse,
     yearLevel:
       rest.role === "STUDENT_FARMER" && academicUpdate.changed
         ? (rest.yearLevel ?? "").trim() || null
         : rest.yearLevel || null,
-    section:
-      rest.role === "STUDENT_FARMER" && academicUpdate.changed
-        ? (rest.section ?? "").trim() || null
-        : rest.section || null,
+    section: resultingSection,
     academicYear:
       rest.role === "STUDENT_FARMER" && academicUpdate.changed
         ? academicUpdate.academicYear || null
@@ -346,7 +358,14 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
       const authoritativeUser = await tx.user.findUnique({
         where: { id },
-        select: { id: true, role: true, status: true },
+        select: {
+          id: true,
+          role: true,
+          status: true,
+          department: true,
+          course: true,
+          section: true,
+        },
       });
       if (!authoritativeUser) return { error: "User not found" };
 
@@ -376,15 +395,64 @@ export async function updateUser(id: string, input: UpdateUserInput) {
         };
       }
 
-      await applyUserUpdateWithStudentAssignmentLifecycle(
+      const authoritativeAcademicState = resultingUserAcademicState(
+        authoritativeUser,
+        { role: rest.role, department: rest.department }
+      );
+      if (authoritativeAcademicState.role === "FACULTY") {
+        const advisories = await tx.facultySectionAdvisory.findMany({
+          where: { facultyId: id },
+          select: { course: true },
+        });
+        const advisoryError = resultingFacultyAdvisoryError(
+          authoritativeAcademicState.role,
+          authoritativeAcademicState.department,
+          advisories
+        );
+        if (advisoryError) return { error: advisoryError };
+      }
+
+      const facultyValidation = await validateFacultyOperationalTransition(
+        authoritativeUser,
+        {
+          role: rest.role,
+          status: rest.status,
+          department: authoritativeAcademicState.department,
+        },
+        tx
+      );
+      if (!facultyValidation.ok) return facultyValidation;
+
+      const cohortUpdate = await applyUserUpdateWithStudentCohortIntegrity(
         {
           current: authoritativeUser,
-          next: { role: rest.role, status: rest.status },
-          transitionAt,
+          next: {
+            role: rest.role,
+            status: rest.status,
+            course: resultingCourse,
+            section: resultingSection,
+          },
         },
         tx,
-        () => tx.user.update({ where: { id }, data: updateData })
+        () =>
+          applyUserUpdateWithStudentAssignmentLifecycle(
+            {
+              current: authoritativeUser,
+              next: { role: rest.role, status: rest.status },
+              transitionAt,
+            },
+            tx,
+            () =>
+              tx.user.update({
+                where: { id },
+                data: {
+                  ...updateData,
+                  department: authoritativeAcademicState.department,
+                },
+              })
+          )
       );
+      if (!cohortUpdate.ok) return cohortUpdate;
 
       return { success: true as const };
     });
@@ -484,7 +552,13 @@ export async function deactivateUser(id: string) {
     const result = await runStudentAssignmentLifecycleTransaction(async (tx) => {
       const authoritativeUser = await tx.user.findUnique({
         where: { id },
-        select: { id: true, email: true, role: true, status: true },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          department: true,
+        },
       });
       if (!authoritativeUser) return { error: "User not found" };
 
@@ -505,6 +579,17 @@ export async function deactivateUser(id: string) {
             "Cannot deactivate the last remaining Super Admin. Promote another account to Super Admin first.",
         };
       }
+
+      const facultyValidation = await validateFacultyOperationalTransition(
+        authoritativeUser,
+        {
+          role: authoritativeUser.role,
+          status: "INACTIVE",
+          department: authoritativeUser.department,
+        },
+        tx
+      );
+      if (!facultyValidation.ok) return facultyValidation;
 
       const inactiveEmail = `inactive_${transitionAt.getTime()}_${authoritativeUser.email}`;
       await applyUserUpdateWithStudentAssignmentLifecycle(

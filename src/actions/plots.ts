@@ -7,6 +7,7 @@ import { plotSchema, type PlotFormValues } from "@/lib/validations/plot";
 import { FORM_EDITABLE_PLOT_STATUSES } from "@/lib/plots/lifecycle";
 import { applyPlotTransitionEffects } from "@/lib/plots/transition-effects";
 import {
+  applyPlotActivityEntryWithIntegrity,
   applyPlotUpdateWithAdviserIntegrity,
   runPlotAdviserTransaction,
   validateNewPlotAdviser,
@@ -74,28 +75,49 @@ export async function updatePlot(id: string, input: PlotFormValues) {
   // with the current status so a normal save round-trips it unchanged, and
   // a request that claims otherwise is treated as tampered, not honored.
   const statusIsLocked = !FORM_EDITABLE_PLOT_STATUSES.includes(existing.status);
-  let nextStatus = existing.status;
-  if (!statusIsLocked) {
-    if (!FORM_EDITABLE_PLOT_STATUSES.includes(data.status)) {
-      return {
-        error: "Use the dedicated Harvest or Archive action to set that status.",
-      };
-    }
-    nextStatus = data.status;
+  if (!statusIsLocked && !FORM_EDITABLE_PLOT_STATUSES.includes(data.status)) {
+    return {
+      error: "Use the dedicated Harvest or Archive action to set that status.",
+    };
   }
 
   const transitionedAt = new Date();
   const proposedFacultyId = data.facultyId || null;
   const result = await runPlotAdviserTransaction(async (tx) => {
+    const authoritativeExisting = await tx.plot.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!authoritativeExisting) {
+      return { ok: false as const, error: "Plot not found" };
+    }
+
+    const authoritativeStatusIsLocked =
+      !FORM_EDITABLE_PLOT_STATUSES.includes(authoritativeExisting.status);
+    let authoritativeNextStatus = authoritativeExisting.status;
+    if (!authoritativeStatusIsLocked) {
+      if (!FORM_EDITABLE_PLOT_STATUSES.includes(data.status)) {
+        return {
+          ok: false as const,
+          error: "Use the dedicated Harvest or Archive action to set that status.",
+        };
+      }
+      authoritativeNextStatus = data.status;
+    }
+
     return applyPlotUpdateWithAdviserIntegrity(
-      { plotId: id, proposedFacultyId },
+      {
+        plotId: id,
+        proposedFacultyId,
+        resultingStatus: authoritativeNextStatus,
+      },
       tx,
       async () => {
         const effects = await applyPlotTransitionEffects({
           client: tx,
           plotId: id,
-          previousStatus: existing.status,
-          nextStatus,
+          previousStatus: authoritativeExisting.status,
+          nextStatus: authoritativeNextStatus,
           transitionedAt,
         });
         await tx.plot.update({
@@ -109,7 +131,7 @@ export async function updatePlot(id: string, input: PlotFormValues) {
             currentStageId: data.currentStageId || null,
             plantingDate: parseDate(data.plantingDate),
             expectedHarvest: parseDate(data.expectedHarvest),
-            status: nextStatus,
+            status: authoritativeNextStatus,
           },
         });
         return effects;
@@ -179,16 +201,27 @@ export async function archivePlot(id: string) {
 export async function restorePlot(id: string) {
   await requireAdmin();
 
-  const plot = await prisma.plot.findUnique({ where: { id } });
-  if (!plot) return { error: "Plot not found" };
-  if (plot.status !== "ARCHIVED") {
-    return { error: "Plot is not archived" };
-  }
+  const result = await runPlotAdviserTransaction(async (tx) => {
+    const plot = await tx.plot.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!plot) return { ok: false as const, error: "Plot not found" };
+    if (plot.status !== "ARCHIVED") {
+      return { ok: false as const, error: "Plot is not archived" };
+    }
 
-  await prisma.plot.update({
-    where: { id },
-    data: { status: "PREPARING", archivedAt: null },
+    return applyPlotActivityEntryWithIntegrity(
+      { plotId: id, resultingStatus: "PREPARING" },
+      tx,
+      () =>
+        tx.plot.update({
+          where: { id },
+          data: { status: "PREPARING", archivedAt: null },
+        })
+    );
   });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/dashboard/plots");
   revalidatePath("/dashboard/plots/archived");
@@ -242,19 +275,27 @@ export async function harvestPlot(id: string) {
 export async function unharvestPlot(id: string) {
   await requireAdmin();
 
-  const plot = await prisma.plot.findUnique({
-    where: { id },
-    select: { status: true },
-  });
-  if (!plot) return { error: "Plot not found" };
-  if (plot.status !== "HARVESTED") {
-    return { error: "Plot is not harvested." };
-  }
+  const result = await runPlotAdviserTransaction(async (tx) => {
+    const plot = await tx.plot.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!plot) return { ok: false as const, error: "Plot not found" };
+    if (plot.status !== "HARVESTED") {
+      return { ok: false as const, error: "Plot is not harvested." };
+    }
 
-  await prisma.plot.update({
-    where: { id },
-    data: { status: "GROWING", harvestedAt: null },
+    return applyPlotActivityEntryWithIntegrity(
+      { plotId: id, resultingStatus: "GROWING" },
+      tx,
+      () =>
+        tx.plot.update({
+          where: { id },
+          data: { status: "GROWING", harvestedAt: null },
+        })
+    );
   });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/dashboard/plots");
   revalidatePath("/dashboard/plots/archived");

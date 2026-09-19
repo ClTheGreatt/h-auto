@@ -14,6 +14,11 @@ import {
   type AcademicCohort,
 } from "@/lib/academics/cohort-integrity";
 import { isSectionAllowedForCourse } from "@/lib/constants/user-import";
+import {
+  removedFacultyAdvisoryCohorts,
+  runFacultyOperationalTransaction,
+  validateFacultyAdvisoryRemoval,
+} from "@/lib/users/faculty-operational-integrity";
 
 type RequestedCohort = { course: string; section: string };
 
@@ -42,7 +47,7 @@ export async function setFacultyAdvisories(
   const requested = normalizeRequestedCohorts(cohorts);
   const reviewIds = [...new Set(removeReviewIds)];
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await runFacultyOperationalTransaction(async (tx) => {
     const faculty = await tx.user.findUnique({
       where: { id: facultyId },
       select: { role: true, department: true },
@@ -61,57 +66,62 @@ export async function setFacultyAdvisories(
     );
     if ("error" in plan) return { error: plan.error } as const;
 
-    if (!isCanonicalAcademicProgram(faculty.department)) {
+    const hasCanonicalDepartment = isCanonicalAcademicProgram(
+      faculty.department
+    );
+    if (!hasCanonicalDepartment) {
       if (requested.length > 0) {
         return { error: MISSING_FACULTY_DEPARTMENT_ERROR } as const;
       }
-      if (plan.reviewIdsToRemove.length > 0) {
-        await tx.facultySectionAdvisory.deleteMany({
-          where: {
-            facultyId,
-            id: { in: plan.reviewIdsToRemove },
-          },
-        });
+    } else {
+      for (const cohort of requested) {
+        const error = requestedCohortError(faculty.department, cohort);
+        if (error) return { error } as const;
       }
-      return { success: true } as const;
-    }
 
-    for (const cohort of requested) {
-      const error = requestedCohortError(faculty.department, cohort);
-      if (error) return { error } as const;
-    }
-
-    const phaseAConflict = reviewSectionConflictError(
-      requested,
-      plan.reviewRowsToKeep
-    );
-    if (phaseAConflict) return { error: phaseAConflict } as const;
-
-    if (requested.length > 0) {
-      const existingCohorts = await tx.user.findMany({
-        where: {
-          role: "STUDENT_FARMER",
-          OR: requested.map((cohort) => ({
-            course: cohort.course,
-            section: cohort.section,
-          })),
-        },
-        select: { course: true, section: true },
-        distinct: ["course", "section"],
-      });
-      const availableCohorts = existingCohorts.flatMap((cohort) =>
-        isCanonicalAcademicProgram(cohort.course) && cohort.section
-          ? [{ course: cohort.course, section: cohort.section }]
-          : []
+      const phaseAConflict = reviewSectionConflictError(
+        requested,
+        plan.reviewRowsToKeep
       );
-      const missing = missingRequestedCohort(requested, availableCohorts);
-      if (missing) {
-        return {
-          error:
-            "The selected Section does not exist for this Course / Program.",
-        } as const;
+      if (phaseAConflict) return { error: phaseAConflict } as const;
+
+      if (requested.length > 0) {
+        const existingCohorts = await tx.user.findMany({
+          where: {
+            role: "STUDENT_FARMER",
+            OR: requested.map((cohort) => ({
+              course: cohort.course,
+              section: cohort.section,
+            })),
+          },
+          select: { course: true, section: true },
+          distinct: ["course", "section"],
+        });
+        const availableCohorts = existingCohorts.flatMap((cohort) =>
+          isCanonicalAcademicProgram(cohort.course) && cohort.section
+            ? [{ course: cohort.course, section: cohort.section }]
+            : []
+        );
+        const missing = missingRequestedCohort(requested, availableCohorts);
+        if (missing) {
+          return {
+            error:
+              "The selected Section does not exist for this Course / Program.",
+          } as const;
+        }
       }
     }
+
+    const removedCohorts = removedFacultyAdvisoryCohorts(
+      existingAdvisories,
+      [...plan.reviewRowsToKeep, ...requested]
+    );
+    const removalValidation = await validateFacultyAdvisoryRemoval(
+      facultyId,
+      removedCohorts,
+      tx
+    );
+    if (!removalValidation.ok) return removalValidation;
 
     if (plan.resolvedIdsToReplace.length > 0) {
       await tx.facultySectionAdvisory.deleteMany({
@@ -126,7 +136,7 @@ export async function setFacultyAdvisories(
         },
       });
     }
-    if (requested.length > 0) {
+    if (hasCanonicalDepartment && requested.length > 0) {
       await tx.facultySectionAdvisory.createMany({
         data: requested.map((cohort) => ({ facultyId, ...cohort })),
         skipDuplicates: true,
