@@ -63,6 +63,7 @@ import {
   synchronizeCreateStudentAcademicState,
 } from "@/lib/users/create-student-academic";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
+import type { UserRole } from "@prisma/client";
 
 const { min: STUDENT_ID_MIN, max: STUDENT_ID_MAX } = studentIdPrefixRange();
 
@@ -93,6 +94,8 @@ type SimilarUser = {
 type UserFormProps = {
   mode: "create" | "edit";
   userId?: string;
+  allowedRoles: UserRole[];
+  roleReadOnly?: boolean;
   defaultValues?: Partial<FormValues>;
 };
 
@@ -103,7 +106,13 @@ const ROLE_LABELS: Record<string, string> = {
   STUDENT_FARMER: "Student Farmer",
 };
 
-export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
+export function UserForm({
+  mode,
+  userId,
+  allowedRoles,
+  roleReadOnly = false,
+  defaultValues,
+}: UserFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [similarResult, setSimilarResult] = useState<{
@@ -430,19 +439,29 @@ export function UserForm({ mode, userId, defaultValues }: UserFormProps) {
               render={({ field }) => (
                 <FormItem className="min-w-0">
                 <FormLabel>Role <RequiredMark /></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={roleReadOnly}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="FACULTY">Faculty</SelectItem>
-                      <SelectItem value="STUDENT_FARMER">Student Farmer</SelectItem>
+                      {allowedRoles.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {ROLE_LABELS[role]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {roleReadOnly && (
+                    <FormDescription className="text-xs">
+                      Only a Super Admin can manage this account role.
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

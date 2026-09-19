@@ -50,9 +50,9 @@ export type UserRow = {
   academicYear: string | null;
   graduatedAt: Date | null;
   // Resolved server-side (canManageUser) — whether the viewer is allowed to
-  // deactivate this specific account. Only ever false for an Admin/Super
-  // Admin row viewed by a plain Admin. Gates the Deactivate menu item below;
-  // the server action enforces the same rule regardless.
+  // manage this specific account. Only ever false for an Admin/Super Admin
+  // row viewed by a plain Admin. Gates the row's management menu below; the
+  // server actions enforce the same rule regardless.
   canManage: boolean;
 };
 
@@ -372,49 +372,49 @@ export function UserTableRow({
         </TableCell>
       )}
       <TableCell className="px-3 py-2 text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/users/${user.id}/edit`}>
-                <Pencil className="w-4 h-4 mr-2" />
-                Edit
-              </Link>
-            </DropdownMenuItem>
-            {user.role === "STUDENT_FARMER" && user.graduatedAt && (
-              <UngraduateStudentDialog
-                userId={user.id}
-                userName={`${user.firstName} ${user.lastName}`}
-                trigger={
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <Undo2 className="w-4 h-4 mr-2" />
-                    Un-graduate
-                  </DropdownMenuItem>
-                }
-              />
-            )}
-            {user.status === "INACTIVE" ? (
-              <ReactivateUserDialog
-                userId={user.id}
-                userName={`${user.firstName} ${user.lastName}`}
-                userEmail={user.email}
-                trigger={
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Reactivate
-                  </DropdownMenuItem>
-                }
-              />
-            ) : (
-              user.canManage && (
+        {user.canManage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/users/${user.id}/edit`}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              {user.role === "STUDENT_FARMER" && user.graduatedAt && (
+                <UngraduateStudentDialog
+                  userId={user.id}
+                  userName={`${user.firstName} ${user.lastName}`}
+                  trigger={
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <Undo2 className="w-4 h-4 mr-2" />
+                      Un-graduate
+                    </DropdownMenuItem>
+                  }
+                />
+              )}
+              {user.status === "INACTIVE" ? (
+                <ReactivateUserDialog
+                  userId={user.id}
+                  userName={`${user.firstName} ${user.lastName}`}
+                  userEmail={user.email}
+                  trigger={
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Reactivate
+                    </DropdownMenuItem>
+                  }
+                />
+              ) : (
                 <DeleteUserDialog
                   userId={user.id}
                   userName={`${user.firstName} ${user.lastName}`}
@@ -428,10 +428,10 @@ export function UserTableRow({
                     </DropdownMenuItem>
                   }
                 />
-              )
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </TableCell>
     </TableRow>
   );

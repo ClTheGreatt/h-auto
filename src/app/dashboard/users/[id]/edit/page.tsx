@@ -1,6 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-helpers";
+import {
+  assignableUserRoles,
+  canManageUser,
+  requireAdmin,
+} from "@/lib/auth-helpers";
 import { UserForm } from "@/components/users/user-form";
 import { BackButton } from "@/components/analytics/back-button";
 
@@ -9,11 +13,18 @@ export default async function EditUserPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { id } = await params;
 
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) notFound();
+
+  const canManageTarget = canManageUser(session.user.role, user.role);
+  const allowedRoles = canManageTarget
+    ? assignableUserRoles(session.user.role)
+    : [user.role];
+
+  if (!canManageTarget) redirect(`/dashboard/users/${user.id}`);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -28,6 +39,8 @@ export default async function EditUserPage({
       <UserForm
         mode="edit"
         userId={user.id}
+        allowedRoles={allowedRoles}
+        roleReadOnly={!canManageTarget}
         defaultValues={{
           firstName: user.firstName,
           middleName: user.middleName ?? "",

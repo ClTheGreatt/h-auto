@@ -31,11 +31,13 @@ export function UserDetailActionsMenu({
   userEmail: string;
   userStatus: UserStatus;
   // Resolved server-side (canManageUser) — whether the viewer is allowed to
-  // deactivate this specific account. Only ever false for an Admin/Super
-  // Admin target viewed by a plain Admin. Gates the Deactivate item below;
-  // the server action enforces the same rule regardless.
+  // manage this specific account. Only ever false for an Admin/Super Admin
+  // target viewed by a plain Admin. Gates this entire management menu; the
+  // server actions enforce the same rule regardless.
   canManage: boolean;
 }) {
+  if (!canManage) return null;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -57,21 +59,19 @@ export function UserDetailActionsMenu({
             }
           />
         ) : (
-          canManage && (
-            <DeleteUserDialog
-              userId={userId}
-              userName={userName}
-              trigger={
-                <DropdownMenuItem
-                  onSelect={(e) => e.preventDefault()}
-                  className="text-danger-text focus:text-danger-text"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Deactivate
-                </DropdownMenuItem>
-              }
-            />
-          )
+          <DeleteUserDialog
+            userId={userId}
+            userName={userName}
+            trigger={
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                className="text-danger-text focus:text-danger-text"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Deactivate
+              </DropdownMenuItem>
+            }
+          />
         )}
       </DropdownMenuContent>
     </DropdownMenu>

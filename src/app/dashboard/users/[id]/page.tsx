@@ -75,7 +75,7 @@ export default async function UserDetailPage({
 
   if (!user) notFound();
 
-  // Whether the viewer is allowed to deactivate THIS user (only a Super
+  // Whether the viewer is allowed to manage THIS user (only a Super
   // Admin may manage an Admin/Super Admin target) — resolved server-side
   // and passed down as a plain boolean, same idiom as canManageAdvisories
   // above.
@@ -151,19 +151,23 @@ export default async function UserDetailPage({
           </div>
 
           <div className="flex gap-2">
-            <Button variant="secondary" asChild>
-              <Link href={`/dashboard/users/${user.id}/edit`}>
-                <Pencil className="w-4 h-4 mr-2" />
-                Edit
-              </Link>
-            </Button>
-            <UserDetailActionsMenu
-              userId={user.id}
-              userName={fullName}
-              userEmail={user.email}
-              userStatus={user.status}
-              canManage={canManageTarget}
-            />
+            {canManageTarget && (
+              <>
+                <Button variant="secondary" asChild>
+                  <Link href={`/dashboard/users/${user.id}/edit`}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit
+                  </Link>
+                </Button>
+                <UserDetailActionsMenu
+                  userId={user.id}
+                  userName={fullName}
+                  userEmail={user.email}
+                  userStatus={user.status}
+                  canManage={canManageTarget}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>
