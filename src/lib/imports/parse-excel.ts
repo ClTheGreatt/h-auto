@@ -20,6 +20,7 @@ import {
   detectHeaderCandidates,
   mapSourceRows,
   selectDetectedHeader,
+  selectClearlySuperiorSheet,
   type ImportCell,
   type ImportMatrixAnalysis,
   type ImportMatrixRow,
@@ -98,7 +99,7 @@ function selectedSheetMatrix(
     };
   }
 
-  // At most 20 populated rows can precede/contain the header. Anything
+  // At most the bounded header-scan region can precede/contain the header. Anything
   // beyond that plus the 250-row import cap necessarily exceeds the data
   // bound, so fail before walking a large worksheet.
   if (sheet.actualRowCount > MAX_HEADER_SCAN_ROWS + MAX_IMPORT_DATA_ROWS) {
@@ -199,6 +200,7 @@ function analyzeWorksheet(
   const analyzed = analyzeImportMatrix(matrix, importType, {
     fileType: "xlsx",
     sheetName: sheet.name,
+    isOfficialTemplate: isTemplateWorkbook,
     ...(selectedHeaderRow !== undefined ? { forcedHeaderRow: selectedHeaderRow } : {}),
   });
   if ("error" in analyzed) return analyzed;
@@ -323,15 +325,16 @@ export async function parseExcelImportFile(
     const clearSheets = candidates.filter(
       (candidate) => candidate.selectedHeaderRow !== null
     );
-    if (clearSheets.length === 1) {
+    const superiorSheet = selectClearlySuperiorSheet(candidates);
+    if (superiorSheet) {
       const selected = visibleSheets.find(
-        (sheet) => sheet.name === clearSheets[0].name
+        (sheet) => sheet.name === superiorSheet.name
       )!;
       return analyzeWorksheet(
         selected,
         candidates,
         importType,
-        clearSheets[0].selectedHeaderRow!
+        superiorSheet.selectedHeaderRow!
       );
     }
 

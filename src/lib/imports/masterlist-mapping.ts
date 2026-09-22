@@ -6,9 +6,24 @@ import {
   type ImportRowType,
 } from "@/lib/constants/user-import";
 import type { ImportFileFormat } from "./file-format";
+import {
+  classifyImportDocument,
+  type DocumentIntelligence,
+} from "./document-structure";
+import {
+  extractDocumentMetadata,
+  uniqueSafeMetadataByField,
+  type DocumentMetadata,
+} from "./metadata-extractor";
+import {
+  classifyImportRows,
+  parseReviewedFullName,
+  type FullNameSuggestion,
+  type RowClassification,
+} from "./row-classifier";
 
 export const MAX_IMPORT_WORKSHEETS = 10;
-export const MAX_HEADER_SCAN_ROWS = 20;
+export const MAX_HEADER_SCAN_ROWS = 50;
 export const MAX_IMPORT_COLUMNS = 100;
 export const MAX_IMPORT_DATA_ROWS = 250;
 
@@ -64,6 +79,12 @@ export type DetectedHeader = {
   identityFieldCount: number;
   roleSpecificFieldCount: number;
   qualifies: boolean;
+  isStructuralHeader: boolean;
+  mappedFieldEvidence: string[];
+  documentEvidence: string[];
+  negativeEvidence: string[];
+  followingRecordCount: number;
+  mostlyNumericFollowingCount: number;
   duplicateHeaders: string[];
 };
 
@@ -79,6 +100,19 @@ export type ImportSourceRow = {
   cells: ImportCell[];
 };
 
+export type ImportFieldSource =
+  | {
+      kind: "DOCUMENT_METADATA";
+      value: string;
+      metadataId: string;
+    }
+  | {
+      kind: "REVIEWED_CONSTANT";
+      value: string;
+    };
+
+export type FullNameRowSuggestion = FullNameSuggestion & { rowNumber: number };
+
 export type MappingResult = {
   status: ImportMappingStatus;
   missingRequiredFields: ImportField[];
@@ -92,6 +126,13 @@ export type ImportMatrixAnalysis = {
   selectedHeaderRow: number | null;
   columns: ImportColumn[];
   sourceRows: ImportSourceRow[];
+  rowClassifications: RowClassification[];
+  skippedRowCount: number;
+  metadata: DocumentMetadata[];
+  document: DocumentIntelligence;
+  fieldSources: Partial<Record<ImportField, ImportFieldSource>>;
+  reviewedFullNameSourceIndex: number | null;
+  fullNameSuggestions: FullNameRowSuggestion[];
   mappingStatus: ImportMappingStatus;
   missingRequiredFields: ImportField[];
   hasLegacyPasswordColumn: boolean;
@@ -127,6 +168,15 @@ export function shouldAutoContinueToPreview(
   return (
     analysis?.mappingStatus === "READY" && analysis.sourceRows.length > 0
   );
+}
+
+function userStatusForMapping(
+  status: ImportMappingStatus
+): DocumentIntelligence["status"] {
+  if (status === "READY") return "READY";
+  return status === "AMBIGUOUS"
+    ? "NEEDS_REVIEW"
+    : "MISSING_REQUIRED_INFORMATION";
 }
 
 export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
@@ -168,6 +218,8 @@ const FACULTY_ALIASES: Partial<Record<FacultyImportField, readonly string[]>> = 
     "employee id",
     "employee number",
     "employee no",
+    "faculty id",
+    "instructor id",
   ],
   department: ["department", "dept"],
   position: ["position", "faculty position", "designation"],
@@ -181,6 +233,9 @@ const STUDENT_ALIASES: Partial<Record<StudentImportField, readonly string[]>> = 
     "id no",
     "student number",
     "student no",
+    "student id",
+    "school id",
+    "learner id",
   ],
   academicYear: ["academicYear", "academic year"],
   course: ["course", "program", "degree program"],
@@ -198,7 +253,58 @@ const AMBIGUOUS_HEADERS = new Set([
   "ay",
   "a y",
   "program year",
+  "student name",
+  "faculty name",
+  "instructor name",
 ]);
+
+const FULL_NAME_HEADERS = new Set([
+  "name",
+  "full name",
+  "student name",
+  "faculty name",
+  "instructor name",
+  "students",
+]);
+
+const STRUCTURAL_HEADER_WEIGHTS: Record<string, number> = {
+  students: 4,
+  student: 3,
+  "student name": 5,
+  "full name": 4,
+  "faculty name": 5,
+  activity: 2,
+  activities: 2,
+  quiz: 2,
+  quizzes: 2,
+  total: 1,
+  equiv: 2,
+  equivalent: 2,
+  attendance: 3,
+  present: 2,
+  absent: 2,
+  remarks: 1,
+};
+
+const NEGATIVE_HEADER_WEIGHTS: Record<string, number> = {
+  activity: 1,
+  activities: 1,
+  quiz: 1,
+  quizzes: 1,
+  total: 1,
+  equiv: 1,
+  equivalent: 1,
+  semester: 2,
+  instructor: 2,
+  "course code": 2,
+  "course title": 2,
+  college: 2,
+};
+
+const CONSTANT_ALLOWED_FIELDS: Record<ImportRowType, ReadonlySet<ImportField>> = {
+  FACULTY: new Set(["department", "position"]),
+  STUDENT_FARMER: new Set(["course", "yearLevel", "section", "academicYear"]),
+};
 
 const IDENTITY_FIELDS = new Set<ImportField>([
   "firstName",
@@ -321,7 +427,10 @@ export function buildAutomaticColumns(
       };
     }
 
-    if (duplicateHeaders.has(normalizedHeader)) {
+    if (
+      duplicateHeaders.has(normalizedHeader) &&
+      (suggestedField !== null || AMBIGUOUS_HEADERS.has(normalizedHeader))
+    ) {
       return {
         sourceIndex,
         sourceHeader,
@@ -427,6 +536,49 @@ export function evaluateColumnMapping(
   return { status: "READY", missingRequiredFields: [], errors };
 }
 
+function evaluateAnalysisSources(
+  columns: readonly ImportColumn[],
+  fieldSources: Partial<Record<ImportField, ImportFieldSource>>,
+  importType: ImportRowType,
+  reviewedFullNameSourceIndex: number | null,
+  fullNameSuggestions: readonly FullNameRowSuggestion[]
+): MappingResult {
+  const base = evaluateColumnMapping(columns, importType);
+  const mapped = new Set(
+    columns
+      .map((column) => column.mappedField)
+      .filter((field): field is ImportField => !!field)
+  );
+  for (const field of Object.keys(fieldSources) as ImportField[]) mapped.add(field);
+  if (
+    reviewedFullNameSourceIndex !== null &&
+    fullNameSuggestions.length > 0 &&
+    fullNameSuggestions.every((suggestion) => suggestion.status === "REVIEW_REQUIRED")
+  ) {
+    mapped.add("firstName");
+    mapped.add("lastName");
+    mapped.add("middleName");
+  }
+  const missingRequiredFields = getRequiredImportFields(importType).filter(
+    (field) => !mapped.has(field)
+  );
+  if (base.status === "AMBIGUOUS") {
+    return { ...base, missingRequiredFields };
+  }
+  return {
+    status: missingRequiredFields.length > 0 ? "NEEDS_MAPPING" : "READY",
+    missingRequiredFields,
+    errors: base.errors,
+  };
+}
+
+export function isReviewedConstantAllowed(
+  importType: ImportRowType,
+  field: ImportField
+): boolean {
+  return CONSTANT_ALLOWED_FIELDS[importType].has(field);
+}
+
 export function applyManualColumnMapping(
   columns: readonly ImportColumn[],
   importType: ImportRowType,
@@ -494,7 +646,79 @@ export function detectHeaderCandidates(
       const roleSpecificFieldCount = recognizedFields.filter((field) =>
         roleSpecific.has(field)
       ).length;
-      const score = recognizedFields.length;
+      const normalizedHeaders = headers.map(normalizeImportHeader).filter(Boolean);
+      const blockingDuplicateHeaders = duplicateHeaders.filter(
+        (header) => aliasIndex.has(header) || AMBIGUOUS_HEADERS.has(header)
+      );
+      const documentEvidence = [
+        ...new Set(
+          normalizedHeaders.filter(
+            (header) => STRUCTURAL_HEADER_WEIGHTS[header] !== undefined
+          )
+        ),
+      ];
+      const negativeEvidence = [
+        ...new Set(
+          normalizedHeaders.filter(
+            (header) => NEGATIVE_HEADER_WEIGHTS[header] !== undefined
+          )
+        ),
+      ];
+      const mappedFieldEvidence = recognizedFields.map(
+        (field) => IMPORT_FIELD_LABELS[field]
+      );
+      const followingRows = matrix
+        .filter(
+          (candidate) =>
+            candidate.rowNumber > row.rowNumber &&
+            candidate.rowNumber <= row.rowNumber + 10
+        )
+        .slice(0, 5);
+      let followingRecordCount = 0;
+      let mostlyNumericFollowingCount = 0;
+      for (const followingRow of followingRows) {
+        const values = followingRow.cells
+          .map((cell) => cell.text.trim())
+          .filter(Boolean);
+        const recognizedFollowingFields = new Set(
+          values
+            .map((value) => aliasIndex.get(normalizeImportHeader(value)))
+            .filter((field): field is ImportField => !!field)
+        );
+        if (recognizedFollowingFields.size >= 4 || values.length < 2) continue;
+        if (values.some((value) => /[\p{L}]/u.test(value))) {
+          followingRecordCount += 1;
+        }
+        const numericCount = values.filter((value) =>
+          /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/u.test(value)
+        ).length;
+        if (numericCount >= Math.ceil(values.length * 0.75)) {
+          mostlyNumericFollowingCount += 1;
+        }
+      }
+      const structuralScore = documentEvidence.reduce(
+        (sum, header) => sum + STRUCTURAL_HEADER_WEIGHTS[header],
+        0
+      );
+      const negativeScore = negativeEvidence.reduce(
+        (sum, header) => sum + NEGATIVE_HEADER_WEIGHTS[header],
+        0
+      );
+      const score =
+        recognizedFields.length * 4 +
+        structuralScore -
+        negativeScore +
+        Math.min(followingRecordCount, 3) -
+        Math.min(mostlyNumericFollowingCount, 2);
+      const qualifies =
+        recognizedFields.length >= 4 &&
+        identityFieldCount >= 2 &&
+        roleSpecificFieldCount >= 1 &&
+        blockingDuplicateHeaders.length === 0;
+      const isStructuralHeader =
+        qualifies ||
+        structuralScore >= 5 ||
+        (normalizedHeaders.includes("no") && structuralScore >= 3);
       const preview = headers
         .filter((header) => header.trim())
         .slice(0, 6)
@@ -507,14 +731,24 @@ export function detectHeaderCandidates(
         score,
         identityFieldCount,
         roleSpecificFieldCount,
-        qualifies:
-          score >= 4 &&
-          identityFieldCount >= 2 &&
-          roleSpecificFieldCount >= 1 &&
-          duplicateHeaders.length === 0,
+        qualifies,
+        isStructuralHeader,
+        mappedFieldEvidence,
+        documentEvidence,
+        negativeEvidence,
+        followingRecordCount,
+        mostlyNumericFollowingCount,
         duplicateHeaders,
       };
-    });
+    })
+    .sort(
+      (a, b) =>
+        Number(b.qualifies) - Number(a.qualifies) ||
+        Number(b.isStructuralHeader) - Number(a.isStructuralHeader) ||
+        b.score - a.score ||
+        a.rowNumber - b.rowNumber
+    )
+    .slice(0, 3);
 }
 
 export function selectDetectedHeader(
@@ -524,9 +758,36 @@ export function selectDetectedHeader(
     .filter((candidate) => candidate.qualifies)
     .sort((a, b) => b.score - a.score || a.rowNumber - b.rowNumber);
 
-  if (qualified.length === 0) return null;
+  if (qualified.length === 0) {
+    const structural = candidates
+      .filter((candidate) => candidate.isStructuralHeader)
+      .sort((a, b) => b.score - a.score || a.rowNumber - b.rowNumber);
+    if (structural.length === 0) return null;
+    if (structural.length === 1) return structural[0];
+    return structural[0].score - structural[1].score >= 3
+      ? structural[0]
+      : null;
+  }
   if (qualified.length === 1) return qualified[0];
   return qualified[0].score - qualified[1].score >= 2 ? qualified[0] : null;
+}
+
+export function selectClearlySuperiorSheet(
+  sheets: readonly ImportSheetCandidate[]
+): ImportSheetCandidate | null {
+  const ranked = sheets
+    .filter((sheet) => sheet.selectedHeaderRow !== null)
+    .map((sheet) => ({
+      sheet,
+      score:
+        sheet.headerCandidates.find(
+          (candidate) => candidate.rowNumber === sheet.selectedHeaderRow
+        )?.score ?? Number.NEGATIVE_INFINITY,
+    }))
+    .sort((left, right) => right.score - left.score);
+  if (ranked.length === 0) return null;
+  if (ranked.length === 1) return ranked[0].sheet;
+  return ranked[0].score - ranked[1].score >= 3 ? ranked[0].sheet : null;
 }
 
 export function matrixFromValues(values: readonly unknown[][]): ImportMatrixRow[] {
@@ -545,6 +806,7 @@ export function analyzeImportMatrix(
     fileType: ImportFileFormat;
     sheetName: string;
     forcedHeaderRow?: number;
+    isOfficialTemplate?: boolean;
   }
 ): AnalyzeMatrixResult {
   if (matrix.length > MAX_HEADER_SCAN_ROWS + MAX_IMPORT_DATA_ROWS) {
@@ -587,6 +849,22 @@ export function analyzeImportMatrix(
   }
 
   if (!selectedHeader) {
+    const metadata = extractDocumentMetadata(
+      matrix,
+      options.sheetName,
+      null,
+      MAX_HEADER_SCAN_ROWS
+    );
+    const document = classifyImportDocument({
+      matrix,
+      importType,
+      candidates: headerCandidates,
+      selectedHeader: null,
+      metadata,
+      isOfficialTemplate: options.isOfficialTemplate,
+      mappingReady: false,
+      needsReview: true,
+    });
     return {
       analysis: {
         fileType: options.fileType,
@@ -595,6 +873,13 @@ export function analyzeImportMatrix(
         selectedHeaderRow: null,
         columns: [],
         sourceRows: [],
+        rowClassifications: [],
+        skippedRowCount: 0,
+        metadata,
+        document,
+        fieldSources: {},
+        reviewedFullNameSourceIndex: null,
+        fullNameSuggestions: [],
         mappingStatus: "AMBIGUOUS",
         missingRequiredFields: [...getRequiredImportFields(importType)],
         hasLegacyPasswordColumn: false,
@@ -607,12 +892,74 @@ export function analyzeImportMatrix(
   )!;
   const headers = headerMatrixRow.cells.map((cell) => cell.text);
   const columns = buildAutomaticColumns(headers, importType);
-  const mapping = evaluateColumnMapping(columns, importType);
-  const sourceRows = matrix
+  const metadata = extractDocumentMetadata(
+    matrix,
+    options.sheetName,
+    selectedHeader.rowNumber,
+    MAX_HEADER_SCAN_ROWS
+  );
+  const safeMetadata = uniqueSafeMetadataByField(metadata);
+  const columnFields = new Set(
+    columns
+      .map((column) => column.mappedField)
+      .filter((field): field is ImportField => !!field)
+  );
+  const fieldSources: Partial<Record<ImportField, ImportFieldSource>> = {};
+  for (const [field, item] of Object.entries(safeMetadata) as [
+    ImportField,
+    DocumentMetadata,
+  ][]) {
+    if (
+      !columnFields.has(field) &&
+      getImportFields(importType).includes(field) &&
+      isReviewedConstantAllowed(importType, field) &&
+      item.canonicalValue
+    ) {
+      fieldSources[field] = {
+        kind: "DOCUMENT_METADATA",
+        value: item.canonicalValue,
+        metadataId: item.id,
+      };
+    }
+  }
+  const fullNameSourceIndex = headers.findIndex((header) =>
+    FULL_NAME_HEADERS.has(normalizeImportHeader(header))
+  );
+  const allRowsAfterHeader = matrix
     .filter((row) => row.rowNumber > selectedHeader!.rowNumber)
     .filter((row) =>
       row.cells.some((cell) => cell.isFormula || cell.text.trim() !== "")
     );
+  const rowClassifications = classifyImportRows(allRowsAfterHeader, {
+    ...(fullNameSourceIndex >= 0 ? { nameColumnIndex: fullNameSourceIndex } : {}),
+    mappedColumnIndexes: columns
+      .filter((column) => column.mappedField !== null)
+      .map((column) => column.sourceIndex),
+  });
+  const includedRows = new Set(
+    rowClassifications
+      .filter((entry) => entry.classification === "RECORD" || entry.classification === "UNCERTAIN")
+      .map((entry) => entry.rowNumber)
+  );
+  const sourceRows = allRowsAfterHeader.filter((row) => includedRows.has(row.rowNumber));
+  const fullNameSuggestions: FullNameRowSuggestion[] =
+    fullNameSourceIndex < 0
+      ? []
+      : sourceRows
+          .map((row) => {
+            const suggestion = parseReviewedFullName(
+              row.cells[fullNameSourceIndex]?.text ?? ""
+            );
+            return suggestion ? { ...suggestion, rowNumber: row.rowNumber } : null;
+          })
+          .filter((item): item is FullNameRowSuggestion => item !== null);
+  const mapping = evaluateAnalysisSources(
+    columns,
+    fieldSources,
+    importType,
+    null,
+    fullNameSuggestions
+  );
 
   if (sourceRows.length > MAX_IMPORT_DATA_ROWS) {
     return {
@@ -628,6 +975,24 @@ export function analyzeImportMatrix(
       selectedHeaderRow: selectedHeader.rowNumber,
       columns,
       sourceRows,
+      rowClassifications,
+      skippedRowCount: rowClassifications.filter(
+        (entry) => entry.classification === "NON_RECORD" || entry.classification === "FOOTER"
+      ).length,
+      metadata,
+      document: classifyImportDocument({
+        matrix,
+        importType,
+        candidates: headerCandidates,
+        selectedHeader,
+        metadata,
+        isOfficialTemplate: options.isOfficialTemplate,
+        mappingReady: mapping.status === "READY",
+        needsReview: mapping.status === "AMBIGUOUS",
+      }),
+      fieldSources,
+      reviewedFullNameSourceIndex: null,
+      fullNameSuggestions,
       mappingStatus: mapping.status,
       missingRequiredFields: mapping.missingRequiredFields,
       hasLegacyPasswordColumn: headers.some(
@@ -651,12 +1016,32 @@ export function updateAnalysisMapping(
   );
   if ("error" in result) return result;
 
+  const fieldSources = { ...analysis.fieldSources };
+  if (targetField) delete fieldSources[targetField];
+  const reviewedFullNameSourceIndex =
+    targetField && ["firstName", "middleName", "lastName"].includes(targetField)
+      ? null
+      : analysis.reviewedFullNameSourceIndex;
+
+  const mapping = evaluateAnalysisSources(
+    result.columns,
+    fieldSources,
+    importType,
+    reviewedFullNameSourceIndex,
+    analysis.fullNameSuggestions
+  );
   return {
     analysis: {
       ...analysis,
       columns: result.columns,
-      mappingStatus: result.mapping.status,
-      missingRequiredFields: result.mapping.missingRequiredFields,
+      fieldSources,
+      reviewedFullNameSourceIndex,
+      mappingStatus: mapping.status,
+      missingRequiredFields: mapping.missingRequiredFields,
+      document: {
+        ...analysis.document,
+        status: userStatusForMapping(mapping.status),
+      },
     },
   };
 }
@@ -669,12 +1054,119 @@ export function resetAnalysisMapping(
     analysis.columns.map((column) => column.sourceHeader),
     importType
   );
-  const mapping = evaluateColumnMapping(columns, importType);
+  const mapping = evaluateAnalysisSources(
+    columns,
+    {},
+    importType,
+    null,
+    analysis.fullNameSuggestions
+  );
   return {
     ...analysis,
     columns,
+    fieldSources: {},
+    reviewedFullNameSourceIndex: null,
     mappingStatus: mapping.status,
     missingRequiredFields: mapping.missingRequiredFields,
+    document: {
+      ...analysis.document,
+      status: userStatusForMapping(mapping.status),
+    },
+  };
+}
+
+export function updateAnalysisFieldSource(
+  analysis: ImportMatrixAnalysis,
+  importType: ImportRowType,
+  field: ImportField,
+  source: ImportFieldSource | null
+): { analysis: ImportMatrixAnalysis } | { error: string } {
+  if (!getImportFields(importType).includes(field)) {
+    return { error: "That field is not available for the selected import type." };
+  }
+  if (source?.kind === "REVIEWED_CONSTANT" && !isReviewedConstantAllowed(importType, field)) {
+    return { error: `${IMPORT_FIELD_LABELS[field]} cannot be supplied as a constant.` };
+  }
+  if (source?.kind === "DOCUMENT_METADATA") {
+    const metadata = analysis.metadata.find((item) => item.id === source.metadataId);
+    if (
+      !isReviewedConstantAllowed(importType, field) ||
+      !metadata ||
+      metadata.canonicalField !== field ||
+      metadata.canonicalValue !== source.value ||
+      (metadata.status !== "DETECTED" && metadata.status !== "DERIVED_SAFELY")
+    ) {
+      return { error: "That document value is not a safe source for this field." };
+    }
+  }
+  if (source && !source.value.trim()) return { error: "Enter a non-empty value." };
+  if (source && analysis.columns.some((column) => column.mappedField === field)) {
+    return { error: `${IMPORT_FIELD_LABELS[field]} is already mapped from a column.` };
+  }
+  const fieldSources = { ...analysis.fieldSources };
+  if (source) fieldSources[field] = { ...source, value: source.value.trim() };
+  else delete fieldSources[field];
+  const mapping = evaluateAnalysisSources(
+    analysis.columns,
+    fieldSources,
+    importType,
+    analysis.reviewedFullNameSourceIndex,
+    analysis.fullNameSuggestions
+  );
+  return {
+    analysis: {
+      ...analysis,
+      fieldSources,
+      mappingStatus: mapping.status,
+      missingRequiredFields: mapping.missingRequiredFields,
+      document: {
+        ...analysis.document,
+        status: userStatusForMapping(mapping.status),
+      },
+    },
+  };
+}
+
+export function updateReviewedFullNameSource(
+  analysis: ImportMatrixAnalysis,
+  importType: ImportRowType,
+  sourceIndex: number | null
+): { analysis: ImportMatrixAnalysis } | { error: string } {
+  if (sourceIndex !== null) {
+    const source = analysis.columns.find((column) => column.sourceIndex === sourceIndex);
+    if (!source || !FULL_NAME_HEADERS.has(source.normalizedHeader)) {
+      return { error: "Choose a recognized full-name source column." };
+    }
+    if (
+      analysis.fullNameSuggestions.length !== analysis.sourceRows.length ||
+      analysis.fullNameSuggestions.some((suggestion) => suggestion.status === "AMBIGUOUS")
+    ) {
+      return { error: "One or more full names are ambiguous and must be corrected before use." };
+    }
+    for (const field of ["firstName", "middleName", "lastName"] as ImportField[]) {
+      if (analysis.columns.some((column) => column.mappedField === field)) {
+        return { error: `${IMPORT_FIELD_LABELS[field]} is already mapped from a column.` };
+      }
+    }
+  }
+  const mapping = evaluateAnalysisSources(
+    analysis.columns,
+    analysis.fieldSources,
+    importType,
+    sourceIndex,
+    analysis.fullNameSuggestions
+  );
+  return {
+    analysis: {
+      ...analysis,
+      reviewedFullNameSourceIndex: sourceIndex,
+      mappingStatus: mapping.status,
+      missingRequiredFields: mapping.missingRequiredFields,
+      document: {
+        ...analysis.document,
+        status: userStatusForMapping(mapping.status),
+      },
+    },
   };
 }
 
@@ -708,6 +1200,35 @@ export function mapSourceRows(
         raw[column.mappedField] = "";
       } else {
         raw[column.mappedField] = cell.text;
+        if (
+          column.mappedField === "idNumber" &&
+          (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/iu.test(cell.text.trim()) ||
+            /^\d+$/u.test(cell.text.trim()))
+        ) {
+          parsingErrors.push(
+            "Excel appears to have changed this ID into a number. Verify the original ID."
+          );
+        }
+      }
+    }
+
+    for (const [field, source] of Object.entries(analysis.fieldSources) as [
+      ImportField,
+      ImportFieldSource,
+    ][]) {
+      raw[field] = source.value;
+    }
+
+    if (analysis.reviewedFullNameSourceIndex !== null) {
+      const suggestion = analysis.fullNameSuggestions.find(
+        (item) => item.rowNumber === sourceRow.rowNumber
+      );
+      if (suggestion?.status === "REVIEW_REQUIRED") {
+        raw.firstName = suggestion.firstName;
+        raw.middleName = suggestion.middleName;
+        raw.lastName = suggestion.lastName;
+      } else {
+        parsingErrors.push("The full name could not be split safely and requires review.");
       }
     }
 

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -51,12 +52,16 @@ import {
   matrixFromValues,
   resetAnalysisMapping,
   shouldAutoContinueToPreview,
+  isReviewedConstantAllowed,
   updateAnalysisMapping,
+  updateAnalysisFieldSource,
+  updateReviewedFullNameSource,
   type ImportField,
   type ImportMatrixAnalysis,
   type ImportMatrixRow,
   type ImportSheetCandidate,
 } from "@/lib/imports/masterlist-mapping";
+import { DOCUMENT_TYPE_LABELS } from "@/lib/imports/document-structure";
 import type { ParseExcelResponse } from "@/lib/imports/parse-excel";
 import type { ParsedRow } from "@/lib/imports/parse-rows";
 import type { ServerImportRow } from "@/lib/imports/preflight";
@@ -98,6 +103,15 @@ function todayLocalDateStamp(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function issueCategory(code: string): string {
+  if (code.includes("DUPLICATE") && code.endsWith("_FILE")) return "Duplicate in file";
+  if (code.endsWith("_EXISTS")) return "Already exists in H-Auto";
+  if (code.includes("MISMATCH") || code.includes("COHORT")) return "Academic progression issue";
+  if (code.startsWith("INVALID_")) return "Invalid value";
+  if (code === "PARSING_ERROR") return "Source data issue";
+  return "Missing required field";
+}
+
 export function ImportForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +130,7 @@ export function ImportForm() {
   const [analysis, setAnalysis] = useState<ImportMatrixAnalysis | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isTemplateWorkbook, setIsTemplateWorkbook] = useState(false);
+  const [constantDrafts, setConstantDrafts] = useState<Record<string, string>>({});
 
   const allColumns =
     importType === "FACULTY" ? FACULTY_IMPORT_COLUMNS : STUDENT_IMPORT_COLUMNS;
@@ -143,6 +158,7 @@ export function ImportForm() {
     setSelectedSheet(null);
     setAnalysis(null);
     setIsTemplateWorkbook(false);
+    setConstantDrafts({});
   }
 
   function invalidateAnalysisGeneration() {
@@ -354,6 +370,7 @@ export function ImportForm() {
     setPreparedRows([]);
     setResult(null);
     setHasLegacyPasswordColumn(false);
+    setConstantDrafts({});
     await parseSpreadsheetFile(uploadedFile, sheetName);
   }
 
@@ -363,6 +380,7 @@ export function ImportForm() {
     setPreparedRows([]);
     setResult(null);
     setHasLegacyPasswordColumn(false);
+    setConstantDrafts({});
     if (csvMatrix) {
       const generation = beginAnalysisGeneration();
       await setCsvAnalysis(csvMatrix, generation, rowNumber);
@@ -421,7 +439,9 @@ export function ImportForm() {
         response.rows.map((row) => ({
           rowNumber: row.rowNumber,
           raw: row.raw,
-          errors: row.issues.map((issue) => issue.message),
+          errors: row.issues.map(
+            (issue) => `${issueCategory(issue.code)}: ${issue.message}`
+          ),
         }))
       );
       setPreparedRows(payload);
@@ -448,10 +468,45 @@ export function ImportForm() {
   async function handleResetMapping() {
     if (!analysis) return;
     const reset = resetAnalysisMapping(analysis, importType);
+    setConstantDrafts({});
     setAnalysis(reset);
     if (shouldAutoContinueToPreview(reset)) {
       await previewAnalysis(reset);
     }
+  }
+
+  async function handleReviewedConstant(field: ImportField) {
+    if (!analysis) return;
+    const value = constantDrafts[field]?.trim() ?? "";
+    const updated = updateAnalysisFieldSource(
+      analysis,
+      importType,
+      field,
+      value ? { kind: "REVIEWED_CONSTANT", value } : null
+    );
+    if ("error" in updated) {
+      toast.error(updated.error);
+      return;
+    }
+    setAnalysis(updated.analysis);
+    setRows([]);
+    setPreparedRows([]);
+  }
+
+  async function handleFullNameReview(sourceIndex: number) {
+    if (!analysis) return;
+    const updated = updateReviewedFullNameSource(
+      analysis,
+      importType,
+      analysis.reviewedFullNameSourceIndex === sourceIndex ? null : sourceIndex
+    );
+    if ("error" in updated) {
+      toast.error(updated.error);
+      return;
+    }
+    setAnalysis(updated.analysis);
+    setRows([]);
+    setPreparedRows([]);
   }
 
   async function handleCommit() {
@@ -612,7 +667,33 @@ export function ImportForm() {
         .map((column) => column.mappedField)
         .filter((field): field is ImportField => !!field) ?? []
     );
+    for (const field of Object.keys(analysis?.fieldSources ?? {}) as ImportField[]) {
+      usedTargets.add(field);
+    }
+    if (analysis?.reviewedFullNameSourceIndex != null) {
+      usedTargets.add("firstName");
+      usedTargets.add("middleName");
+      usedTargets.add("lastName");
+    }
     const headerCandidates = selectedSheetCandidate?.headerCandidates ?? [];
+    const orderedColumns = analysis
+      ? [...analysis.columns].sort((left, right) => {
+          const leftResolved = left.mappedField !== null || left.status === "IGNORED";
+          const rightResolved = right.mappedField !== null || right.status === "IGNORED";
+          return Number(leftResolved) - Number(rightResolved) || left.sourceIndex - right.sourceIndex;
+        })
+      : [];
+    const ignoredColumnCount =
+      analysis?.columns.filter((column) => column.status === "IGNORED").length ?? 0;
+    const constantFields =
+      analysis?.missingRequiredFields.filter((field) =>
+        isReviewedConstantAllowed(importType, field)
+      ) ?? [];
+    const fullNameColumn = analysis?.columns.find((column) =>
+      ["name", "full name", "student name", "faculty name", "instructor name", "students"].includes(
+        column.normalizedHeader
+      )
+    );
 
     return (
       <div className="space-y-4">
@@ -631,17 +712,57 @@ export function ImportForm() {
               <Badge
                 variant="secondary"
                 className={cn(
-                  analysis.mappingStatus === "READY" &&
+                  analysis.document.status === "READY" &&
                     "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
-                  analysis.mappingStatus !== "READY" &&
+                  analysis.document.status !== "READY" &&
                     "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                 )}
               >
-                {analysis.mappingStatus.replace("_", " ")}
+                {analysis.document.status.replaceAll("_", " ")}
               </Badge>
             )}
           </CardContent>
         </Card>
+
+        {analysis && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">Document summary</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {DOCUMENT_TYPE_LABELS[analysis.document.documentType]} · {analysis.document.confidence.toLowerCase()} confidence
+                  </p>
+                </div>
+                <Badge variant="outline">{analysis.sheetName}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {analysis.document.evidence.map((item) => (
+                <p key={item} className="text-sm text-muted-foreground">{item}</p>
+              ))}
+              {analysis.document.importTypeWarning && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  {analysis.document.importTypeWarning} The selected import type remains authoritative.
+                </div>
+              )}
+              {analysis.metadata.length > 0 && (
+                <div>
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Detected context</div>
+                  <div className="flex flex-wrap gap-2">
+                    {analysis.metadata.map((item) => (
+                      <Badge key={item.id} variant="secondary" className="max-w-full whitespace-normal text-left">
+                        {item.displayLabel}: {item.value}
+                        {item.status === "UNSUPPORTED_VALUE" ? " · needs confirmation" : ""}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {!isTemplateWorkbook && sheets.length > 1 && (
           <Card>
@@ -679,7 +800,7 @@ export function ImportForm() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Choose or correct the header row from the first 20 rows.
+                  Choose or correct one of the three strongest header candidates from the first 50 rows.
                 </p>
                 <Label htmlFor="import-header-row">Header row</Label>
                 <Select
@@ -703,7 +824,7 @@ export function ImportForm() {
                         key={candidate.rowNumber}
                         value={String(candidate.rowNumber)}
                       >
-                        Row {candidate.rowNumber} — {candidate.preview || "(empty)"}
+                        Row {candidate.rowNumber} — {candidate.preview || "(empty)"} ({candidate.score})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -718,7 +839,7 @@ export function ImportForm() {
           headerCandidates.length === 0 && (
             <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              No non-empty header row was found in the first 20 rows. Choose a
+              No reliable header row was found in the first 50 rows. Choose a
               different worksheet or fix the file and upload it again.
             </div>
           )}
@@ -731,11 +852,59 @@ export function ImportForm() {
             <CardContent className="space-y-4">
               <div className="text-sm text-muted-foreground">
                 {analysis.fileType !== "csv" && `${analysis.sheetName} · `}
-                Header row {analysis.selectedHeaderRow} · {analysis.sourceRows.length} data row(s)
+                Header row {analysis.selectedHeaderRow} · {analysis.sourceRows.length} potential record(s) · {analysis.skippedRowCount} skipped · {ignoredColumnCount} ignored column(s)
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  H-Auto fields
+                </div>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {targetFields.map((field) => {
+                    const sourceColumn = analysis.columns.find(
+                      (column) => column.mappedField === field
+                    );
+                    const fieldSource = analysis.fieldSources[field];
+                    const usesFullName =
+                      analysis.reviewedFullNameSourceIndex !== null &&
+                      ["firstName", "middleName", "lastName"].includes(field);
+                    const resolved = !!sourceColumn || !!fieldSource || usesFullName;
+                    const sourceLabel = sourceColumn
+                      ? sourceColumn.sourceHeader
+                      : fieldSource?.kind === "DOCUMENT_METADATA"
+                        ? "Document information"
+                        : fieldSource?.kind === "REVIEWED_CONSTANT"
+                          ? "Reviewed uniform value"
+                          : usesFullName
+                            ? "Reviewed full-name suggestion"
+                            : requiredColumns.includes(field)
+                              ? "No source detected"
+                              : "Optional / ignored";
+                    const example = sourceColumn
+                      ? analysis.sourceRows[0]?.cells[sourceColumn.sourceIndex]?.text
+                      : fieldSource?.value;
+                    return (
+                      <div key={field} className="flex items-start justify-between gap-3 rounded-md border p-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium">
+                            {IMPORT_FIELD_LABELS[field]}
+                            {requiredColumns.includes(field) ? " *" : ""}
+                          </div>
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {sourceLabel}{example ? ` · ${example}` : ""}
+                          </div>
+                        </div>
+                        <Badge variant={resolved ? "secondary" : "outline"} className="shrink-0 text-[10px]">
+                          {resolved ? "Resolved" : requiredColumns.includes(field) ? "Missing" : "Optional"}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="space-y-2">
-                {analysis.columns.map((column) => {
+                {orderedColumns.map((column) => {
                   const selectValue = column.mappedField
                     ? column.mappedField
                     : column.status === "IGNORED"
@@ -789,12 +958,78 @@ export function ImportForm() {
                         </SelectContent>
                       </Select>
                       <Badge variant="outline" className="w-fit text-[10px]">
-                        {column.status.replace("_", " ")}
+                        {column.status === "AMBIGUOUS"
+                          ? "Needs review"
+                          : column.status.replaceAll("_", " ")}
                       </Badge>
                     </div>
                   );
                 })}
               </div>
+
+              {fullNameColumn && analysis.fullNameSuggestions.length > 0 && (
+                <div className="rounded-md border bg-muted/30 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Reviewed full-name suggestions</div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        H-Auto recognized LASTNAME, FIRSTNAME MIDDLENAME [suffix]. Suffixes stay with Last Name because the current user model has no suffix field.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={analysis.reviewedFullNameSourceIndex === fullNameColumn.sourceIndex ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => void handleFullNameReview(fullNameColumn.sourceIndex)}
+                    >
+                      {analysis.reviewedFullNameSourceIndex === fullNameColumn.sourceIndex
+                        ? "Stop using suggestions"
+                        : "Review and use suggestions"}
+                    </Button>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {analysis.fullNameSuggestions.slice(0, 6).map((suggestion) => (
+                      <div key={suggestion.rowNumber} className="rounded border bg-background p-2 text-xs">
+                        <div className="font-medium">Row {suggestion.rowNumber}: {suggestion.original}</div>
+                        <div className={suggestion.status === "AMBIGUOUS" ? "mt-1 text-amber-700" : "mt-1 text-muted-foreground"}>
+                          {suggestion.status === "AMBIGUOUS"
+                            ? "Ambiguous — correct the file or map separate name columns."
+                            : `${suggestion.firstName} · ${suggestion.middleName || "no middle name"} · ${suggestion.lastName}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {constantFields.length > 0 && (
+                <div className="rounded-md border p-4">
+                  <div className="text-sm font-medium">Uniform values for this file</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Use only when every record belongs to the same cohort. Identity, name, email, and phone fields can never be constants.
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {constantFields.map((field) => (
+                      <div key={field} className="space-y-1.5">
+                        <Label htmlFor={`constant-${field}`}>{IMPORT_FIELD_LABELS[field]}</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id={`constant-${field}`}
+                            value={constantDrafts[field] ?? ""}
+                            onChange={(event) =>
+                              setConstantDrafts((current) => ({ ...current, [field]: event.target.value }))
+                            }
+                            placeholder={`Same ${IMPORT_FIELD_LABELS[field].toLowerCase()} for all rows`}
+                          />
+                          <Button type="button" variant="outline" onClick={() => void handleReviewedConstant(field)}>
+                            Apply
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {analysis.missingRequiredFields.length > 0 && (
                 <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
@@ -852,7 +1087,8 @@ export function ImportForm() {
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{fileName}</div>
                 <div className="text-xs text-muted-foreground">
-                  {rows.length} row(s) parsed · {importType === "FACULTY" ? "Faculty" : "Student"} import
+                  {rows.length} record(s) detected · {importType === "FACULTY" ? "Faculty" : "Student"} import
+                  {analysis ? ` · ${DOCUMENT_TYPE_LABELS[analysis.document.documentType]} · ${analysis.sheetName}` : ""}
                 </div>
               </div>
             </div>
@@ -862,7 +1098,15 @@ export function ImportForm() {
               </Badge>
               {invalidCount > 0 && (
                 <Badge variant="secondary" className="bg-red-100 text-red-700">
-                  {invalidCount} with errors
+                  {invalidCount} blocked
+                </Badge>
+              )}
+              {(analysis?.skippedRowCount ?? 0) > 0 && (
+                <Badge variant="outline">{analysis!.skippedRowCount} skipped</Badge>
+              )}
+              {(analysis?.columns.filter((column) => column.status === "IGNORED").length ?? 0) > 0 && (
+                <Badge variant="outline">
+                  {analysis!.columns.filter((column) => column.status === "IGNORED").length} ignored columns
                 </Badge>
               )}
             </div>
@@ -1049,7 +1293,7 @@ export function ImportForm() {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="rounded border border-green-200 bg-green-50 p-3">
                 <div className="text-xs font-medium text-green-700">
                   Successfully created
@@ -1062,6 +1306,14 @@ export function ImportForm() {
                 <div className="text-xs font-medium text-red-700">Failed</div>
                 <div className="text-2xl font-semibold text-red-700">
                   {result.failed.length}
+                </div>
+              </div>
+              <div className="rounded border bg-muted/30 p-3">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Skipped non-record rows
+                </div>
+                <div className="text-2xl font-semibold">
+                  {analysis?.skippedRowCount ?? 0}
                 </div>
               </div>
             </div>

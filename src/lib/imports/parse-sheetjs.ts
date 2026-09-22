@@ -20,6 +20,7 @@ import {
   detectHeaderCandidates,
   mapSourceRows,
   selectDetectedHeader,
+  selectClearlySuperiorSheet,
   type ImportCell,
   type ImportMatrixAnalysis,
   type ImportMatrixRow,
@@ -193,6 +194,7 @@ function analyzeWorksheet(
   const analyzed = analyzeImportMatrix(worksheetMatrix(sheet), importType, {
     fileType: format,
     sheetName: name,
+    isOfficialTemplate: isTemplateWorkbook,
     ...(selectedHeaderRow !== undefined
       ? { forcedHeaderRow: selectedHeaderRow }
       : {}),
@@ -364,8 +366,9 @@ export async function parseSheetJsImportFile(
     const clearSheets = candidates.filter(
       (candidate) => candidate.selectedHeaderRow !== null
     );
-    if (clearSheets.length === 1) {
-      const selected = clearSheets[0];
+    const superiorSheet = selectClearlySuperiorSheet(candidates);
+    if (superiorSheet) {
+      const selected = superiorSheet;
       return analyzeWorksheet(
         format,
         selected.name,

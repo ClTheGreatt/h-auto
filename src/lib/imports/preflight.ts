@@ -92,6 +92,8 @@ export type ExistingIdentityLookup = (
 const ALLOWED_PARSING_ERRORS = new Set([
   "Formula cells are not supported for imported user fields.",
   "Excel error cells are not supported for imported user fields.",
+  "Excel appears to have changed this ID into a number. Verify the original ID.",
+  "The full name could not be split safely and requires review.",
 ]);
 
 const FIELD_CODES: Record<string, ImportIssueCode> = {
