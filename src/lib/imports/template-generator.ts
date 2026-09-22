@@ -64,7 +64,7 @@ const STUDENT_ONLY_NOTE =
 
 const CLOSING_NOTES = [
   "Delete the example rows and add your actual data on the Data sheet before uploading",
-  "Save as .xlsx or export to .csv — both formats are accepted",
+  "Upload directly as .xlsx, .xls, .xlsm (data only), or UTF-8 .csv",
 ];
 
 // Hidden lookup sheet backing the position/department/course dropdowns —

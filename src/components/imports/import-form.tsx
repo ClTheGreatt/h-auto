@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Papa from "papaparse";
 import { toast } from "sonner";
 import {
   AlertCircle,
@@ -61,6 +60,13 @@ import {
 import type { ParseExcelResponse } from "@/lib/imports/parse-excel";
 import type { ParsedRow } from "@/lib/imports/parse-rows";
 import type { ServerImportRow } from "@/lib/imports/preflight";
+import {
+  detectImportFile,
+  isImportFileFailure,
+  normalizedImportExtension,
+  type ImportFileFailure,
+} from "@/lib/imports/file-format";
+import { parseCsvImportBytes } from "@/lib/imports/parse-csv";
 import { cn } from "@/lib/utils";
 import type { ImportRowType } from "@/lib/validations/import";
 
@@ -238,34 +244,22 @@ export function ImportForm() {
     return true;
   }
 
-  function parseCsvFile(file: File) {
+  async function parseCsvFile(bytes: Uint8Array) {
     const generation = beginAnalysisGeneration();
-    Papa.parse<string[]>(file, {
-      header: false,
-      skipEmptyLines: false,
-      complete: async (results) => {
-        if (!isCurrentGeneration(generation)) return;
-        if (results.errors.length > 0) {
-          toast.error(
-            `CSV parse error: ${results.errors[0].message}. Please check the file format.`
-          );
-          setIsParsing(false);
-          return;
-        }
-        const matrix = matrixFromValues(results.data);
-        setCsvMatrix(matrix);
-        await setCsvAnalysis(matrix, generation);
-        if (isCurrentGeneration(generation)) setIsParsing(false);
-      },
-      error: (error) => {
-        if (!isCurrentGeneration(generation)) return;
-        setIsParsing(false);
-        toast.error(`Failed to parse CSV: ${error.message}`);
-      },
-    });
+    const parsed = parseCsvImportBytes(bytes);
+    if (!isCurrentGeneration(generation)) return;
+    if ("error" in parsed) {
+      setIsParsing(false);
+      toast.error(parsed.error);
+      return;
+    }
+    const matrix = matrixFromValues(parsed.values);
+    setCsvMatrix(matrix);
+    await setCsvAnalysis(matrix, generation);
+    if (isCurrentGeneration(generation)) setIsParsing(false);
   }
 
-  async function parseExcelFile(
+  async function parseSpreadsheetFile(
     file: File,
     sheetName?: string,
     headerRow?: number
@@ -282,7 +276,9 @@ export function ImportForm() {
         method: "POST",
         body: formData,
       });
-      const data = (await response.json()) as ParseExcelResponse | { error: string };
+      const data = (await response.json()) as
+        | ParseExcelResponse
+        | ImportFileFailure;
       if (!isCurrentGeneration(generation)) return;
 
       if (!response.ok || "error" in data) {
@@ -305,45 +301,49 @@ export function ImportForm() {
     } catch {
       if (!isCurrentGeneration(generation)) return;
       toast.error(
-        "We couldn't read this Excel workbook. Please verify that it is a valid .xlsx file."
+        "We couldn't read this spreadsheet. Check the file and try again."
       );
     } finally {
       if (isCurrentGeneration(generation)) setIsParsing(false);
     }
   }
 
-  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
-    const lowerName = file.name.toLowerCase();
-    const isCsv = lowerName.endsWith(".csv");
-    const isXlsx = lowerName.endsWith(".xlsx");
-
-    if (lowerName.endsWith(".xls")) {
+    if (!normalizedImportExtension(file.name)) {
       toast.error(
-        "Legacy .xls files are not supported. Save the file as .xlsx or .csv and try again."
+        "This file type is not supported. Upload a CSV, XLS, XLSX, or XLSM file."
       );
-      return;
-    }
-    if (!isCsv && !isXlsx) {
-      toast.error("Please upload a CSV or Excel file (.csv, .xlsx)");
       return;
     }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
       toast.error("File is too large. Maximum upload size is 4 MB.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
     invalidateAnalysisGeneration();
-    clearDownstreamState();
-    setUploadedFile(file);
-    setFileName(file.name);
-    if (isXlsx) void parseExcelFile(file);
-    else parseCsvFile(file);
+    setIsParsing(true);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const detected = detectImportFile(file.name, bytes);
+      if (isImportFileFailure(detected)) {
+        toast.error(detected.error);
+        return;
+      }
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
+      clearDownstreamState();
+      setUploadedFile(file);
+      setFileName(file.name);
+      if (detected.format === "csv") await parseCsvFile(bytes);
+      else await parseSpreadsheetFile(file);
+    } catch {
+      toast.error("We couldn't read this file. Check its format and try again.");
+    } finally {
+      setIsParsing(false);
+    }
   }
 
   async function handleSheetChange(sheetName: string) {
@@ -354,7 +354,7 @@ export function ImportForm() {
     setPreparedRows([]);
     setResult(null);
     setHasLegacyPasswordColumn(false);
-    await parseExcelFile(uploadedFile, sheetName);
+    await parseSpreadsheetFile(uploadedFile, sheetName);
   }
 
   async function handleHeaderRowChange(rowNumber: number) {
@@ -370,7 +370,7 @@ export function ImportForm() {
       return;
     }
     if (uploadedFile && selectedSheet) {
-      await parseExcelFile(uploadedFile, selectedSheet, rowNumber);
+      await parseSpreadsheetFile(uploadedFile, selectedSheet, rowNumber);
     }
   }
 
@@ -576,8 +576,8 @@ export function ImportForm() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              onChange={handleFileSelect}
+              accept=".csv,.xls,.xlsx,.xlsm,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12"
+              onChange={(event) => void handleFileSelect(event)}
               disabled={isParsing}
               className="hidden"
               id="user-import-upload"
@@ -591,11 +591,13 @@ export function ImportForm() {
             >
               <Upload className="mb-2 size-8 text-gray-400" />
               <p className="text-sm font-medium text-gray-700">
-                {isParsing ? "Reading file..." : "Click to upload a CSV or Excel file"}
+                {isParsing
+                  ? "Reading file..."
+                  : "Click to upload a CSV, XLS, XLSX, or XLSM file"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Supported columns are detected automatically. Mapping appears
-                only when required fields need your review.
+                XLSM files are read as worksheet data only. Supported columns
+                are detected automatically.
               </p>
             </label>
           </CardContent>
@@ -728,7 +730,7 @@ export function ImportForm() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-sm text-muted-foreground">
-                {analysis.fileType === "xlsx" && `${analysis.sheetName} · `}
+                {analysis.fileType !== "csv" && `${analysis.sheetName} · `}
                 Header row {analysis.selectedHeaderRow} · {analysis.sourceRows.length} data row(s)
               </div>
 

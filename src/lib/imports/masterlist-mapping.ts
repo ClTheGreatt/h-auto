@@ -5,6 +5,7 @@ import {
   STUDENT_REQUIRED_FIELDS,
   type ImportRowType,
 } from "@/lib/constants/user-import";
+import type { ImportFileFormat } from "./file-format";
 
 export const MAX_IMPORT_WORKSHEETS = 10;
 export const MAX_HEADER_SCAN_ROWS = 20;
@@ -85,7 +86,7 @@ export type MappingResult = {
 };
 
 export type ImportMatrixAnalysis = {
-  fileType: "csv" | "xlsx";
+  fileType: ImportFileFormat;
   sheetName: string;
   headerCandidates: DetectedHeader[];
   selectedHeaderRow: number | null;
@@ -541,7 +542,7 @@ export function analyzeImportMatrix(
   matrix: readonly ImportMatrixRow[],
   importType: ImportRowType,
   options: {
-    fileType: "csv" | "xlsx";
+    fileType: ImportFileFormat;
     sheetName: string;
     forcedHeaderRow?: number;
   }

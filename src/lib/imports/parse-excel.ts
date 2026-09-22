@@ -1,5 +1,9 @@
 import ExcelJS from "exceljs";
 import { buildParsedRows, type ParsedRow } from "./parse-rows";
+import type {
+  ImportFileErrorCode,
+  ImportFileFormat,
+} from "./file-format";
 import type { ImportRowType } from "@/lib/validations/import";
 import {
   detectImportTypeMismatch,
@@ -23,8 +27,8 @@ import {
   type ImportMappingStatus,
 } from "./masterlist-mapping";
 
-export type ParseExcelSuccess = {
-  fileType: "xlsx";
+export type ParseWorkbookSuccess = {
+  fileType: ImportFileFormat;
   isTemplateWorkbook: boolean;
   sheets: ImportSheetCandidate[];
   selectedSheet: string | null;
@@ -34,8 +38,13 @@ export type ParseExcelSuccess = {
   hasLegacyPasswordColumn: boolean;
 };
 
-export type ParseExcelResult = ParseExcelSuccess | { error: string };
-export type ParseExcelResponse = Omit<ParseExcelSuccess, "rows">;
+export type ParseExcelSuccess = ParseWorkbookSuccess & { fileType: "xlsx" };
+export type ParseExcelFailure = {
+  error: string;
+  errorCode?: ImportFileErrorCode;
+};
+export type ParseExcelResult = ParseExcelSuccess | ParseExcelFailure;
+export type ParseExcelResponse = Omit<ParseWorkbookSuccess, "rows">;
 
 export const EXCEL_PARSE_ERROR_MESSAGE =
   "We couldn't read this Excel workbook. Please verify that it is a valid .xlsx file.";

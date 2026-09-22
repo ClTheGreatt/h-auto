@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-helpers";
-import { parseExcelImportFile } from "@/lib/imports/parse-excel";
+import { parseImportWorkbookFile } from "@/lib/imports/parse-import-file";
 import type { ImportRowType } from "@/lib/validations/import";
 import { MAX_IMPORT_FILE_BYTES } from "@/lib/constants/user-import";
+import { importFileFailure } from "@/lib/imports/file-format";
+
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   await requireAdmin();
@@ -23,8 +26,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
   if (file.size > MAX_IMPORT_FILE_BYTES) {
+    const failure = importFileFailure("FILE_TOO_LARGE");
     return NextResponse.json(
-      { error: "File is too large. Maximum upload size is 4 MB." },
+      failure,
       { status: 413 }
     );
   }
@@ -43,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = await file.arrayBuffer();
-  const result = await parseExcelImportFile(buffer, importType, {
+  const result = await parseImportWorkbookFile(buffer, file.name, importType, {
     ...(typeof selectedSheet === "string" && selectedSheet
       ? { selectedSheet }
       : {}),
@@ -51,7 +55,7 @@ export async function POST(req: NextRequest) {
   });
 
   if ("error" in result) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json(result, { status: 400 });
   }
 
   // The browser rebuilds validation rows after the administrator reviews the
