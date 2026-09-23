@@ -9,6 +9,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -330,6 +331,12 @@ export function CropForm({
                       placeholder="Planting, watering, fertilization, and harvest instructions"
                     />
                   </FormControl>
+                  {showPresetBasis ? (
+                    <FormDescription>
+                      Editable H-Auto cultivation guidance. See the Philippine
+                      cultivation reference above for the external publication.
+                    </FormDescription>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}

@@ -37,6 +37,8 @@ const OPERATIONAL_FIELDS = [
 
 const EXPECTED_OPERATIONAL_HASH =
   "5b050320d4f430d59fe77d052f86c64888877e79f8d84b4be7fb05efbb8d6cec";
+const EXPECTED_CULTIVATION_GUIDE_HASH =
+  "18adcbaff27ac50544771f50e6dd543cc08e56b234b8523aa0ab5e9608f341e2";
 
 function operationalSnapshot() {
   return CROP_PRESETS.map((preset) => ({
@@ -47,6 +49,13 @@ function operationalSnapshot() {
         OPERATIONAL_FIELDS.map((field) => [field, stage[field]])
       )
     ),
+  }));
+}
+
+function cultivationGuideSnapshot() {
+  return CROP_PRESETS.map(({ id, cultivationGuide }) => ({
+    id,
+    cultivationGuide,
   }));
 }
 
@@ -114,7 +123,7 @@ test("C. final built-in references use official Philippine ATI sources", () => {
   }
 });
 
-test("D. provenance copy makes no official or DA-approved threshold claim", () => {
+test("B-E. provenance copy separates external references from H-Auto guidance", () => {
   const copy = CROP_PRESETS.map((preset) => preset.provenance?.summary).join(" ");
   const renderedPanels = CROP_PRESETS.map((preset) =>
     renderToStaticMarkup(<PresetProvenancePanel preset={preset} />)
@@ -122,13 +131,25 @@ test("D. provenance copy makes no official or DA-approved threshold claim", () =
 
   assert.doesNotMatch(
     `${copy} ${renderedPanels}`,
-    /DA-approved|official threshold|reference-backed|reference-guided|directly sourced|based on DA|DA-based/i
+    /DA-approved|official threshold|reference-backed|reference-guided|directly sourced|based on DA|DA-based|copied from DA/i
   );
-  assert.match(copy, /configurable system defaults/i);
+  assert.match(
+    copy,
+    /external Philippine crop-production and cultivation reference/i
+  );
+  assert.match(
+    copy,
+    /cultivation guide is configurable system guidance/i
+  );
+  assert.match(copy, /configurable system crop profile/i);
+  assert.match(copy, /configurable monitoring defaults/i);
+  assert.match(copy, /not a direct transcription/i);
+  assert.match(copy, /values are not prescribed/i);
   assert.match(
     renderedPanels,
-    /not direct values prescribed by the cited publication/i
+    /guide is not a direct transcription of the cited publication/i
   );
+  assert.match(renderedPanels, /stages and ranges are not prescribed by it/i);
 });
 
 test("built-in Eggplant renders a Philippine cultivation reference", () => {
@@ -139,8 +160,16 @@ test("built-in Eggplant renders a Philippine cultivation reference", () => {
   assert.match(html, /Built-in preset · Philippine cultivation reference/);
   assert.match(html, /Gabay sa Pagtatanim ng Talong/);
   assert.match(html, /View cultivation reference/);
-  assert.match(html, /configurable system defaults/);
-  assert.match(html, /not direct values prescribed by the cited publication/);
+  assert.match(
+    html,
+    /external Philippine crop-production and cultivation reference/
+  );
+  assert.match(html, /H-Auto guidance note:/);
+  assert.match(html, /cultivation guide is editable, configurable system guidance/);
+  assert.match(html, /growth-stage structure is part of H-Auto&#x27;s configurable crop profile/);
+  assert.match(html, /sensor monitoring ranges are configurable defaults/);
+  assert.match(html, /guide is not a direct transcription/);
+  assert.match(html, /stages and ranges are not prescribed/);
 });
 
 test("D. a custom preset renders administrator-defined copy without references", () => {
@@ -180,6 +209,29 @@ test("H-I. all pre-feature operational preset values remain exact", () => {
   const snapshot = JSON.stringify(operationalSnapshot());
   assert.equal(CROP_PRESETS.reduce((count, preset) => count + preset.stages.length, 0), 33);
   assert.equal(createHash("sha256").update(snapshot).digest("hex"), EXPECTED_OPERATIONAL_HASH);
+});
+
+test("F. all nine cultivation guides remain exactly unchanged", () => {
+  const snapshot = JSON.stringify(cultivationGuideSnapshot());
+
+  assert.deepEqual(
+    CROP_PRESETS.map((preset) => preset.id),
+    [
+      "eggplant",
+      "tomato",
+      "pechay",
+      "mustasa",
+      "kangkong",
+      "ampalaya",
+      "sitaw",
+      "kalabasa",
+      "okra",
+    ]
+  );
+  assert.equal(
+    createHash("sha256").update(snapshot).digest("hex"),
+    EXPECTED_CULTIVATION_GUIDE_HASH
+  );
 });
 
 test("J-K. loaded values remain editable and provenance never enters form data", () => {

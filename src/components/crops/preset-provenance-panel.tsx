@@ -74,8 +74,8 @@ export function PresetProvenancePanel({ preset }: PresetProvenancePanelProps) {
       </div>
 
       <p className="mt-3 text-sm text-muted-foreground">
-        H-Auto provides configurable stage-based monitoring defaults. The cited
-        publication supplies Philippine crop-production and cultivation context.
+        The publication below is provided as an external Philippine
+        crop-production and cultivation reference.
       </p>
 
       <details className="group mt-3">
@@ -140,9 +140,13 @@ export function PresetProvenancePanel({ preset }: PresetProvenancePanelProps) {
 
           <div className="space-y-1 rounded-md border border-border/70 bg-background p-3 text-xs text-muted-foreground">
             <p>
-              Sensor threshold note: The min/max monitoring values in H-Auto are
-              configurable system defaults and are not direct values prescribed
-              by the cited publication.
+              H-Auto guidance note: The cultivation guide is editable,
+              configurable system guidance. The growth-stage structure is part
+              of H-Auto&apos;s configurable crop profile, and the sensor
+              monitoring ranges are configurable defaults. The guide is not a
+              direct transcription of the cited publication, and the stages and
+              ranges are not prescribed by it. Faculty and administrators may
+              review and edit this H-Auto content.
             </p>
             <p>
               Actual crop conditions may vary by variety, soil condition, growth

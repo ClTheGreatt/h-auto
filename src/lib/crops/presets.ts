@@ -47,7 +47,7 @@ export type CropPreset = {
 };
 
 const REFERENCE_REVIEW_SUMMARY =
-  "This Philippine publication provides crop-production and cultivation guidance for the built-in preset. H-Auto's growth-stage structure and sensor ranges remain configurable system defaults.";
+  "This publication is provided as an external Philippine crop-production and cultivation reference. H-Auto's cultivation guide is configurable system guidance, its growth-stage structure is part of a configurable system crop profile, and its sensor monitoring ranges are configurable monitoring defaults. This content is not a direct transcription of, and its values are not prescribed by, the cited publication.";
 
 function referenceReviewed(reference: PresetReference): PresetProvenance {
   return {
