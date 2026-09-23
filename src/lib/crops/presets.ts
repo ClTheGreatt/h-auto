@@ -21,6 +21,20 @@ export type PresetStage = {
   maxPotassium: number;
 };
 
+export type PresetReference = {
+  organization: string;
+  title: string;
+  url?: string;
+  scope: string[];
+};
+
+export type PresetProvenance = {
+  kind: "REFERENCE_REVIEWED" | "ADMIN_DEFINED";
+  reviewedAt?: string;
+  summary: string;
+  references: PresetReference[];
+};
+
 export type CropPreset = {
   id: string;
   displayName: string;
@@ -29,7 +43,19 @@ export type CropPreset = {
   description: string;
   cultivationGuide: string;
   stages: PresetStage[];
+  provenance?: PresetProvenance;
 };
+
+const REFERENCE_REVIEW_SUMMARY =
+  "This Philippine publication provides crop-production and cultivation guidance for the built-in preset. H-Auto's growth-stage structure and sensor ranges remain configurable system defaults.";
+
+function referenceReviewed(reference: PresetReference): PresetProvenance {
+  return {
+    kind: "REFERENCE_REVIEWED",
+    summary: REFERENCE_REVIEW_SUMMARY,
+    references: [reference],
+  };
+}
 
 export const CROP_PRESETS: CropPreset[] = [
   {
@@ -41,6 +67,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Warm-season vegetable widely cultivated in the Philippines. Prefers full sun and well-drained loamy soil.",
     cultivationGuide:
       "Planting: Sow seeds in seedbeds 30 days before transplanting. Transplant when seedlings have 4-6 true leaves at a spacing of 60 cm between plants.\n\nWatering: Water regularly, especially during flowering and fruit development. Avoid waterlogging which can cause root rot.\n\nFertilizing: Apply complete fertilizer (14-14-14) at planting. Side-dress with urea 30 days after transplanting, then again at flowering.\n\nHarvest: Pick fruits when glossy and firm, 65-90 days after transplanting. Harvest every 2-3 days to encourage continuous production.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, CALABARZON",
+      title: "Gabay sa Pagtatanim ng Talong",
+      url: "https://ati2.da.gov.ph/ati-4a/content/publications/maridelle-g-jaurigue/gabay-sa-pagtatanim-ng-talong",
+      scope: ["crop production", "site and soil", "establishment", "crop management"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -85,6 +118,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Popular warm-season fruit vegetable with high demand in Philippine markets. Grows best in well-drained soil with full sun exposure.",
     cultivationGuide:
       "Planting: Sow seeds in seedbeds and transplant after 3-4 weeks at 50 cm spacing. Stake or cage plants to support fruit weight.\n\nWatering: Keep soil consistently moist; avoid wetting foliage to reduce disease risk. Water deeply 2-3 times a week.\n\nFertilizing: Apply complete fertilizer (14-14-14) at transplanting. Increase potassium during flowering and fruiting for better fruit quality.\n\nHarvest: Pick fruits when they turn from green to breaker (light red blush), 60-75 days after transplanting. Harvest every 2-3 days.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, MIMAROPA",
+      title: "Gabay sa Produksyon ng Kamatis",
+      url: "https://ati2.da.gov.ph/ati-4b/content/gabay-sa-produksyon-ng-kamatis",
+      scope: ["crop production", "site and soil", "crop management", "harvest"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -129,6 +169,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Fast-growing leafy vegetable that is a staple in Filipino cooking. Prefers cool, moist conditions and nutrient-rich soil.",
     cultivationGuide:
       "Planting: Direct-seed or transplant seedlings at 15-20 cm spacing. Grows best in loose, organic-rich soil.\n\nWatering: Keep soil consistently moist; leafy growth suffers quickly under water stress. Water lightly but frequently.\n\nFertilizing: Apply nitrogen-rich fertilizer at planting and again 2 weeks later to support fast leaf growth.\n\nHarvest: Harvest whole plants 35-45 days after sowing, or pick outer leaves progressively for a longer harvest window.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, CALABARZON",
+      title: "Gabay sa Pagtatanim ng Pechay",
+      url: "https://ati2.da.gov.ph/ati-4a/content/publications/maridelle-g-jaurigue/gabay-sa-pagtatanim-ng-pechay",
+      scope: ["crop production", "establishment", "crop management", "harvest"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -165,6 +212,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Fast-maturing leafy green with a peppery flavor, widely grown in home gardens and small plots for local consumption.",
     cultivationGuide:
       "Planting: Direct-seed thinly in rows or beds at 10-15 cm spacing. Thin seedlings once established.\n\nWatering: Water lightly and frequently to keep soil moist; avoid letting the bed dry out between waterings.\n\nFertilizing: Apply a nitrogen-rich fertilizer at planting and a light side-dress 2 weeks in for fast, tender leaf growth.\n\nHarvest: Harvest by cutting whole plants or picking outer leaves starting 30-35 days after sowing.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, Cagayan Valley",
+      title: "Gabay sa Pagtatanim ng Mustasa",
+      url: "https://ati2.da.gov.ph/ati-2/content/publications/vladimir-b-caliguiran/gabay-sa-pagtatanim-ng-mustasa",
+      scope: ["site and soil", "establishment", "crop management", "harvest"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -201,6 +255,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Semi-aquatic leafy vegetable that thrives in moist to waterlogged soil. One of the fastest-growing and most tolerant vegetables in the tropics.",
     cultivationGuide:
       "Planting: Direct-seed or plant stem cuttings in moist beds or paddies at 15-20 cm spacing.\n\nWatering: Keep soil saturated to waterlogged at all times; kangkong tolerates and even prefers standing water.\n\nFertilizing: Apply nitrogen-rich fertilizer at planting and again after each cutting to encourage regrowth.\n\nHarvest: Cut shoots 25-30 days after planting, 15-20 cm from the base. Regrows for multiple harvests every 2-3 weeks.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, CALABARZON",
+      title: "Gabay sa Pagtatanim ng Kangkong",
+      url: "https://ati2.da.gov.ph/ati-4a/content/publications/maridelle-g-jaurigue/gabay-sa-pagtatanim-ng-kangkong",
+      scope: ["crop production", "establishment", "crop management", "harvest"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -237,6 +298,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Climbing vine vegetable valued for its bitter fruit and medicinal properties. Requires trellising and full sun exposure.",
     cultivationGuide:
       "Planting: Sow seeds directly or in seedbeds; transplant at 60-80 cm spacing along a trellis. Provide support as vines develop.\n\nWatering: Water regularly, especially during flowering and fruiting. Avoid waterlogging at the base of the vine.\n\nFertilizing: Apply complete fertilizer (14-14-14) at planting. Side-dress with potassium-rich fertilizer during flowering and fruiting.\n\nHarvest: Pick fruits while still green and firm, 55-65 days after transplanting. Harvest every 2-3 days for continuous production.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, CALABARZON",
+      title: "Gabay sa Pagtatanim ng Ampalaya",
+      url: "https://ati2.da.gov.ph/ati-4a/content/publications/maridelle-g-jaurigue/gabay-sa-pagtatanim-ng-ampalaya",
+      scope: ["crop production", "site and soil", "establishment", "crop management"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -281,6 +349,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Long, slender legume popular in Filipino dishes. A nitrogen-fixing vine that benefits from trellis support and needs less added nitrogen than most vegetables.",
     cultivationGuide:
       "Planting: Direct-seed at 30-40 cm spacing along a trellis or stake. Provide support early as vines climb quickly.\n\nWatering: Water regularly but avoid waterlogging; beans are sensitive to soggy soil.\n\nFertilizing: Apply a light complete fertilizer at planting; avoid excess nitrogen since legumes fix their own. Side-dress with potassium during flowering and pod formation.\n\nHarvest: Pick pods while young and tender, 55-65 days after sowing. Harvest every 2-3 days to keep plants productive.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, MIMAROPA",
+      title: "Gabay sa Produksyon ng Sitaw",
+      url: "https://ati2.da.gov.ph/ati-4b/content/gabay-sa-produksyon-ng-sitaw",
+      scope: ["crop production", "establishment", "crop management", "harvest"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -325,6 +400,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Sprawling vine crop producing large, long-storing fruit. Needs generous spacing and rich, well-drained soil.",
     cultivationGuide:
       "Planting: Sow seeds directly in hills spaced 1-1.5 m apart to allow for vine spread.\n\nWatering: Water deeply once or twice a week; increase frequency during flowering and fruit set.\n\nFertilizing: Apply complete fertilizer (14-14-14) at planting. Side-dress with potassium-rich fertilizer during flowering and fruiting for fruit development.\n\nHarvest: Harvest mature fruits 90-100 days after sowing, when the rind is hard and fully colored. Cure in a dry area for longer storage.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, CALABARZON",
+      title: "Gabay sa Pagtatanim ng Kalabasa",
+      url: "https://ati2.da.gov.ph/ati-4a/content/publications/maridelle-g-jaurigue/gabay-sa-pagtatanim-ng-kalabasa",
+      scope: ["crop production", "site and soil", "establishment", "fertility"],
+    }),
     stages: [
       {
         name: "Germination",
@@ -369,6 +451,13 @@ export const CROP_PRESETS: CropPreset[] = [
       "Heat-tolerant pod vegetable that thrives in hot, humid tropical weather with minimal care and few pest problems.",
     cultivationGuide:
       "Planting: Direct-seed at 30-40 cm spacing in full sun. Soak seeds overnight before sowing to speed germination.\n\nWatering: Water regularly, especially during flowering and pod set. Okra tolerates brief dry spells once established.\n\nFertilizing: Apply complete fertilizer (14-14-14) at planting. Side-dress with potassium-rich fertilizer during flowering.\n\nHarvest: Pick pods young and tender, 2-3 days after flowering, about 50-60 days after sowing. Harvest every 1-2 days to keep pods from becoming fibrous.",
+    provenance: referenceReviewed({
+      organization:
+        "Department of Agriculture - Agricultural Training Institute, MIMAROPA",
+      title: "Gabay sa Pagtatanim ng Okra",
+      url: "https://ati2.da.gov.ph/ati-4b/content/gabay-sa-pagtatanim-ng-okra",
+      scope: ["crop production", "site and soil", "crop management", "harvest"],
+    }),
     stages: [
       {
         name: "Germination",

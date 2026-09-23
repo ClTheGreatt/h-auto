@@ -50,7 +50,16 @@ import { Separator } from "@/components/ui/separator";
 import { cropSchema, type CropFormValues } from "@/lib/validations/crop";
 import { createCrop, updateCrop } from "@/actions/crops";
 import { CROP_PRESETS, type CropPreset } from "@/lib/crops/presets";
+import {
+  getPresetLoadValues,
+  NONE_PRESET_ID,
+  PARAMETER_BASIS,
+  resolvePresetSelection,
+  showsPresetQuickStart,
+  type ThresholdField,
+} from "@/lib/crops/preset-provenance";
 import { StageReferenceGuideFields } from "@/components/crops/stage-reference-guide-fields";
+import { PresetProvenancePanel } from "@/components/crops/preset-provenance-panel";
 
 type CropFormProps = {
   mode: "create" | "edit";
@@ -64,8 +73,6 @@ type CropFormProps = {
   plotsInUseCount?: number;
   stageReferenceImages?: Record<string, string>;
 };
-
-const NONE_PRESET = "__none__";
 
 const emptyStage = {
   name: "",
@@ -102,12 +109,15 @@ export function CropForm({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<CropPreset | null>(null);
   const [imageUrls, setImageUrls] = useState(stageReferenceImages);
   const [mediaPendingStageIds, setMediaPendingStageIds] = useState<Set<string>>(
     () => new Set()
   );
   const hasMediaPending = mediaPendingStageIds.size > 0;
   const needsSaveConfirm = mode === "edit" && plotsInUseCount > 0;
+  const showPresetBasis =
+    selectedPreset?.provenance?.kind === "REFERENCE_REVIEWED";
 
   const form = useForm<CropFormValues>({
     resolver: zodResolver(cropSchema),
@@ -127,7 +137,8 @@ export function CropForm({
   });
 
   function handlePresetSelect(presetId: string) {
-    if (presetId === NONE_PRESET) {
+    if (presetId === NONE_PRESET_ID) {
+      setSelectedPreset(null);
       form.setValue("name", "");
       form.setValue("daysToHarvest", 30);
       form.setValue("description", "");
@@ -137,26 +148,19 @@ export function CropForm({
       return;
     }
 
-    const preset =
-      CROP_PRESETS.find((p) => p.id === presetId) ??
-      customPresets.find((p) => p.id === presetId);
+    const preset = resolvePresetSelection(presetId, CROP_PRESETS, customPresets);
     if (!preset) return;
+    setSelectedPreset(preset);
+
+    const loadedValues = getPresetLoadValues(preset);
 
     // Don't set variety — it varies per seed brand, user's own input.
-    form.setValue("name", preset.name);
-    form.setValue("daysToHarvest", preset.daysToHarvest);
-    form.setValue("description", preset.description);
-    form.setValue("cultivationGuide", preset.cultivationGuide);
+    form.setValue("name", loadedValues.name);
+    form.setValue("daysToHarvest", loadedValues.daysToHarvest);
+    form.setValue("description", loadedValues.description);
+    form.setValue("cultivationGuide", loadedValues.cultivationGuide);
 
-    replace(
-      preset.stages.map((s, i) => ({
-        ...s,
-        expectedAppearance: s.expectedAppearance ?? "",
-        observableSigns: s.observableSigns ?? [],
-        facultyGuidance: s.facultyGuidance ?? "",
-        orderIndex: i,
-      }))
-    );
+    replace(loadedValues.stages);
 
     toast.success(`Loaded ${preset.displayName} preset. Review and edit as needed.`);
   }
@@ -199,22 +203,22 @@ export function CropForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {mode === "create" && (
+        {showsPresetQuickStart(mode) && (
           <Card>
             <CardHeader>
               <CardTitle>Quick start (optional)</CardTitle>
               <CardDescription>
-                Select a common vegetable to auto-fill recommended values. You
-                can still edit any field before saving.
+                Select a common vegetable to auto-fill configurable starting
+                values. You can still edit any field before saving.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <Select onValueChange={handlePresetSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a preset..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE_PRESET} className="italic text-muted-foreground">
+                  <SelectItem value={NONE_PRESET_ID} className="italic text-muted-foreground">
                     — None (manual entry) —
                   </SelectItem>
                   <SelectSeparator />
@@ -241,6 +245,7 @@ export function CropForm({
                   )}
                 </SelectContent>
               </Select>
+              <PresetProvenancePanel preset={selectedPreset} />
             </CardContent>
           </Card>
         )}
@@ -337,7 +342,7 @@ export function CropForm({
             <div>
               <h2 className="text-lg font-semibold text-foreground">Growth stages</h2>
               <p className="text-sm text-muted-foreground">
-                Define each stage and the ideal thresholds for that stage.
+                Define each stage and its configurable monitoring thresholds.
               </p>
             </div>
             <Button
@@ -439,7 +444,11 @@ export function CropForm({
                     }
                   />
                   <Separator />
-                  <StageThresholdFields control={form.control} index={index} />
+                  <StageThresholdFields
+                    control={form.control}
+                    index={index}
+                    showPresetBasis={showPresetBasis}
+                  />
                 </CardContent>
               </Card>
             ))}
@@ -565,60 +574,110 @@ function StageBasicFields({
 function StageThresholdFields({
   control,
   index,
+  showPresetBasis,
 }: {
   control: Control<CropFormValues>;
   index: number;
+  showPresetBasis: boolean;
 }) {
   return (
     <div className="space-y-4">
+      {showPresetBasis ? (
+        <p className="text-xs text-muted-foreground">
+          Initial preset settings — these labels describe the loaded starting
+          profile; all fields remain editable.
+        </p>
+      ) : null}
       <div>
         <h3 className="text-sm font-medium text-foreground mb-2">Environmental thresholds</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <ThresholdPair control={control} index={index} field="SoilMoisture" label="Soil moisture (%)" />
-          <ThresholdPair control={control} index={index} field="Temperature" label="Temperature (°C)" />
-          <ThresholdPair control={control} index={index} field="Humidity" label="Humidity (%)" />
-          <ThresholdPair control={control} index={index} field="LightIntensity" label="Light intensity (lux)" />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="SoilMoisture"
+            label="Soil moisture (%)"
+            showPresetBasis={showPresetBasis}
+          />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="Temperature"
+            label="Temperature (°C)"
+            showPresetBasis={showPresetBasis}
+          />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="Humidity"
+            label="Humidity (%)"
+            showPresetBasis={showPresetBasis}
+          />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="LightIntensity"
+            label="Light intensity (lux)"
+            showPresetBasis={showPresetBasis}
+          />
         </div>
       </div>
 
       <div>
         <h3 className="text-sm font-medium text-foreground mb-2">Soil nutrients (mg/kg)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <ThresholdPair control={control} index={index} field="Nitrogen" label="Nitrogen (N)" />
-          <ThresholdPair control={control} index={index} field="Phosphorus" label="Phosphorus (P)" />
-          <ThresholdPair control={control} index={index} field="Potassium" label="Potassium (K)" />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="Nitrogen"
+            label="Nitrogen (N)"
+            showPresetBasis={showPresetBasis}
+          />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="Phosphorus"
+            label="Phosphorus (P)"
+            showPresetBasis={showPresetBasis}
+          />
+          <ThresholdPair
+            control={control}
+            index={index}
+            field="Potassium"
+            label="Potassium (K)"
+            showPresetBasis={showPresetBasis}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-type ThresholdField =
-  | "SoilMoisture"
-  | "Temperature"
-  | "Humidity"
-  | "LightIntensity"
-  | "Nitrogen"
-  | "Phosphorus"
-  | "Potassium";
-
 function ThresholdPair({
   control,
   index,
   field,
   label,
+  showPresetBasis,
 }: {
   control: Control<CropFormValues>;
   index: number;
   field: ThresholdField;
   label: string;
+  showPresetBasis: boolean;
 }) {
   const minName = `stages.${index}.min${field}` as const;
   const maxName = `stages.${index}.max${field}` as const;
 
   return (
     <div className="border rounded-md p-3 bg-muted">
-      <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        {showPresetBasis ? (
+          <span className="rounded-full border bg-background px-2 py-0.5 text-[11px] font-medium text-foreground">
+            {PARAMETER_BASIS[field].label}
+          </span>
+        ) : null}
+      </div>
       <div className="grid grid-cols-2 gap-2 items-start">
         <FormField
           control={control}
