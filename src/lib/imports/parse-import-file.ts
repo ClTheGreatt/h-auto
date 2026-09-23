@@ -11,7 +11,7 @@ import {
   type ParseExcelOptions,
   type ParseWorkbookSuccess,
 } from "./parse-excel";
-import { inspectOoxmlWorkbookKind } from "./inspect-ooxml";
+import { inspectOoxmlWorkbook } from "./inspect-ooxml";
 import { parseSheetJsImportFile } from "./parse-sheetjs";
 import type { ImportRowType } from "@/lib/validations/import";
 
@@ -49,17 +49,23 @@ export async function parseImportWorkbookFile(
     return parseSheetJsImportFile(arrayBuffer, "xls", importType, options);
   }
 
-  const ooxmlKind = inspectOoxmlWorkbookKind(arrayBuffer);
-  if (typeof ooxmlKind !== "string") return ooxmlKind;
-  if (ooxmlKind !== detected.format) {
+  const inspection = inspectOoxmlWorkbook(arrayBuffer, detected.format);
+  if (!("kind" in inspection)) return inspection;
+  if (inspection.kind !== detected.format) {
     return contentMismatchFailure(`.${detected.format}`);
   }
-  if (ooxmlKind === "xlsm") {
+  if (inspection.kind === "xlsm") {
     return parseSheetJsImportFile(arrayBuffer, "xlsm", importType, options);
   }
 
   const result = await parseExcelImportFile(arrayBuffer, importType, options);
   if ("error" in result) {
+    if (
+      inspection.classification === "COMPATIBLE_XLSX" &&
+      result.failureStage === "WORKBOOK_PARSE"
+    ) {
+      return parseSheetJsImportFile(arrayBuffer, "xlsx", importType, options);
+    }
     return importFileFailure(
       result.errorCode ?? codeForExistingParserError(result.error),
       result.error

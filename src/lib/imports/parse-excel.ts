@@ -43,6 +43,7 @@ export type ParseExcelSuccess = ParseWorkbookSuccess & { fileType: "xlsx" };
 export type ParseExcelFailure = {
   error: string;
   errorCode?: ImportFileErrorCode;
+  failureStage?: "WORKBOOK_PARSE";
 };
 export type ParseExcelResult = ParseExcelSuccess | ParseExcelFailure;
 export type ParseExcelResponse = Omit<ParseWorkbookSuccess, "rows">;
@@ -230,6 +231,7 @@ export async function parseExcelImportFile(
   if (buffer.byteLength > MAX_IMPORT_FILE_BYTES) {
     return { error: "File is too large. Maximum upload size is 4 MB." };
   }
+  let workbookLoaded = false;
   try {
     const workbook = new ExcelJS.Workbook();
     // Route uploads arrive as Web ArrayBuffers. Normalize to the Node Buffer
@@ -237,6 +239,7 @@ export async function parseExcelImportFile(
     // This avoids relying on producer/runtime-specific ArrayBuffer handling.
     const workbookBuffer = Buffer.from(buffer);
     await workbook.xlsx.load(workbookBuffer as never);
+    workbookLoaded = true;
 
     const visibleSheets = workbook.worksheets.filter(
       (sheet) => sheet.state === "visible"
@@ -366,8 +369,13 @@ export async function parseExcelImportFile(
     }
 
     return ambiguousResult(candidates, null);
-  } catch (err) {
-    console.error("Failed to parse Excel import workbook.", err);
-    return { error: EXCEL_PARSE_ERROR_MESSAGE };
+  } catch {
+    return workbookLoaded
+      ? { error: EXCEL_PARSE_ERROR_MESSAGE, errorCode: "PARSE_ERROR" }
+      : {
+          error: EXCEL_PARSE_ERROR_MESSAGE,
+          errorCode: "CORRUPT_OR_UNREADABLE",
+          failureStage: "WORKBOOK_PARSE",
+        };
   }
 }

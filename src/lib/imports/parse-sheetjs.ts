@@ -244,7 +244,7 @@ function isVisibleSheet(
 
 export async function parseSheetJsImportFile(
   arrayBuffer: ArrayBuffer,
-  format: "xls" | "xlsm",
+  format: "xls" | "xlsx" | "xlsm",
   importType: ImportRowType,
   options: ParseExcelOptions = {}
 ): Promise<ParseSheetJsResult> {
